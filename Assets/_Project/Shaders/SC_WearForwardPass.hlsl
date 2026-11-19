@@ -257,6 +257,26 @@ Varyings LitPassVertex(Attributes input)
     return output;
 }
 
+#if defined(_SC_RUINSKIN)
+// T23 ruin skin. Per material, through properties the URP Lit cbuffer already carries (no new cbuffer entries, so the SRP batcher keeps working):
+//   _DetailAlbedoMapScale = strength of the colour variation (0..1, default 1), _DetailNormalMapScale = strength of the second-scale normal (0..1.5),
+//   _SpecColor (set with SetVector, linear, the metallic workflow never reads it) = (stone width in m, moss amount 0..1, foot band height in m (0 = off), foot darkness 0..1).
+// All of it is world-space or second-scale, so the 2 m texture repeat stops being the pattern the eye finds.
+float SCHash(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float SCNoise(float2 p)
+{
+    float2 i = floor(p), f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(SCHash(i), SCHash(i + float2(1, 0)), f.x), lerp(SCHash(i + float2(0, 1)), SCHash(i + float2(1, 1)), f.x), f.y);
+}
+#endif
+
 // Used in Standard (Physically Based) shader
 void LitPassFragment(
     Varyings input
@@ -287,6 +307,67 @@ void LitPassFragment(
     // carries ochre, oxblood or blue-green. _SpecColor (unused in the metallic workflow, but in the SRP-batcher cbuffer) holds paint / 0.17, set linear and raw.
     half3 paintTex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb;
     surfaceData.albedo = dot(paintTex, half3(0.2126h, 0.7152h, 0.0722h)) * _SpecColor.rgb;
+#endif
+
+#if defined(_SC_RUINSKIN)
+    {
+        const half3 lumW = half3(0.2126h, 0.7152h, 0.0722h);
+        float3 nW = normalize(input.normalWS);
+        float3 pW = input.positionWS;
+        float upF = saturate(nW.y);
+        bool isFlat = abs(nW.y) > 0.7;
+        float2 pl = isFlat ? pW.xz : float2(abs(nW.z) > abs(nW.x) ? pW.x : pW.z, pW.y);   // the surface's own plane in metres
+        float stoneW = max(0.05, _SpecColor.x), mossAmt = _SpecColor.y, footH = _SpecColor.z, footDark = _SpecColor.w;
+        half amt = _DetailAlbedoMapScale;
+
+        // per-stone value and hue: courses half a stone high, a random bond offset per course
+        float row = floor(pl.y / (stoneW * 0.5));
+        float col = floor(pl.x / stoneW + SCHash(float2(row, 7.1)) * 5.0);
+        float stoneA = SCHash(float2(col, row)), stoneB = SCHash(float2(col + 31.7, row + 11.3));
+        float macro = (SCNoise(pl * (1.0 / 4.5)) - 0.5) * 0.30 + (SCNoise(pl * (1.0 / 1.3)) - 0.5) * 0.16;
+        half3 tone = half3(1.0 + (stoneB - 0.5) * 0.20, 1.0, 1.0 - (stoneB - 0.5) * 0.24);
+        surfaceData.albedo *= tone * (1.0h + (half)((stoneA - 0.5) * 0.30 + macro) * amt);
+
+        // a second, blotch-only layer of the same scan (a high mip: no joints, so no ghost joint lines at another angle) and a grain normal from noise, not from the block texture
+        float2 uv2 = float2(input.uv.x * 0.91 - input.uv.y * 0.41, input.uv.x * 0.41 + input.uv.y * 0.91) * 0.37 + float2(0.31, 0.17);
+        half meanL = max(0.03h, dot(SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_BaseMap, uv2, 11.0).rgb, lumW));
+        half blotch = dot(SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_BaseMap, uv2, 4.5).rgb, lumW);
+        surfaceData.albedo *= lerp(1.0h, clamp(blotch / meanL, 0.7h, 1.35h), 0.7h * amt);
+    #if defined(_NORMALMAP)
+        {
+            float2 gp = pl * 17.0; const float e = 0.35;
+            float g0 = SCNoise(gp) + 0.5 * SCNoise(gp * 2.3 + 5.0);
+            float gx = SCNoise(gp + float2(e, 0)) + 0.5 * SCNoise((gp + float2(e, 0)) * 2.3 + 5.0);
+            float gy = SCNoise(gp + float2(0, e)) + 0.5 * SCNoise((gp + float2(0, e)) * 2.3 + 5.0);
+            half2 gr = (half2)(float2(gx - g0, gy - g0) / e) * 0.22h * _DetailNormalMapScale;
+            // pl.x runs along the surface's tangent only for walls facing +-z/x and ground: good enough for a grain that has no direction
+            surfaceData.normalTS = normalize(half3(surfaceData.normalTS.xy - gr, surfaceData.normalTS.z));
+        }
+    #endif
+
+        // mortar depth and chipped edges from the scan's height: joints go dark, the tops of the stones lift
+        half h = 0.5h;
+    #if defined(_PARALLAXMAP)
+        h = SAMPLE_TEXTURE2D(_ParallaxMap, sampler_ParallaxMap, input.uv).g;
+        surfaceData.albedo *= lerp(0.50h, 1.0h, smoothstep(0.03h, 0.30h, h));
+        surfaceData.albedo *= 1.0h + smoothstep(0.78h, 0.97h, h) * (0.10h + 0.22h * (half)SCNoise(pl * 9.0));
+    #endif
+        half cav = smoothstep(0.03h, 0.30h, h);
+        half lum1 = saturate(dot(surfaceData.albedo, lumW) * 3.0h);
+
+        // moss: world-up faces first (ledges, wall tops), pulled into the low joints by the height, broken by noise; more in the joints at the foot
+        float aboveGround = footH > 0.0 ? pW.y - unity_ObjectToWorld._m13 : 99.0;
+        half foot = footH > 0.0 ? 1.0h - smoothstep(0.0h, (half)footH, (half)aboveGround) : 0.0h;
+        float field = upF * 1.5 + (h - 0.5) * 0.9 + (SCNoise(pl * 3.1) - 0.5) * 0.8 - 0.55 + foot * (1.0 - cav) * 0.9;
+        half moss2 = smoothstep(0.55h, 0.95h, (half)field) * mossAmt;
+        half3 mossC = half3(0.060h, 0.095h, 0.026h) * (0.55h + 0.9h * lum1) * (0.75h + 0.5h * (half)SCNoise(pl * 6.0));
+        surfaceData.albedo = lerp(surfaceData.albedo, mossC, moss2 * 0.88h);
+        surfaceData.smoothness = saturate(surfaceData.smoothness - moss2 * 0.25h);
+
+        // foot band: damp and dirty from the ground up, fading over footH
+        surfaceData.albedo *= 1.0h - foot * footDark * 0.55h;
+        surfaceData.smoothness = saturate(surfaceData.smoothness + foot * footDark * 0.06h);
+    }
 #endif
 
     // SC_WEAR: vertex-colour masks. Unity gives meshes with no colour (1,1,1,1), which must mean "no wear".

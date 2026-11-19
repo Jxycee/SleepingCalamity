@@ -737,12 +737,25 @@ namespace SleepingCalamity.EditorTools
                 m.EnableKeyword("_SC_WEARGB");
                 if (slot == "FK_ChimneyStone")   // 30% light and 70% dark stones on the stack read as a checker in the morning sun: halve the tint's difference from the sandstone
                     m.SetColor("_BaseColor", Color.Lerp(src.GetColor("_BaseColor"), Color.white, 0.5f));
+                T23Walls.Skin(m, ShellLook(slot));   // T23: scanned wall sets, per-stone variation, height-blended moss, foot band (SC_SHELL_RESKIN_OFF=1 keeps the old look)
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
                 EditorUtility.SetDirty(m);
                 map[slot] = m;
             }
             AssetDatabase.SaveAssets();
             return map;
+        }
+
+        static T23Walls.Look ShellLook(string slot)
+        {
+            switch (slot)
+            {
+                case "FK_Sandstone": return new T23Walls.Look { Set = "ashlar", Tile = 0.6f, Bump = 1.2f, StoneW = 0.62f, Moss = 0.75f, Foot = 1.0f, FootDark = 0.9f, Variation = 1f, DetailN = 0.7f, Parallax = 0.03f };
+                case "FK_ChimneyStone": return new T23Walls.Look { Set = "ashlar", Tile = 0.75f, Bump = 1.2f, StoneW = 0.5f, Moss = 0.6f, Foot = 0.9f, FootDark = 0.8f, Variation = 1f, DetailN = 0.7f, Parallax = 0.03f };
+                case "FK_PlinthJoint": return new T23Walls.Look { Set = "rubble", Tile = 0.5f, Bump = 1.3f, StoneW = 0.4f, Moss = 0.8f, Foot = 1.2f, FootDark = 1.0f, Variation = 1f, DetailN = 0.7f, Parallax = 0.03f };
+                case "FK_Oak": return new T23Walls.Look { Set = null, StoneW = 0.3f, Moss = 0.35f, Foot = 0.8f, FootDark = 0.8f, Variation = 0.7f, DetailN = 0f };
+                default: return new T23Walls.Look { Set = null, StoneW = 1.5f, Moss = 0.45f, Foot = 1.0f, FootDark = 0.9f, Variation = 0.8f, DetailN = 0f };   // FK_Plaster
+            }
         }
 
         // The ruin folders hold byte-identical copies of the B9 atlas (different GUIDs): build the one shared material from a fixed folder, so it does not

@@ -79,6 +79,12 @@ namespace SleepingCalamity.EditorTools
         static string PiecePath(string name) => Folder + "/" + name + "/" + name + ".fbx";
         static bool Exists(string name) => AssetDatabase.IsValidFolder(Folder) && AssetImporter.GetAtPath(PiecePath(name)) != null;
 
+        static T23Walls.Look WallLook(string slot, float bump)
+        {
+            string set = slot == "TW_Coping" || slot == "TW_Patch" ? "ashlar" : "rubble";
+            return new T23Walls.Look { Set = set, Tile = set == "ashlar" ? 0.6f : 0.5f, Bump = Mathf.Max(bump, 1.0f), StoneW = set == "ashlar" ? 0.6f : 0.4f, Moss = slot == "TW_Coping" ? 1.0f : 0.7f, Foot = 0f, FootDark = 0f, Variation = 1f, DetailN = 0.7f, Parallax = 0.025f };
+        }
+
         internal static Dictionary<string, Material> BuildMaterials()   // also the Q15 road props (HollowmereRoad)
         {
             Dictionary<string, Material> map = BeautyCornerArt.BuildFacadeMaterials();
@@ -97,6 +103,7 @@ namespace SleepingCalamity.EditorTools
                 m.SetColor("_BaseColor", c);
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
                 m.SetFloat("_BumpScale", s.Bump);
+                if (s.Source == "sandstone") T23Walls.Skin(m, WallLook(s.Slot, s.Bump));   // T23: scanned wall sets and the ruin skin
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }

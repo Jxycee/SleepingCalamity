@@ -50,7 +50,7 @@ namespace SleepingCalamity.EditorTools
             new Layer { Name = "MidHills", R0 = 1150f, Rc = 1700f, R1 = 2300f, W = 320f, Amp = 190f, Lam = 900f, Meander = 220f, Tile = 700f, TreeH = 20f, TreeCell = 20f, Segs = 1080, Rings = 80, Seed = 11f,
                 HazeNear = 0.52f, HazeFar = 0.74f, D0 = 1200f, D1 = 2300f, Mist = 0.10f, Cool = 1.1f, CoolAmt = 0.6f, Patch = 0.25f, HazeTint = new Color(0.94f, 0.99f, 1.05f), Lift = new Vector3(0.95f, 1.04f, 1.18f) },
             new Layer { Name = "FarRange", R0 = 2050f, Rc = 2550f, R1 = 2990f, W = 300f, Amp = 240f, Lam = 1700f, Meander = 160f, Tile = 1400f, TreeH = 0f, TreeCell = 0f, Segs = 1080, Rings = 60, Seed = 23f,
-                HazeNear = 0.74f, HazeFar = 0.88f, D0 = 1800f, D1 = 2990f, Mist = 0.05f, Cool = 1.05f, CoolAmt = 0.7f, Patch = 0.2f, HazeTint = new Color(0.91f, 0.98f, 1.08f), Lift = new Vector3(0.95f, 1.05f, 1.2f) },
+                HazeNear = 0.34f, HazeFar = 0.50f, D0 = 1800f, D1 = 2990f, Mist = 0.05f, Cool = 1.05f, CoolAmt = 0.7f, Patch = 0.2f, HazeTint = new Color(0.91f, 0.98f, 1.08f), Lift = new Vector3(0.95f, 1.05f, 1.2f) },
         };
 
         // ------------------------------------------------------------------------------------------------ the height model
@@ -167,14 +167,15 @@ namespace SleepingCalamity.EditorTools
                 float rock = (1f - Smooth(0.60f, 0.80f, nY)) * Smooth(0.35f, 0.7f, sm.Rel) * (li == 2 ? 1f : 0.5f);
                 float mk = sm.Massif / 360f;
                 rock = Mathf.Max(rock, Smooth(0.10f, 0.45f, mk));
-                Color rockCol = Color.Lerp(new Color(0.22f, 0.20f, 0.17f), new Color(0.33f, 0.30f, 0.26f), PN(x / 40f, z / 40f));   // scree lighter than the face
+                Color rockCol = Color.Lerp(new Color(0.10f, 0.09f, 0.08f), new Color(0.19f, 0.17f, 0.15f), PN(x / 40f, z / 40f)) * (0.55f + 0.9f * (0.6f * PN(x / 17f + 3f, z / 17f) + 0.4f * PN(x / 61f, z / 61f + 8f)));   // scree lighter than the face
                 col = Color.Lerp(col, rockCol, rock);
-                col = Color.Lerp(col, new Color(0.30f, 0.28f, 0.26f), Smooth(0.78f, 0.97f, mk));   // pale ash on the summit
+                col = Color.Lerp(col, new Color(0.17f, 0.155f, 0.14f), Smooth(0.78f, 0.97f, mk) * 0.8f);   // T23: dark ash, not a pale cap
             }
             float water = HollowmereBackdropTuning.Saltwake ? WaterMask(x, z) : 0f;
-            if (water > 0f) col = Color.Lerp(col, new Color(0.44f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.56f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.60f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 1f), water);
+            if (water > 0f) col = Color.Lerp(col, new Color(0.30f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.43f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.55f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 1f), water);
             float ao = Mathf.Lerp(0.60f, 1f, Smooth(0.10f, 0.65f, sm.Rel)); ao = Mathf.Lerp(ao, 1f, water);   // valley floors darker than the crests
             col *= ao;
+            col *= 1f - 0.4f * 4f * water * (1f - water);   // T23: darker shore line, so the estuary reads as water against the land
             col.r *= L.Lift.x; col.g *= L.Lift.y; col.b *= L.Lift.z;
             col.a = 1f;
             return col;
@@ -202,7 +203,7 @@ namespace SleepingCalamity.EditorTools
                 for (int i = 0; i < Layers.Length; i++)
                 {
                     Layer L = Layers[i];
-                    Material m = Mat("M_BD_" + L.Name, Color.white, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt, patch: L.Patch, hazeTint: L.HazeTint, tex: i < 2 ? canopy : null, canopy: i < 2 ? 1f : 0f);
+                    Material m = Mat("M_BD_" + L.Name, Color.white, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt, patch: L.Patch, hazeTint: L.HazeTint, tex: i < 2 ? canopy : null, canopy: i < 2 ? 1f : 0f, hazeTop: i == 2 ? 0.5f : 0f, hazeTopHeight: i == 2 ? 330f : 0f);
                     tris += BuildTerrain(root, i, m);
                     if (HollowmereBackdropTuning.Trees && L.TreeH > 0f)
                     {

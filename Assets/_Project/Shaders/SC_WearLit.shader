@@ -140,6 +140,8 @@ Shader "SleepingCalamity/WearLit"
             #pragma shader_feature_local_fragment _SC_PAINT
             // SC wear-strong mode (ruin shells only): stronger char, soot and moss constants, see SC_WearForwardPass.hlsl.
             #pragma shader_feature_local_fragment _SC_WEARGB
+            // T23 ruin skin (walls and cobbles): per-stone and macro variation, a second-scale detail layer, height-blended moss, a foot band. Off = unchanged. See SC_WearForwardPass.hlsl.
+            #pragma shader_feature_local_fragment _SC_RUINSKIN
 
             // -------------------------------------
             // Universal Pipeline keywords

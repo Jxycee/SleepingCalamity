@@ -480,6 +480,12 @@ namespace SleepingCalamity.EditorTools
             l.type = LightType.Point; l.color = new Color(1f, 0.72f, 0.42f); l.intensity = LanternIntensity; l.range = LanternRange; l.shadows = LightShadows.None;
         }
 
+        static T23Walls.Look LaneLook(string slot, float bump)
+        {
+            string set = slot == "LK_Dressed" || slot == "LK_StepRiser" ? "ashlar" : "rubble";
+            return new T23Walls.Look { Set = set, Tile = set == "ashlar" ? 0.6f : 0.5f, Bump = Mathf.Max(bump, 1.0f), StoneW = set == "ashlar" ? 0.6f : 0.4f, Moss = slot == "LK_Mortar" ? 0.2f : 0.75f, Foot = 0f, FootDark = 0f, Variation = 1f, DetailN = 0.7f, Parallax = 0.025f };
+        }
+
         static Dictionary<string, Material> BuildMaterials()
         {
             var map = new Dictionary<string, Material>();
@@ -495,6 +501,7 @@ namespace SleepingCalamity.EditorTools
                 m.SetColor("_BaseColor", new Color(Mathf.LinearToGammaSpace(s.Tint.r), Mathf.LinearToGammaSpace(s.Tint.g), Mathf.LinearToGammaSpace(s.Tint.b), 1f));
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
                 m.SetFloat("_BumpScale", s.Bump);
+                if (s.Source == "sandstone") T23Walls.Skin(m, LaneLook(s.Slot, s.Bump));   // T23: scanned wall sets and the ruin skin
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }

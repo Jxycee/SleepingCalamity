@@ -39,10 +39,10 @@ Material:
     - _FillBoost: 1
     - _GroundMist: 0.05
     - _HazeCoolAmt: 0.7
-    - _HazeFar: 0.88
-    - _HazeNear: 0.74
-    - _HazeTop: 0
-    - _HazeTopHeight: 0
+    - _HazeFar: 0.5
+    - _HazeNear: 0.34
+    - _HazeTop: 0.5
+    - _HazeTopHeight: 330
     - _KeyBias: 0.15
     - _KeyBoost: 1
     - _KeyWrap: 0.7

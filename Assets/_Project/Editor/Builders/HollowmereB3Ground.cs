@@ -46,6 +46,7 @@ namespace SleepingCalamity.EditorTools
             Color neutral = new Color(1.0f, 0.97f, 0.92f, 1f);
             m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);
             m.enableInstancing = true;
+            T23Walls.Skin(m, new T23Walls.Look { Set = null, StoneW = 0.2f, Moss = 0f, Foot = 0f, FootDark = 0f, Variation = 0.8f, DetailN = 0.6f });   // T23 item 5: world-space macro tone, per-sett shift and a second-scale grain, so the 2 m repeat is not the pattern
             MaterialValidation.Validate(m);
             EditorUtility.SetDirty(m);
             return m;
