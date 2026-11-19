@@ -26,6 +26,7 @@ namespace SleepingCalamity.Presentation
             public float Wingspan = 0.5f;
             public float Hover;         // Wander: metres of slow vertical bob (butterfly flutter)
             public float Jitter;        // Wander: metres of fast hover jitter (bees)
+            public float HideWithin = 3f; // a card closer than this to the camera is hidden (a flat card as a huge wing); photo-textured wing meshes use 0.5
             public float Tilt;          // degrees the card pitches up from its heading (butterflies and bees tilt so their wings show to a camera at eye height)
             public float AloftRadius = 34f, AloftHeight = 30f;   // Perch: the wheel after a lift
             public int Seed;
@@ -173,7 +174,7 @@ namespace SleepingCalamity.Presentation
                     }
                     c.position = p;
                     // a card within 3 m of the camera would read as a huge wing: hide it there
-                    bool near = cam != null && (cam.transform.position - p).sqrMagnitude < 9f;
+                    bool near = cam != null && (cam.transform.position - p).sqrMagnitude < f.HideWithin * f.HideWithin;
                     // T11: no capture-camera list any more (the T07c BakedAvoid hack is gone): SC_BirdCard fades a card with the distance to whatever camera renders it, for every viewer
                     float s = near ? 0f : scale;
                     c.localScale = new Vector3(s, s, s);

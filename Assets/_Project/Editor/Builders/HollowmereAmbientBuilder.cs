@@ -37,7 +37,7 @@ namespace SleepingCalamity.EditorTools
             var life = new GameObject(RootName).transform; life.SetParent(root, false);
             BuilderUtil.EnsureFolder(TexFolder);
             Transform ruined = root.Find(HollowmereBuilder.RuinedRoot), rebuilt = root.Find(HollowmereBuilder.RebuiltRoot);
-            if (HollowmereAmbientLife.Birds || HollowmereAmbientLife.Butterflies || HollowmereAmbientLife.Bees) { _card = EnsureCardMesh(); EnsureCardMaterials(); }
+            if (HollowmereAmbientLife.Birds || HollowmereAmbientLife.Butterflies || HollowmereAmbientLife.Bees) { _card = EnsureCardMesh(); EnsureCardMaterials(); EnsureWings(); }
 
             var common = new List<AmbientCreatures.Flock>();
             if (HollowmereAmbientLife.Birds) BuildBirds(life, ruined, common, t);
@@ -48,6 +48,30 @@ namespace SleepingCalamity.EditorTools
             if (HollowmereAmbientLife.ReedSway) BuildReedSway(life, root);
             BuildWindWaves(root);
             if (HollowmereAmbientLife.ChimneySmoke) BuildSmoke(ruined, rebuilt, t);
+            if (HollowmereAmbientLife.ClothSway) BuildClothSway(life, root);
+            if (HollowmereAmbientLife.Animals) HollowmereAnimals.Build(ruined, t);
+        }
+
+        // T24: washing-line cloths (WashingLine.fbx parts named Cloth_*, hung -Y from the rope) sway in the wind via AmbientClothSway (transform pitch about the rope axis; no shader change).
+        static void BuildClothSway(Transform life, Transform root)
+        {
+            // one AmbientClothSway per washing line (on the line's own root, referencing only its own children), so the line moves into its art scene whole and HollowmereCombine skips the cloths
+            var byLine = new Dictionary<Transform, List<Transform>>(); var order = new List<Transform>();
+            foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (!tr.name.StartsWith("Cloth_", System.StringComparison.Ordinal) || tr.GetComponent<MeshRenderer>() == null || tr.IsChildOf(life) || tr.parent == null) continue;
+                if (!byLine.TryGetValue(tr.parent, out var l)) { byLine[tr.parent] = l = new List<Transform>(); order.Add(tr.parent); }
+                l.Add(tr);
+            }
+            int n = 0;
+            foreach (Transform line in order)
+            {
+                var sway = line.gameObject.AddComponent<AmbientClothSway>();
+                sway.Cloths = byLine[line].ToArray();
+                sway.Rest = sway.Cloths.Select(c => c.localRotation).ToArray();
+                n += sway.Cloths.Length;
+            }
+            Debug.Log("SC HOLLOWMERE ambient: " + n + " washing-line cloths on " + order.Count + " lines sway");
         }
 
         // ---------------------------------------------------------------------------------------------------------------- birds
@@ -179,8 +203,9 @@ namespace SleepingCalamity.EditorTools
                 bool meadow = s.Name.StartsWith("Meadow"), pathSpot = s.Name.StartsWith("Path_");
                 if (HollowmereAmbientLife.Butterflies)
                 {
-                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Hover = HollowmereAmbientLife.ButterflyHover, Seed = seed++ };
-                    f.Cards = Cards(life, f.Name, (seed % 3) == 0 ? _butterflyOrange : (seed % 3) == 1 ? _butterfly : _butterflyYellow, pathSpot ? HollowmereAmbientLife.PathButterflies : meadow ? HollowmereAmbientLife.ButterfliesPerFlock + 2 : HollowmereAmbientLife.ButterfliesPerFlock);
+                    int sp = seed % Wings.Length;   // T24: peacock, small tortoiseshell, cabbage white, brimstone: a real pinned-specimen photo per flock
+                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Hover = HollowmereAmbientLife.ButterflyHover, HideWithin = 0.5f, Seed = seed++ };
+                    f.Cards = Cards(life, f.Name, _wingMat[sp], pathSpot ? HollowmereAmbientLife.PathButterflies : meadow ? HollowmereAmbientLife.ButterfliesPerFlock + 2 : HollowmereAmbientLife.ButterfliesPerFlock, _wingMesh[sp]);
                     common.Add(f);
                 }
                 if (HollowmereAmbientLife.Bees && !pathSpot)
@@ -216,14 +241,14 @@ namespace SleepingCalamity.EditorTools
             return picked;
         }
 
-        static Transform[] Cards(Transform parent, string name, Material mat, int count)
+        static Transform[] Cards(Transform parent, string name, Material mat, int count, Mesh mesh = null)
         {
             var holder = new GameObject("Flock_" + name).transform; holder.SetParent(parent, false);
             var cards = new Transform[count];
             for (int i = 0; i < count; i++)
             {
                 var go = new GameObject("Card" + i); go.transform.SetParent(holder, false);
-                go.AddComponent<MeshFilter>().sharedMesh = _card;
+                go.AddComponent<MeshFilter>().sharedMesh = mesh != null ? mesh : _card;
                 var r = go.AddComponent<MeshRenderer>();
                 r.sharedMaterial = mat; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
                 r.lightProbeUsage = LightProbeUsage.Off; r.reflectionProbeUsage = ReflectionProbeUsage.Off;
@@ -274,6 +299,38 @@ namespace SleepingCalamity.EditorTools
             m.enableInstancing = false;
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+
+        // ---------------------------------------------------------------------------------------------------------------- T24 photo-textured butterflies
+        // Four pinned-specimen photos (Wikimedia Commons, Museum of Toulouse "MHNT", CC BY-SA 4.0; see Content/Art/Town/AmbientLife/Wings/SOURCES.md), cut out with alpha, on a grid mesh with SC_WingCard.
+        static readonly string[] Wings = { "peacock", "tortoise", "cabbage", "brimstone" };
+        const string WingFolder = "Assets/_Project/Content/Art/Town/AmbientLife/Wings";
+        static readonly Mesh[] _wingMesh = new Mesh[4];
+        static readonly Material[] _wingMat = new Material[4];
+
+        static void EnsureWings()
+        {
+            Shader sh = Shader.Find("SleepingCalamity/WingCard") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/WingCard");
+            for (int i = 0; i < Wings.Length; i++)
+            {
+                string tp = WingFolder + "/T_Wing_" + Wings[i] + ".png";
+                BeautyCornerArt.ImportTexture(tp, true, false, true, 1024);
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(tp) ?? throw new System.IO.FileNotFoundException(tp);
+                float aspect = tex.height / (float)tex.width;
+                string mp = TexFolder + "/Wing_" + Wings[i] + ".asset";
+                Mesh fresh = AmbientWingMesh.Build("Wing_" + Wings[i], aspect, 12, 4);
+                var m = AssetDatabase.LoadAssetAtPath<Mesh>(mp);
+                if (m == null) { AssetDatabase.CreateAsset(fresh, mp); m = fresh; }
+                else { m.Clear(); m.vertices = fresh.vertices; m.uv = fresh.uv; m.triangles = fresh.triangles; m.RecalculateBounds(); m.RecalculateNormals(); EditorUtility.SetDirty(m); Object.DestroyImmediate(fresh); }
+                _wingMesh[i] = m;
+                Material mat = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_Wing_" + Wings[i] + ".mat", sh);
+                mat.SetTexture("_MainTex", tex); mat.SetColor("_Tint", Color.white); mat.SetFloat("_Cutoff", 0.5f); mat.SetFloat("_Translucency", Wings[i] == "cabbage" || Wings[i] == "brimstone" ? 1.1f : 0.8f);
+                mat.SetFloat("_FlapSpeed", 22f); mat.SetFloat("_FlapAmp", 0.55f); mat.SetFloat("_Fold", 0f); mat.SetFloat("_Dihedral", 0.18f); mat.SetFloat("_FadeNear", 0.3f); mat.SetFloat("_FadeFar", 0.8f);
+                mat.enableInstancing = false;
+                EditorUtility.SetDirty(mat);
+                _wingMat[i] = mat;
+            }
         }
 
         // ---------------------------------------------------------------------------------------------------------------- fish rings
@@ -391,6 +448,25 @@ namespace SleepingCalamity.EditorTools
                 if (preset == null) continue;
                 Transform home = preset.Find("Landmarks/HeroesHome_Cistern");
                 if (home != null && ChimneyTop(home, 0, true, out Vector3 top)) Plume(Holder(preset), "Smoke_HeroesHome", top, mat, 401);
+            }
+            // T24: the four living (the heroes) keep four fires in the Ruined preset: the home's cistern (above), its annex and the two lots nearest the home. (The docs name no four family-house lots yet; T25 may re-pick.)
+            if (ruined != null)
+            {
+                Transform annex = ruined.Find("Landmarks/HeroesHome_Annex");
+                if (annex != null && ChimneyTop(annex, 7, false, out Vector3 at)) Plume(Holder(ruined), "Smoke_HeroesAnnex", at, mat, 402);
+                Transform rf = ruined.Find("Foundations");
+                if (rf != null)
+                {
+                    var home = new Vector2(12.5f, 11.25f);
+                    int s2 = 403;
+                    foreach (Foundation f in t.Foundations.Where(x => x.Id != "F03" && x.Id != "F05" && x.Id != "F06").OrderBy(x => (new Vector2(x.Centre.X, x.Centre.Z) - home).sqrMagnitude).Take(2))
+                    {
+                        Transform lot = null;
+                        foreach (Transform c in rf) if (c.name.StartsWith(f.Id + "_", System.StringComparison.Ordinal)) { lot = c; break; }
+                        if (lot != null && ChimneyTop(lot, s2, false, out Vector3 lt)) Plume(Holder(ruined), "Smoke_Hero_" + f.Id, lt, mat, s2);
+                        s2++;
+                    }
+                }
             }
             if (rebuilt == null) return;
             Transform foundations = rebuilt.Find("Foundations");

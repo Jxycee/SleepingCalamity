@@ -52,6 +52,7 @@ namespace SleepingCalamity.EditorTools
                         if (mr == null || mf.sharedMesh == null || go.transform.childCount != 0) { Count(reasons, "noMrOrChildren"); continue; }
                         if (go.GetComponents<Component>().Length != 3) { Count(reasons, "otherComponent"); continue; }
                         if (go.GetComponentInParent<LODGroup>() != null) { Count(reasons, "lodGroup"); continue; }
+                        if (go.GetComponentInParent<SleepingCalamity.Presentation.AmbientClothSway>() != null) { Count(reasons, "swaying"); continue; }   // T24: washing-line cloths are moved by AmbientClothSway
                         Mesh m = mf.sharedMesh; if (HollowmereLods.Tris(m) > MaxTris || m.vertexCount > MaxVerts) { Count(reasons, "tooBig"); continue; }
                         Vector3 sz = mr.bounds.size; if (Mathf.Max(sz.x, Mathf.Max(sz.y, sz.z)) > MaxExtent) { Count(reasons, "tooWide"); continue; }
                         if (mr.sharedMaterials.Any(x => x == null || x.renderQueue > 2450)) { Count(reasons, "transparentOrNullMat"); continue; }

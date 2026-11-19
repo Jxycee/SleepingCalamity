@@ -15,6 +15,8 @@ namespace SleepingCalamity.Presentation
         public static bool FishRings = true;      // slow rings on the lake
         public static bool ReedSway = true;       // the lake and pool reeds lean with the gusts
         public static bool WindWaves = true;      // drifting cloud shadows plus gust bands crossing the grass and fields (a sun light cookie scrolled with the wind)
+        public static bool Animals = true;        // T24: feral goats and Tuppence the cat (Ruined preset only)
+        public static bool ClothSway = true;      // T24: washing-line cloths swing in the wind
         public static bool ChimneySmoke = true;   // heroes' home in both presets, every rebuilt house in Rebuilt only
 
         // ---- wind (shared by reeds, smoke and the cookie)
