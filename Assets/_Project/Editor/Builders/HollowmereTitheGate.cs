@@ -68,7 +68,7 @@ namespace SleepingCalamity.EditorTools
             GameObject closeGo = null;
             try
             {
-                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+                HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
                 Camera gateCam = null;
                 foreach (Camera c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None)) if (c.name == "Cap_HM_TitheGate") gateCam = c;
                 if (gateCam == null) throw new System.InvalidOperationException("Cap_HM_TitheGate not found");

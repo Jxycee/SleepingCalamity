@@ -26,6 +26,8 @@ namespace SleepingCalamity.EditorTools
     public static partial class HollowmereBuilder
     {
         public const string ScenePath = "Assets/_Project/Scenes/Hollowmere.unity";
+        // Only HollowmereScoped sets this (from SC_SCOPED_SCENES): the scene files to write, null = all. BuildAll and every other caller always write everything.
+        internal static ISet<string> ScopedScenes;
         const string MaterialsFolder = "Assets/_Project/Content/Materials/Hollowmere";
         public enum Preset { Ruined, Rebuilt }
         public const string RuinedRoot = "Preset_Ruined", RebuiltRoot = "Preset_Rebuilt";
@@ -183,9 +185,14 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- scene
+        static System.Diagnostics.Stopwatch lapWatch;
+        static void Lap(string label) { if (lapWatch == null) lapWatch = System.Diagnostics.Stopwatch.StartNew(); Debug.Log("SC HOLLOWMERE LAP " + label + " " + lapWatch.Elapsed.TotalSeconds.ToString("F1") + "s"); lapWatch.Restart(); }
+
         static void BuildScene(TownLayout t)
         {
+            lapWatch = System.Diagnostics.Stopwatch.StartNew();
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            HollowmereSplit.TitleScene(scene);   // T24b: the additive art scenes need a titled main scene
             var root = new GameObject("Hollowmere").transform;
             HollowmereRuinDressing.Reset(); HollowmereRuinShells.Reset(); HollowmereRuinDressing.SetLayout(t); HollowmereWild.Reset();
             Transform set = Child(root, "Set");
@@ -195,6 +202,7 @@ namespace SleepingCalamity.EditorTools
             BuildWalls(set, t, ruined, rebuilt);
             BuildKeep(set, t);
             HollowmereLanes.Build(set, ruined, rebuilt, t);   // Q11 lane kit: terrace and lot retaining walls, steps, kerbs, gutters, garden walls, gates, lanterns
+            Lap("ground-walls-keep-lanes");
 
             Transform both = Child(set, "Corner");
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
@@ -207,6 +215,7 @@ namespace SleepingCalamity.EditorTools
             }
             ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
+            Lap("corner-foundations");
             HollowmereRuinDressing.LogSummary();
             {
                 int nm = 0, nt = 0, nl = 0; foreach (var kv in HollowmereRuinShells.BuiltAll) { if (kv.Value == RuinClass.Mid) nm++; else if (kv.Value == RuinClass.Tall) nt++; else nl++; }
@@ -237,6 +246,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereOrchard.BuildBanksT13(set, ruined, rebuilt, t);   // T13a: outcrops, fern bands and roots on the keep banks and the crag face (after the roadside: shares its helpers; before Combine and Mesh LODs)
             HollowmereOrchard.BuildT13c(set, ruined, rebuilt, t);   // T13c: orchard lane-kit pier and broken courses to church-ruin stone, OrchardGap foreground, shore wall foot, R3_02 foot
             HollowmereGround.Build(set, ruined, rebuilt, t);   // T13a: lone street props grouped by use or removed, stall goods, contact rings, plants and chips (after every collider)
+            Lap("square-to-ground");
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
@@ -284,26 +294,37 @@ namespace SleepingCalamity.EditorTools
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);   // B3: the B0 Morning light; the corner's light with the town-scale haze, sky and grade (Q12)
             HollowmereZones.Build(root, t);   // T11: local light-zone Volumes, fills, mist, shafts and motes (after Look.Apply: it reads the Morning grade; before the hub, whose Volume lookup skips local volumes)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
+            Lap("light-ambient-cameras-zones-hub");
             ApplyPreset(Preset.Ruined);
             HollowmereCombine.Apply(scene);   // T12 scene diet: small plain objects merged per parent and 12 m cell (before the meshes become assets)
+            Lap("combine");
             GeneratedMeshes.Externalize(scene, "Hollowmere");   // T03 scene diet: generated meshes become assets instead of hex text in the scene file
+            Lap("externalize");
             HollowmereLods.Apply(scene);   // T12: Mesh LOD levels inside the mesh assets (zero scene bytes), shadows off under 0.5 m
-            BuilderUtil.SaveScene(scene, ScenePath);
+            Lap("lods");
+            root.gameObject.AddComponent<SleepingCalamity.Presentation.HollowmereSceneLoader>().Scenes = (string[])SceneNames.HollowmereArt.Clone();   // T24b: loads the art scenes on every peer when the town loads
+            HollowmereSplit.Result split = HollowmereSplit.Split(scene);   // T24b: static art subtrees (no collider, no outside reference) move into the additive scenes
+            Lap("split");
+            HollowmereSplit.Save(scene, split, ScenePath, ScopedScenes);
+            Lap("save");
             Debug.Log("SC HOLLOWMERE scene built " + ScenePath);
         }
 
         // Shows one preset root and hides the other (the open scene).
         public static void ApplyPreset(Preset preset)
         {
-            foreach (GameObject go in SceneManager.GetActiveScene().GetRootGameObjects())
+            // The main scene's roots decide; the art scenes (T24b) hold copies of the same two roots, switched with them.
+            bool done = false;
+            foreach (GameObject go in HollowmereSplit.AllRoots())
             {
-                if (go.name != "Hollowmere") continue;
                 Transform r = go.transform.Find(RuinedRoot), b = go.transform.Find(RebuiltRoot);
-                if (r == null || b == null) throw new InvalidOperationException("Hollowmere preset roots missing");
-                r.gameObject.SetActive(preset == Preset.Ruined); b.gameObject.SetActive(preset == Preset.Rebuilt);
-                return;
+                if (r == null && b == null) continue;
+                if (!done && (r == null || b == null)) throw new InvalidOperationException("Hollowmere preset roots missing");
+                if (r != null) r.gameObject.SetActive(preset == Preset.Ruined);
+                if (b != null) b.gameObject.SetActive(preset == Preset.Rebuilt);
+                done = true;
             }
-            throw new InvalidOperationException("No Hollowmere root in the open scene");
+            if (!done) throw new InvalidOperationException("No Hollowmere root in the open scene");
         }
 
         // B3 polish: the FountainRing row also lays Art_RingBed (the corner's PlazaBed tileable, a different grain and tone from the square's coursed T01c ground), which showed as an

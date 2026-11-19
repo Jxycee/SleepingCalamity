@@ -1,3 +1,4 @@
+using System.Linq;
 // The Bootstrap scene, the Lobby, the greybox test arena and the build list. Each scene starts from NewScene(EmptyScene, Single) and is saved to the
 // same path, so its GUID stays stable.
 using SleepingCalamity.App;
@@ -272,7 +273,7 @@ namespace SleepingCalamity.EditorTools
         // Build list in SceneNames.BuildOrder order (Bootstrap at index 0).
         public static void ApplyBuildSettings()
         {
-            string[] names = SceneNames.BuildOrder;
+            string[] names = SceneNames.BuildOrder.Concat(SceneNames.HollowmereArt).ToArray();   // T24b: the town's additive art scenes follow the gameplay scenes (LoadSceneAsync by name needs the entry)
             var entries = new EditorBuildSettingsScene[names.Length];
             for (int i = 0; i < names.Length; i++)
             {

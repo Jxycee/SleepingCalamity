@@ -36,7 +36,7 @@ namespace SleepingCalamity.EditorTools
             Camera cam = null;
             try
             {
-                EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+                HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
                 HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);
                 cam = LookTestBuilder.AddCapture(null, "Cap_StallLod", Vector3.zero, Vector3.forward, Fov);
                 foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })

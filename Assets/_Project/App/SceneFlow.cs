@@ -33,6 +33,23 @@ namespace SleepingCalamity.App
             session.StateChanged += HandleStateChanged;
             session.Ended += HandleEnded;
             SceneManager.activeSceneChanged += HandleActiveSceneChanged;
+            networkManager.OnServerStarted += InstallSceneFilter;
+            networkManager.OnClientStarted += InstallSceneFilter;
+        }
+
+        // T24b: Hollowmere's art scenes are loaded locally by HollowmereSceneLoader on every peer. NGO's late-join synchronisation lists every additively loaded scene it passes
+        // VerifySceneBeforeLoading, so without this a joiner would load each art scene a second time (once from the sync, once from its own loader). False refuses them on both sides.
+        public static bool AllowsNgoSceneLoad(string sceneName, LoadSceneMode mode) => !(mode == LoadSceneMode.Additive && SceneNames.IsHollowmereArt(sceneName));
+
+        private NetworkSceneManager filteredSceneManager;
+
+        private void InstallSceneFilter()
+        {
+            NetworkSceneManager sm = networkManager.SceneManager;
+            if (disposed || sm == null || ReferenceEquals(sm, filteredSceneManager)) return;
+            filteredSceneManager = sm;
+            NetworkSceneManager.VerifySceneBeforeLoadingDelegateHandler previous = sm.VerifySceneBeforeLoading;
+            sm.VerifySceneBeforeLoading = (index, name, mode) => AllowsNgoSceneLoad(name, mode) && (previous == null || previous(index, name, mode));
         }
 
         // The scene the first start loads (M6 S3: the town). Precedence: -dev-dive, -dev-combat, the test override, Hollowmere.
@@ -62,6 +79,8 @@ namespace SleepingCalamity.App
             session.StateChanged -= HandleStateChanged;
             session.Ended -= HandleEnded;
             SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
+            networkManager.OnServerStarted -= InstallSceneFilter;
+            networkManager.OnClientStarted -= InstallSceneFilter;
         }
 
         // Host only. Sends a connected player away from the lobby: they are disconnected with EndReason.SentAway (their door says why), and the

@@ -15,7 +15,7 @@ namespace SleepingCalamity.EditorTools
         public static void Run()
         {
             var preset = Environment.GetEnvironmentVariable("SC_TRAVERSAL_PRESET") == "Rebuilt" ? HollowmereBuilder.Preset.Rebuilt : HollowmereBuilder.Preset.Ruined;
-            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+            HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
             HollowmereBuilder.ApplyPreset(preset);
             Physics.SyncTransforms();
             string spec = Environment.GetEnvironmentVariable("SC_TRAVERSAL_POINTS") ?? "";

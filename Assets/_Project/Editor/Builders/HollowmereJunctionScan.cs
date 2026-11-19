@@ -65,7 +65,7 @@ namespace SleepingCalamity.EditorTools
             _layout = HollowmereLayout.Create();
             List<LaneKitRow> rows = LaneKitPlan.Plan(_layout);
             var summary = new StringBuilder();
-            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+            HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
             foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
             {
                 HollowmereBuilder.ApplyPreset(preset);

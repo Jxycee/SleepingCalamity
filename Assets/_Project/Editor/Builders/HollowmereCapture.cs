@@ -53,7 +53,7 @@ namespace SleepingCalamity.EditorTools
             QualitySettings.renderPipeline = rp;
             try
             {
-                EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+                HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
                 // SC_CAPTURE_SUN=LowSun renders only the low-sun look, every camera, "_LowSun" added to the file names (main's single-light run).
                 bool lowOnly = System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "LowSun";
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them

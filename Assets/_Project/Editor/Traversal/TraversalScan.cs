@@ -189,7 +189,7 @@ namespace SleepingCalamity.EditorTools
         {
             string name = Environment.GetEnvironmentVariable("SC_TRAVERSAL_PROBE");
             var preset = Environment.GetEnvironmentVariable("SC_TRAVERSAL_PRESET") == "Rebuilt" ? HollowmereBuilder.Preset.Rebuilt : HollowmereBuilder.Preset.Ruined;
-            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+            HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
             HollowmereBuilder.ApplyPreset(preset);
             Physics.SyncTransforms();
             HeroCapsule hero = HeroCapsule.FromPrefab();

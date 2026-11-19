@@ -426,7 +426,7 @@ namespace SleepingCalamity.EditorTools
         {
             var rp = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(BeautyCornerBuilder.RpAssetPath) ?? throw new FileNotFoundException(BeautyCornerBuilder.RpAssetPath);
             if (!checkOnly) QualitySettings.renderPipeline = rp;
-            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+            HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
             Camera cam = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault(c => c.name == "Cap_HM_Fountain")
                 ?? throw new InvalidOperationException("Cap_HM_Fountain camera not found: build the Hollowmere scene first");
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);

@@ -8,6 +8,8 @@
 //   Which cameras see what a task touched (env SC_PICK_ROOTS=BankSteps,GroundProps: object names or name prefixes anywhere under the Hollowmere root; SC_PICK_DIST metres, default 120; SC_PICK_CAMS=Cap_HM_Eye_ limits the cameras by name prefix):
 //     ... exec -Method SleepingCalamity.EditorTools.HollowmereScoped.Pick -OutDir <scratch>      logs "SC PICK <cameras>", ready for SC_CAPTURE_ONLY
 //
+// T24b: Hollowmere is the main scene plus additive art scenes (Hollowmere_Town, _Outskirts, _Backdrop; HollowmereSplit). SC_SCOPED_SCENES=Town,Backdrop (Main = Hollowmere.unity) saves only those
+// scene files; the in-memory build, which the builders' collider and cache dependencies need, still runs in full, and the rest of the files stay as they are on disk (same bytes as BuildAll).
 // Steps of the scoped build: Hollowmere (HollowmereBuilder.Build), MaterialValidation.SettleAll (the same settle BuildAll ends with), SaveAssets. Optional: SC_SCOPED_TREES=1 also runs AreaTreesIntake
 // (the tree prefabs; normally unchanged), SC_SCOPED_VALIDATE=1 also runs ValidationRunner (BuildAll's validators). No section option: HollowmereBuilder.Build creates the scene fresh and the scene-diet
 // passes (Combine, mesh externalize, LODs) run over all of it at the end, so rerunning single sections cannot give the same bytes.
@@ -43,7 +45,10 @@ namespace SleepingCalamity.EditorTools
         {
             var sw = Stopwatch.StartNew();
             var errors = new List<string>();
-            Step(errors, "Hollowmere", HollowmereBuilder.Build);
+            HollowmereBuilder.ScopedScenes = HollowmereSplit.ScopedFromEnvironment();   // throws on a bad name before the long build starts
+            try { Step(errors, "Hollowmere", HollowmereBuilder.Build); }
+            finally { HollowmereBuilder.ScopedScenes = null; }
+            Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);   // T24b: the art scenes' Build Settings entries
             if (Environment.GetEnvironmentVariable("SC_SCOPED_TREES") == "1") Step(errors, "AreaTrees", AreaTreesIntake.Run);
             Step(errors, "MaterialValidation", () => Debug.Log("SC SCOPED materials settled by ShaderGUI validation: " + MaterialValidation.SettleAll()));
             Step(errors, "Save", AssetDatabase.SaveAssets);
@@ -69,10 +74,11 @@ namespace SleepingCalamity.EditorTools
             string[] roots = rootsEnv.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
             float maxDist = float.TryParse(Environment.GetEnvironmentVariable("SC_PICK_DIST"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d) && d > 0f ? d : 120f;
             string camPrefix = Environment.GetEnvironmentVariable("SC_PICK_CAMS") is string cp && cp.Length > 0 ? cp : "Cap_HM_";   // SC_PICK_CAMS=Cap_HM_Eye_ lists only the eye set
-            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
-            GameObject town = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects().FirstOrDefault(g => g.name == "Hollowmere") ?? throw new InvalidOperationException("No Hollowmere root in the scene");
+            HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
+            List<GameObject> towns = HollowmereSplit.AllRoots();   // the main scene's root and the art scenes' copies of it
+            if (towns.Count == 0) throw new InvalidOperationException("No Hollowmere root in the scene");
             var bounds = new List<Bounds>(); var matched = new List<string>();
-            foreach (Transform t in town.GetComponentsInChildren<Transform>(true))
+            foreach (Transform t in towns.SelectMany(g => g.GetComponentsInChildren<Transform>(true)))
             {
                 if (t.name == "CaptureCameras" || t.name.StartsWith("Cap_", StringComparison.Ordinal)) continue;
                 if (!roots.Any(r => t.name.StartsWith(r, StringComparison.Ordinal))) continue;

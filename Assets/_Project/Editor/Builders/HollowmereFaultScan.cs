@@ -73,7 +73,7 @@ namespace SleepingCalamity.EditorTools
             bool savedBack = Physics.queriesHitBackfaces;
             try
             {
-                EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+                HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);
                 foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                 {
                     HollowmereBuilder.ApplyPreset(preset);

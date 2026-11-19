@@ -4,6 +4,7 @@
 // everything. If a build scene is already open with unsaved edits, the in-memory state is what gets checked.
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
@@ -66,12 +67,12 @@ namespace SleepingCalamity.EditorTools
             return errors;
         }
 
-        // Bootstrap at index 0, then every scene of SceneNames.BuildOrder, all enabled.
+        // Bootstrap at index 0, then every scene of SceneNames.BuildOrder and Hollowmere's additive art scenes, all enabled.
         public static List<string> BuildScenes()
         {
             var errors = new List<string>();
             EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
-            string[] names = SceneNames.BuildOrder;
+            string[] names = SceneNames.BuildOrder.Concat(SceneNames.HollowmereArt).ToArray();   // T24b: Hollowmere's additive art scenes follow the gameplay scenes
             if (scenes.Length != names.Length)
                 errors.Add("expected " + names.Length + " build scenes, found " + scenes.Length);
             for (int i = 0; i < names.Length; i++)
@@ -196,7 +197,7 @@ namespace SleepingCalamity.EditorTools
         public static List<string> SceneNetworkObjectHashes()
         {
             var errors = new List<string>();
-            foreach (string sceneName in SceneNames.BuildOrder)
+            foreach (string sceneName in SceneNames.BuildOrder.Concat(SceneNames.HollowmereArt))
             {
                 string scenePath = AssetPaths.ScenesFolder + "/" + sceneName + ".unity";
                 if (!File.Exists(BuilderUtil.Abs(scenePath))) continue; // BuildScenes reports a missing file
@@ -260,7 +261,7 @@ namespace SleepingCalamity.EditorTools
         // Visits every GameObject (inactive included) of every existing build scene, one scene at a time, then of every prefab under prefabsFolder.
         static void VisitAllObjects(List<string> errors, string prefabsFolder, System.Action<string, GameObject> visit)
         {
-            foreach (string sceneName in SceneNames.BuildOrder)
+            foreach (string sceneName in SceneNames.BuildOrder.Concat(SceneNames.HollowmereArt))
             {
                 string scenePath = AssetPaths.ScenesFolder + "/" + sceneName + ".unity";
                 if (!File.Exists(BuilderUtil.Abs(scenePath))) continue; // BuildScenes reports a missing file
