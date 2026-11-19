@@ -354,6 +354,7 @@ namespace SleepingCalamity.EditorTools
             Color c = new Color(Mathf.LinearToGammaSpace(tint.r), Mathf.LinearToGammaSpace(tint.g), Mathf.LinearToGammaSpace(tint.b), 1f);
             m.SetColor("_BaseColor", c); m.SetColor("_Color", c);
             m.SetFloat("_BumpScale", 1.5f); m.SetShaderPassEnabled("MotionVectors", true);
+            T23Walls.Skin(m, new T23Walls.Look { Set = null, StoneW = 0.55f, Moss = 0.45f, Foot = 0f, FootDark = 0f, Variation = 1f, DetailN = 0.5f });   // T23: the bank under the town wall (Meadow, JettyBack): per-slab tone, moss on the ledges, a second-scale grain
             EditorUtility.SetDirty(m);
             return m;
         }

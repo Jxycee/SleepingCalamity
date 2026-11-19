@@ -27,7 +27,7 @@ namespace SleepingCalamity.EditorTools
         public static void Clear(Material m)
         {
             m.DisableKeyword("_SC_RUINSKIN"); m.DisableKeyword("_PARALLAXMAP");
-            m.SetVector("_SpecColor", new Vector4(0.2f, 0.2f, 0.2f, 1f));
+            m.SetVector("_SpecColor", new Vector4(0.19999996f, 0.19999996f, 0.19999996f, 1f));
             m.SetFloat("_DetailAlbedoMapScale", 1f); m.SetFloat("_DetailNormalMapScale", 1f);
         }
 
@@ -50,7 +50,7 @@ namespace SleepingCalamity.EditorTools
             }
             if (l.Set != null)
             {
-                float gain = l.Set == "ashlar" ? 1.9f : 1.4f;   // the scans are darker than the B1 sandstone (mean linear luminance 0.10 / 0.19 against 0.37): the tint brings them to about 0.19 / 0.26
+                float gain = l.Set == "ashlar" ? 1.9f : 2.3f;   // the scans are darker than the B1 sandstone (mean linear luminance 0.10 / 0.19 against 0.37): the tint brings them to about 0.19 / 0.43
                 Color c = m.GetColor("_BaseColor").linear;
                 m.SetColor("_BaseColor", new Color(Mathf.LinearToGammaSpace(c.r * gain), Mathf.LinearToGammaSpace(c.g * gain), Mathf.LinearToGammaSpace(c.b * gain), 1f));
                 m.SetColor("_Color", m.GetColor("_BaseColor"));
