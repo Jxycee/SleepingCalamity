@@ -24,7 +24,7 @@
 #                      (tested 2026-10-30: plugin installed and loaded, no tool, server never started), so sessions query csharp-ls through
 #                      Tools/cloud/sc_lsp.py instead (def / refs / hover / symbols); the SessionStart hook tells each session so
 #   uv / uvx           Python tools on demand (`uvx <tool>`, `uv tool install <tool>`)
-#   Unity 6000.6.5f1   ~/unity/ed/Editor/Unity (Linux) + the registry packages + DXC: Tools/cloud/unity.sh (batchmode twin of Tools/unity.ps1, needs a
+#   Unity 6000.6.8f1   ~/unity/ed/Editor/Unity (Linux) + the registry packages + DXC: Tools/cloud/unity.sh (batchmode twin of Tools/unity.ps1, needs a
 #                      licence: UNITY_EMAIL + UNITY_PASSWORD secrets, see the doc), sc_cloud_compile.py (C# compile, no licence) and sc_shader_check.py
 #
 #   blender MCP        Tools/cloud/sc_blender_mcp.py (a live, windowed Blender under xvfb) registered as the user-scope `blender` MCP server. The repo's
@@ -53,8 +53,8 @@ BLENDER_VER=4.5.3
 BLENDER_SERIES=4.5
 BLENDER_DIR="$HOME/apps/blender-$BLENDER_VER-linux-x64"
 BLENDER_URL="https://download.blender.org/release/Blender$BLENDER_SERIES/blender-$BLENDER_VER-linux-x64.tar.xz"
-UNITY_VERSION=6000.6.5f1
-UNITY_REVISION=3ff58d469c8a
+UNITY_VERSION=6000.6.8f1
+UNITY_REVISION=237b6593792b
 UNITY_URL="https://download.unity3d.com/download_unity/$UNITY_REVISION/LinuxEditorInstaller/Unity-$UNITY_VERSION.tar.xz"
 DXC_URL="https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2407/linux_dxc_2024_07_31.x86_64.tar.gz"
 find_repo() { # run from the repo, from Tools/cloud, or pasted as the environment's setup script (which starts one directory above the repo)

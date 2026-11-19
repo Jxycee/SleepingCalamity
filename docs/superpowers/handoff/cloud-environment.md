@@ -34,7 +34,7 @@ First session: about 7 minutes for everything except Unity, then the Unity edito
 |---|---|---|
 | Blender 4.5.3 (+ Pillow, SciPy in its own Python) | `blender` on PATH, `~/apps/blender-4.5.3-linux-x64` | every `Art/Blender/tools/sc_*.py` generator and review render, headless: `blender -b --factory-startup --python ...` |
 | Mesa llvmpipe (GL 4.5), lavapipe (Vulkan), xvfb | system | Cycles renders on CPU directly; EEVEE needs `xvfb-run -a blender -b ...` (first shader compile about 75 s); `unity.sh --graphics` runs under `xvfb-run` |
-| Unity 6000.6.5f1 Linux editor + registry packages | `~/unity/ed/Editor/Unity`, `~/unity/pkgs` | `Tools/cloud/unity.sh` (batchmode twin of `unity.ps1`, needs a licence), `sc_cloud_compile.py` (C# compile, no licence) |
+| Unity 6000.6.8f1 Linux editor + registry packages | `~/unity/ed/Editor/Unity`, `~/unity/pkgs` | `Tools/cloud/unity.sh` (batchmode twin of `unity.ps1`, needs a licence), `sc_cloud_compile.py` (C# compile, no licence) |
 | DXC | `~/dxc/bin/dxc` | `sc_shader_check.py` (every shader pass) |
 | .NET 8 SDK, NuGet warm for NUnit 3.14 and Newtonsoft.Json 13.0.2 | `dotnet` | `sc_core_tests.py` (Core EditMode tests under NUnitLite) |
 | csharp-ls 0.16.0 + generated `.csproj`/`.sln` | `csharp-ls`; project root (gitignored) | `Tools/cloud/sc_lsp.py` (def / refs / hover / symbols): cloud Claude Code never offers the LSP tool, even with the csharp-lsp plugin installed and loaded (tested 2026-10-30, also after a resume), so sessions query csharp-ls through this script. `sc_cloud_compile.py --csproj` writes the Unity-style projects it loads (the setup job and the SessionStart hook run it; re-run after adding files); before the Unity editor is in, only Core loads |

@@ -29,8 +29,8 @@ import shutil
 import subprocess
 import sys
 
-UNITY_VERSION = "6000.6.5f1"
-UNITY_REVISION = "3ff58d469c8a"
+UNITY_VERSION = "6000.6.8f1"
+UNITY_REVISION = "237b6593792b"
 EDITOR_URL = f"https://download.unity3d.com/download_unity/{UNITY_REVISION}/LinuxEditorInstaller/Unity-{UNITY_VERSION}.tar.xz"
 HOME = os.path.expanduser("~/unity")
 EDITOR = os.path.join(HOME, "ed", "Editor")

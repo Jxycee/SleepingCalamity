@@ -4,7 +4,7 @@
 Unity compiles a .shader's HLSLPROGRAM blocks with its own HLSL front end per keyword variant. This script does the same steps by hand:
 it reads each ShaderLab file, takes every pass's HLSLINCLUDE + HLSLPROGRAM text, its #pragma vertex/fragment entry points and its keyword
 pragmas (multi_compile*, shader_feature*, including the ones pulled in by #include_with_pragmas), and compiles each stage of each variant
-with Microsoft's DirectXShaderCompiler (dxc) against the real URP and core ShaderLibrary from the Unity 6000.6.5f1 editor's built-in
+with Microsoft's DirectXShaderCompiler (dxc) against the real URP and core ShaderLibrary from the Unity 6000.6.8f1 editor's built-in
 packages (sc_cloud_compile.py --setup fetches the editor). "Packages/..." and "Assets/..." includes resolve the way they do in the editor.
 Errors print as `Assets/...shader(line): error: ...` thanks to #line directives.
 

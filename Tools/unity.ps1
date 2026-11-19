@@ -38,7 +38,7 @@ param(
 )
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
-$UnityExe    = 'C:\Program Files\Unity\Hub\Editor\6000.6.5f1\Editor\Unity.exe'
+$UnityExe    = 'C:\Program Files\Unity\Hub\Editor\6000.6.8f1\Editor\Unity.exe'
 $PortLockPath = Join-Path ([IO.Path]::GetTempPath()) 'sc-unity-playmode.lock'
 $PortWaitMinutes = 120
 $LockFile    = Join-Path $ProjectRoot 'Temp\UnityLockfile'
