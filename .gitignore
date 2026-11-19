@@ -132,3 +132,7 @@ Tools/town/obj/
 # Microsoft GDK package writes this on every editor start in a fresh checkout
 /Assets/Resources/GDKEditionAutoGen/
 /Assets/Resources/GDKEditionAutoGen.meta
+
+# T24c: HollowmereSplit temp scenes (written during a build, deleted at the end of the save)
+Assets/_Project/Scenes/_HollowmereBuild*.unity
+Assets/_Project/Scenes/_HollowmereBuild*.unity.meta

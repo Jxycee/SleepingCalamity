@@ -46,7 +46,7 @@ namespace SleepingCalamity.EditorTools
             {
                 foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                 {
-                    EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+                    HollowmereSplit.OpenAll(HollowmereBuilder.ScenePath);   // T24c: the main scene plus the art scenes, so the full scan sees the visual meshes the split moved
                     ScanSpace s = TraversalSpaces.Hollowmere(preset);
                     ScanResult r = TraversalProbe.Scan(s, hero, new ScanOptions());
                     Debug.Log($"SC TRAVERSAL {s.Name} issues={r.Issues.Count} targets={s.Targets.Count} reached={s.Targets.Count(x => x.Reached)} paths={s.Paths.Count} stairs={r.Stairs} visual={r.VisualMeshes} {r.Seconds:0}s");

@@ -133,8 +133,12 @@ namespace SleepingCalamity.EditorTools
 
         static void Census(StringBuilder sb, string preset)
         {
-            foreach (GameObject go in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
-                Walk(sb, preset, go.transform, 0);
+            for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)   // T24c: the main scene and the art scenes OpenAll opened (rows repeat the shared paths, one per scene)
+            {
+                UnityEngine.SceneManagement.Scene sc = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                if (!sc.isLoaded) continue;
+                foreach (GameObject go in sc.GetRootGameObjects()) Walk(sb, preset, go.transform, 0);
+            }
         }
 
         static void Walk(StringBuilder sb, string preset, Transform t, int depth)

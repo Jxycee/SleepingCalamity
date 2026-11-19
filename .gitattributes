@@ -185,3 +185,6 @@ LightingData.asset     binary
 
 # Generated mesh assets (GeneratedMeshes.cs): text-serialised vertex data, large; the .meta stays plain text
 Assets/_Project/Content/Generated/**/*.asset  lfs
+
+# T24c: the split manifest is compared as text by a scoped save: LF in every checkout
+Assets/_Project/Scenes/Hollowmere_SplitManifest.txt  text eol=lf

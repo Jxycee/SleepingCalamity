@@ -14,7 +14,7 @@ namespace SleepingCalamity.Core
         public const string ArenaDive = "Arena_Dive";   // M5: the Cellars dive hub (Undercroft stair stand-in); the dive floors are built far from it
         public const string Hollowmere = "Hollowmere";   // M6 S3: the town is the session (hub) scene; the Cellars floors are built under it, no scene loads during play
         // T24b: Hollowmere's static art lives in additive scenes the main scene loads on every peer (HollowmereSceneLoader). They are not gameplay scenes and not in BuildOrder
-        // (NGO never loads them); they are in Build Settings after it, because LoadSceneAsync by name needs that. Colliders, NetworkObjects, cameras and lighting stay in Hollowmere itself.
+        // (NGO never loads them); they are in Build Settings after it, because LoadSceneAsync by name needs that. Colliders, NetworkObjects, cameras, the directional light, volumes and probes stay in Hollowmere itself; local point lights travel with the art they light (T24c).
         public const string HollowmereTown = "Hollowmere_Town";
         public const string HollowmereRebuilt = "Hollowmere_Rebuilt";   // the Preset_Rebuilt copies of the town art (hidden until the town is rebuilt)
         public const string HollowmereLanes = "Hollowmere_Lanes";   // the lane kit's art (both presets): the biggest single group

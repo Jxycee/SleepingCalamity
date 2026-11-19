@@ -1,6 +1,8 @@
 // T24b: the Hollowmere scene split. Catches: a scene file over the size budget, a collider, NetworkObject, camera or volume that ended up in an additive art scene (spawn, teleport and
 // late join would then depend on a local load), a missing loader or Build Settings entry (the art would silently not load), and the main scene losing its play-loop objects.
-// NOT covered: a real second machine loading the scenes (PlayMode HollowmereHubTests start the town for the host and check the art arrives).
+// T24c adds the manifest of moved subtrees (a scoped save compares against it).
+// NOT covered here: the art arriving at runtime (PlayMode HollowmereSceneLoaderTests start the town and check each art scene loads once, with no collider); a real second machine loading
+// the scenes (a user walk).
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -104,6 +106,41 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(checkedLots, Is.GreaterThan(3), "the lots' ruin objects were found (TownView has 7)");
             }
             finally { foreach (Scene a in art) EditorSceneManager.CloseScene(a, true); EditorSceneManager.CloseScene(main, true); }
+        }
+
+        // T24c: the manifest a scoped save checks against exists, is sorted, and every path it lists is really in its art scene (so it was written from this split, not a stale one).
+        [Test]
+        public void Manifest_ListsEveryMovedSubtree_AndEachIsInItsArtScene()
+        {
+            string abs = BuilderUtil.Abs(HollowmereSplit.ManifestPath);
+            Assert.That(File.Exists(abs), Is.True, HollowmereSplit.ManifestPath + " is missing: run the full Hollowmere build and commit it");
+            string[] lines = HollowmereSplit.ReadManifest(abs).Split('\n').Where(l => l.Length > 0).ToArray();
+            var open = SceneNames.HollowmereArt.ToDictionary(n => n, n => EditorSceneManager.OpenScene("Assets/_Project/Scenes/" + n + ".unity", OpenSceneMode.Additive));
+            try
+            {
+                int i = 0, total = 0;
+                foreach (string name in SceneNames.HollowmereArt)
+                {
+                    Assert.That(lines[i], Does.StartWith("[" + name + "] "), "one block per art scene, in SceneNames order");
+                    int count = int.Parse(lines[i].Substring(name.Length + 3));
+                    Assert.That(count, Is.GreaterThan(0), name + " has moved subtrees");
+                    GameObject root = open[name].GetRootGameObjects().First(g => g.name == "Hollowmere");
+                    string previous = null;
+                    for (int k = 1; k <= count; k++)
+                    {
+                        string path = lines[i + k];
+                        Assert.That(path, Does.StartWith("Hollowmere/"), name);
+                        if (previous != null) Assert.That(string.CompareOrdinal(previous, path), Is.LessThanOrEqualTo(0), name + ": paths are sorted");
+                        previous = path;
+                        Assert.That(root.transform.Find(path.Substring("Hollowmere/".Length)), Is.Not.Null, name + " does not hold " + path);
+                        total++;
+                    }
+                    i += count + 1;
+                }
+                Assert.That(i, Is.EqualTo(lines.Length), "nothing after the last block");
+                Assert.That(total, Is.GreaterThan(100), "the manifest is not empty");
+            }
+            finally { foreach (Scene s in open.Values) EditorSceneManager.CloseScene(s, true); }
         }
 
         [Test]

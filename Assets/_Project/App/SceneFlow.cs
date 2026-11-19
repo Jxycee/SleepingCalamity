@@ -49,7 +49,16 @@ namespace SleepingCalamity.App
             if (disposed || sm == null || ReferenceEquals(sm, filteredSceneManager)) return;
             filteredSceneManager = sm;
             NetworkSceneManager.VerifySceneBeforeLoadingDelegateHandler previous = sm.VerifySceneBeforeLoading;
-            sm.VerifySceneBeforeLoading = (index, name, mode) => AllowsNgoSceneLoad(name, mode) && (previous == null || previous(index, name, mode));
+            // NGO warns "failed validation on the Host" for every refused scene on every late join (five art scenes: five warnings). Our refusal is the design, so NGO's warning is switched off
+            // (public API, no internals) and any refusal that is not an art scene (a previous handler's) is logged here instead.
+            sm.DisableValidationWarnings(true);
+            sm.VerifySceneBeforeLoading = (index, name, mode) =>
+            {
+                if (!AllowsNgoSceneLoad(name, mode)) return false;
+                if (previous == null || previous(index, name, mode)) return true;
+                Debug.LogWarning("Scene " + name + " (build index " + index + ") being loaded in " + mode + " mode failed validation!");
+                return false;
+            };
         }
 
         // The scene the first start loads (M6 S3: the town). Precedence: -dev-dive, -dev-combat, the test override, Hollowmere.

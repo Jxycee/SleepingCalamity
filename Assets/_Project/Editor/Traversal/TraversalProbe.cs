@@ -139,7 +139,7 @@ namespace SleepingCalamity.EditorTools
             var visuals = new List<GameObject>();
             try
             {
-                if (opt.Full) res.VisualMeshes = AddVisuals(space.Root, visLayer, softLayer, visuals);
+                if (opt.Full) res.VisualMeshes = AddVisuals(space.AllRoots(), visLayer, softLayer, visuals);
                 Physics.SyncTransforms();
 
                 // ------------------------------------------------------------ intended paths
@@ -269,17 +269,18 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ---------------------------------------------------------------------------------------------------------------- visual probe
-        static int AddVisuals(Transform root, int layer, int softLayer, List<GameObject> made)
+        static int AddVisuals(IEnumerable<Transform> roots, int layer, int softLayer, List<GameObject> made)
         {
-            if (root == null) return 0;
+            var rootList = roots.ToList();   // T24c: the main scene's root and the town's art-scene roots
+            if (rootList.Count == 0) return 0;
             var skip = new HashSet<Renderer>();
-            foreach (LODGroup lg in root.GetComponentsInChildren<LODGroup>())
+            foreach (LODGroup lg in rootList.SelectMany(r => r.GetComponentsInChildren<LODGroup>()))
             {
                 LOD[] lods = lg.GetLODs();
                 for (int i = 1; i < lods.Length; i++) foreach (Renderer r in lods[i].renderers) if (r != null) skip.Add(r);
             }
             int n = 0;
-            foreach (MeshRenderer mr in root.GetComponentsInChildren<MeshRenderer>())
+            foreach (MeshRenderer mr in rootList.SelectMany(r => r.GetComponentsInChildren<MeshRenderer>()))
             {
                 if (!mr.enabled || !mr.gameObject.activeInHierarchy || skip.Contains(mr)) continue;
                 if (mr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
@@ -670,12 +671,11 @@ namespace SleepingCalamity.EditorTools
         // ---------------------------------------------------------------------------------------------------------------- stairs
         static void Stairs(ScanResult res, WalkGrid g, HeroCapsule hero)
         {
-            Transform root = res.Space.Root;
-            if (root == null) return;
+            if (res.Space.Root == null) return;
             // a stair is one object named like a stair, at most 12 m across (a group such as Lanes/Steps holding every lane step is not one stair: its children are)
             var stairs = new List<Transform>();
             bool Candidate(Transform t) => IsStairName(t.name) && t.gameObject.activeInHierarchy && RendererBounds(t, out Bounds rb) && Mathf.Max(rb.size.x, rb.size.z) <= 12f;
-            foreach (Transform t in root.GetComponentsInChildren<Transform>())
+            foreach (Transform t in res.Space.AllRoots().SelectMany(r => r.GetComponentsInChildren<Transform>()))   // T24c: the stair art may live in an art scene
             {
                 if (!Candidate(t)) continue;
                 bool nested = false;

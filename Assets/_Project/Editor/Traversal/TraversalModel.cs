@@ -137,6 +137,8 @@ namespace SleepingCalamity.EditorTools
         public Func<float, float, bool> ExpectedWalkable;                  // true where the plan means the hero to walk (lanes, room floors, corridors)
         public Func<Vector3, string> Describe;                             // a plan-level location for a world point (room id and cell, lane), optional
         public Transform Root;                                             // the hierarchy the scan's object checks look at
+        public readonly List<Transform> ArtRoots = new List<Transform>();   // T24c: more roots of the same hierarchy in other open scenes (Hollowmere's additive art scenes hold the visual meshes; colliders stay in Root)
+        public IEnumerable<Transform> AllRoots() { if (Root != null) yield return Root; foreach (Transform t in ArtRoots) if (t != null) yield return t; }
         public string Name => Seed >= 0 ? $"{Scene}_F{Floor}_s{Seed}" : $"{Scene}_{Variant}";
     }
 

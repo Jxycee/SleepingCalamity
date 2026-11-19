@@ -30,9 +30,11 @@ namespace SleepingCalamity.EditorTools
         public static ScanSpace Hollowmere(HollowmereBuilder.Preset preset)
         {
             HollowmereBuilder.ApplyPreset(preset);
+            // T24c: the main scene's root, plus the same root in every open art scene (HollowmereSplit.OpenAll): the visual meshes and stair art the scan looks at live there.
             Transform root = SceneManager.GetActiveScene().GetRootGameObjects().First(g => g.name == "Hollowmere").transform;
             TownLayout t = HollowmereLayout.Create();
             var s = new ScanSpace { Scene = "Hollowmere", Variant = preset.ToString(), Root = root };
+            foreach (GameObject g in HollowmereSplit.AllRoots()) if (g.transform != root) s.ArtRoots.Add(g.transform);
             s.ExpectedGround = (x, z) => HollowmereLayout.Ground(t, x, z);
 
             float NodeY(PathNode n) => n.Kind == PathNodeKind.Door || n.Kind == PathNodeKind.Stair || Mathf.Abs(n.Y) > 0.01f ? n.Y : HollowmereLayout.Ground(t, n.Pos.X, n.Pos.Z);
@@ -73,7 +75,7 @@ namespace SleepingCalamity.EditorTools
                     Name = l.Id, Kind = "Landmark", Pos = new Vector3(l.Footprint.Centre.X, l.Y, l.Footprint.Centre.Z), Reach = Mathf.Max(l.Footprint.HalfX, l.Footprint.HalfZ) + 1.2f,
                 });
             }
-            foreach (Transform tr in root.GetComponentsInChildren<Transform>())
+            foreach (Transform tr in s.AllRoots().SelectMany(r => r.GetComponentsInChildren<Transform>()))
                 if (tr.name == "UndercroftStair" && tr.gameObject.activeInHierarchy)
                     s.Targets.Add(new TraversalTarget { Name = "UndercroftStair (cistern house)", Kind = "CisternStair", Pos = tr.position, Reach = 1.5f });
 

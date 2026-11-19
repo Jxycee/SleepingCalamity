@@ -1,19 +1,23 @@
 // T24b: splits the built Hollowmere scene into the main scene plus additive art scenes (SceneNames.HollowmereArt), so no scene file nears GitHub's size limit and a scoped build
-// writes only the sub-scenes a task touched. Common practice: additive scenes for static environment chunks, loaded by a small loader at runtime (HollowmereSceneLoader); lighting,
-// RenderSettings and volumes stay defined once in the main (active) scene.
+// writes only the sub-scenes a task touched. Common practice: additive scenes for static environment chunks, loaded by a small loader at runtime (HollowmereSceneLoader). The directional
+// light, RenderSettings, volumes and probes stay defined once in the main (active) scene; the local point lights (brazier flicker included) are not blockers, so they travel with the art
+// they light and pop in with it (T24c, controller decision: kept there).
 //
 // How: the builders still make ONE scene in memory, exactly as before (they depend on each other's colliders and caches), and the Combine / mesh externalize / LOD passes run over all
 // of it. Only then does this class move whole subtrees into the sub-scenes, so every frame, mesh asset and name is what the unsplit build made. A subtree moves when the build rules
 // below allow it; anything else stays in Hollowmere.unity:
 //   - a subtree with a Collider, Rigidbody, NetworkBehaviour, Camera, AudioListener, Volume, probe or Terrain anywhere inside stays (colliders never move: spawn, teleport and late join
 //     then do not depend on the additive loads, and the traversal scans and play loop see the same physics world);
-//   - a subtree that holds, or is held by, a serialized reference to a scene object outside it stays (cross-scene references would be dropped on save);
+//   - a subtree that holds, or is held by, a serialized reference to a scene object outside it, or a reference into one of its ancestors below the scene root, stays (cross-scene
+//     references would be dropped on save, and an ancestor's children change when a subtree leaves it);
 //   - a part of a prefab instance below its root cannot be reparented, so a prefab instance moves whole or stays whole.
 // A moved subtree keeps its ancestors' names, local transforms and active state (empty copies of Hollowmere/Preset_Ruined/... in the sub-scene), so paths, the Ruined/Rebuilt switch and
 // world poses are unchanged.
 //
 // Scoped saves: SC_SCOPED_SCENES=Town,Outskirts (names without the Hollowmere_ prefix; Main = Hollowmere.unity) writes only those scenes. The in-memory build still runs in full, because the
 // builders read each other's colliders and caches; what is skipped is the save, the file normalize and the re-import of the others.
+// The full build writes ManifestPath: the sorted hierarchy path of every moved subtree, per scene. A scoped save recomputes them and refuses when any scene differs from the manifest (a
+// builder change moved other subtrees: the scenes on disk would then disagree and art would be missing or twice); run the full build then.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -71,6 +75,7 @@ namespace SleepingCalamity.EditorTools
         {
             public readonly Dictionary<string, Scene> Scenes = new Dictionary<string, Scene>(StringComparer.Ordinal);
             public readonly Dictionary<string, int> MovedObjects = new Dictionary<string, int>(StringComparer.Ordinal);
+            public readonly Dictionary<string, List<string>> MovedPaths = new Dictionary<string, List<string>>(StringComparer.Ordinal);   // scene -> hierarchy path of each moved subtree root (sorted)
             public int KeptGroupObjects;
             public readonly SortedDictionary<string, int> KeptBy = new SortedDictionary<string, int>(StringComparer.Ordinal);   // "<preset>/<group> <reason>" -> objects that stay
         }
@@ -118,8 +123,10 @@ namespace SleepingCalamity.EditorTools
                 result.Scenes[name] = s; result.MovedObjects[name] = 0;
             }
             var chains = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            foreach (string name in SceneNames.HollowmereArt) result.MovedPaths[name] = new List<string>();
             foreach ((Transform t, string target) in moves)
             {
+                result.MovedPaths[target].Add(PathOf(t));   // before the move: the path in the unsplit scene
                 Scene sub = result.Scenes[target];
                 int n = t.GetComponentsInChildren<Transform>(true).Length;
                 Transform parentCopy = EnsureAncestors(sub, target, t.parent, chains);
@@ -130,15 +137,24 @@ namespace SleepingCalamity.EditorTools
                 t.localPosition = lp; t.localRotation = lr; t.localScale = ls;
                 result.MovedObjects[target] += n;
             }
+            foreach (List<string> paths in result.MovedPaths.Values) paths.Sort(StringComparer.Ordinal);
             SceneManager.SetActiveScene(main);
             foreach (var kv in result.KeptBy) if (kv.Value >= 20) Debug.Log("SC SPLIT kept " + kv.Value + " objects: " + kv.Key);
             Debug.Log("SC SPLIT moved " + string.Join(", ", result.MovedObjects.Select(kv => kv.Key + "=" + kv.Value + " objects")) + "; " + keptObjects + " objects of the mapped groups stay in the main scene (colliders, references, prefab parts)");
             return result;
         }
 
+        static string PathOf(Transform t)
+        {
+            var parts = new List<string>();
+            for (; t != null; t = t.parent) parts.Add(t.name);
+            parts.Reverse();
+            return string.Join("/", parts);
+        }
+
         static bool IsBlocker(Component c)
         {
-            return c is Collider || c is Rigidbody || c is Joint || c is Unity.Netcode.NetworkBehaviour || c is Camera || c is AudioListener || c is Volume || c is ReflectionProbe
+            return c is Collider || c is Rigidbody || c is Joint || c is Unity.Netcode.NetworkBehaviour || c is Unity.Netcode.NetworkObject || c is Camera || c is AudioListener || c is Volume || c is ReflectionProbe
                 || c is LightProbeGroup || c is LightProbeProxyVolume || c is Terrain || c is CharacterController;
         }
 
@@ -162,7 +178,13 @@ namespace SleepingCalamity.EditorTools
         static bool Crosses(Transform node, List<(Transform Owner, Transform Target)> edges)
         {
             foreach ((Transform o, Transform t) in edges)
-                if (o.IsChildOf(node) != t.IsChildOf(node)) return true;
+            {
+                bool oIn = o.IsChildOf(node), tIn = t.IsChildOf(node);
+                if (oIn != tIn) return true;
+                // T24c: a reference into an ancestor of the node (a script pointing at Preset_* or Set, or at a group above the node): taking the node out changes that ancestor's children, which
+                // the pointing script may walk. The scene root is exempt (it stays in the main scene, and every node is below it). Owners on an ancestor do not count: the root carries scripts.
+                if (!tIn && t.parent != null && node.IsChildOf(t)) return true;
+            }
             return false;
         }
 
@@ -227,6 +249,8 @@ namespace SleepingCalamity.EditorTools
         {
             try
             {
+                string manifest = ManifestText(split);
+                if (only != null) CheckManifest(manifest);   // before anything is written: a scoped save must not leave the scenes on disk disagreeing with each other
                 foreach (string name in SceneNames.HollowmereArt)
                 {
                     if (only != null && !only.Contains(Short(name))) continue;
@@ -234,12 +258,76 @@ namespace SleepingCalamity.EditorTools
                     BuilderUtil.SaveScene(split.Scenes[name], ScenePath(name));
                     Debug.Log("SC SPLIT saved " + name + " " + new System.IO.FileInfo(BuilderUtil.Abs(ScenePath(name))).Length / 1024 + " KB in " + sw.Elapsed.TotalSeconds.ToString("F1") + "s");
                 }
+                if (only == null) WriteManifest(manifest);
                 if (only != null && !only.Contains(MainName)) return;
                 var swm = System.Diagnostics.Stopwatch.StartNew();
                 BuilderUtil.SaveScene(main, mainPath);
                 Debug.Log("SC SPLIT saved " + mainPath + " " + new System.IO.FileInfo(BuilderUtil.Abs(mainPath)).Length / 1024 + " KB in " + swm.Elapsed.TotalSeconds.ToString("F1") + "s");
             }
             finally { DeleteTemps(); }
+        }
+
+        // ------------------------------------------------------------------------------------------------ manifest (T24c)
+        public const string ManifestPath = "Assets/_Project/Scenes/Hollowmere_SplitManifest.txt";
+
+        // One block per art scene in SceneNames order: "[scene] count", then the sorted hierarchy path of each moved subtree, LF line ends.
+        public static string ManifestText(Result split)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (string name in SceneNames.HollowmereArt)
+            {
+                List<string> paths = split.MovedPaths[name];
+                sb.Append('[').Append(name).Append("] ").Append(paths.Count).Append('\n');
+                foreach (string p in paths) sb.Append(p).Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        // LF only, whatever the checkout's line endings (autocrlf on a PC checkout turns the file into CRLF unless .gitattributes pins it).
+        public static string ReadManifest(string absPath) => System.IO.File.ReadAllText(absPath).Replace("\r\n", "\n");
+
+        static void WriteManifest(string text)
+        {
+            string abs = BuilderUtil.Abs(ManifestPath);
+            if (System.IO.File.Exists(abs) && ReadManifest(abs) == text) return;
+            System.IO.File.WriteAllText(abs, text, new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset(ManifestPath, ImportAssetOptions.ForceSynchronousImport);
+            Debug.Log("SC SPLIT manifest written " + ManifestPath + " (" + text.Length / 1024 + " KB)");
+        }
+
+        // Throws (the scoped build fails, exit non-zero) when the subtrees this build moves differ from the manifest the last full build wrote, for any scene.
+        static void CheckManifest(string text)
+        {
+            string abs = BuilderUtil.Abs(ManifestPath);
+            if (!System.IO.File.Exists(abs)) throw new InvalidOperationException("Scoped save refused: " + ManifestPath + " is missing. Run the full Hollowmere build (no SC_SCOPED_SCENES) first.");
+            string old = ReadManifest(abs);
+            if (old == text) return;
+            Dictionary<string, HashSet<string>> was = ParseManifest(old), now = ParseManifest(text);
+            var sb = new System.Text.StringBuilder("Scoped save refused: the subtrees this build moves into the art scenes differ from " + ManifestPath + ", so the scenes on disk would disagree (art missing or twice). Run the full Hollowmere build (no SC_SCOPED_SCENES) and commit the manifest.");
+            foreach (string name in SceneNames.HollowmereArt)
+            {
+                was.TryGetValue(name, out HashSet<string> a); now.TryGetValue(name, out HashSet<string> b);
+                a ??= new HashSet<string>(StringComparer.Ordinal); b ??= new HashSet<string>(StringComparer.Ordinal);
+                List<string> added = b.Where(x => !a.Contains(x)).OrderBy(x => x, StringComparer.Ordinal).ToList(), removed = a.Where(x => !b.Contains(x)).OrderBy(x => x, StringComparer.Ordinal).ToList();
+                if (added.Count == 0 && removed.Count == 0) continue;   // equal as sets: only the multiplicity of a repeated path differs
+                sb.Append("\n  ").Append(name).Append(": +").Append(added.Count).Append(" -").Append(removed.Count);
+                foreach (string x in added.Take(3)) sb.Append("\n    + ").Append(x);
+                foreach (string x in removed.Take(3)) sb.Append("\n    - ").Append(x);
+            }
+            throw new InvalidOperationException(sb.ToString());
+        }
+
+        static Dictionary<string, HashSet<string>> ParseManifest(string text)
+        {
+            var d = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            HashSet<string> cur = null;
+            foreach (string line in text.Split('\n'))
+            {
+                if (line.Length == 0) continue;
+                if (line[0] == '[') { string name = line.Substring(1, line.IndexOf(']') - 1); d[name] = cur = new HashSet<string>(StringComparer.Ordinal); }
+                else cur?.Add(line);
+            }
+            return d;
         }
 
         static string Short(string sub) => sub.StartsWith("Hollowmere_", StringComparison.Ordinal) ? sub.Substring("Hollowmere_".Length) : sub;
