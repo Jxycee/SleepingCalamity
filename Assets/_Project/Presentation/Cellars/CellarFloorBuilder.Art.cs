@@ -28,10 +28,11 @@ namespace SleepingCalamity.Presentation
     // ---------------------------------------------------------------------------------------------------------------------------------------------------
     public static class CellarArtTuning
     {
-        public const float Ambient = 0.36f;                         // trilight ambient intensity (was 0.8, round 1 0.35, round 2 0.28; the corner uses 0.23 but its lamps sit closer together). Round 3 (B6): 0.28 -> 0.36, so unlit pillar sides keep warm stone value
-        public const float FillIntensity = 1.6f;                    // per-room fill light (was 4.0, round 1 1.8, round 2 1.0; round 3 (B6) 1.6)
+        public const float Ambient = 0.50f;                         // trilight ambient intensity (was 0.8, round 1 0.35, round 2 0.28; the corner uses 0.23 but its lamps sit closer together). Round 3 (B6): 0.28 -> 0.36, so unlit pillar sides keep warm stone value
+        public const float FillIntensity = 28.0f;                    // per-room fill light (was 4.0, round 1 1.8, round 2 1.0; round 3 (B6) 1.6)
+        public const float UnlitFillScale = 1.6f;                     // B8: fill multiplier for a room with no lamp at all on a lit floor (its lanterns rolled empty)
         public const float PierGlowIntensity = 1.5f, PierGlowRange = 3.4f;   // round 3 (B6): a warm unshadowed uplight at the foot of every kit pier, so a pillar between lamp and camera is not a black silhouette
-        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f, CorridorLampRangeScale = 0.7f, CentreLampScale = 1.15f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
+        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f, CorridorLampRangeScale = 0.7f, CentreLampScale = 2.4f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
         public const float FogWarmScale = 0.5f, FogWarmClamp = 0.03f;   // the per-floor fog warm offset: halved, then within this of the base colour per channel
         public static readonly Color FillGold = new Color(1.0f, 0.86f, 0.70f);
         public static readonly Color LampGold = new Color(1.0f, 0.85f, 0.66f);
@@ -49,7 +50,7 @@ namespace SleepingCalamity.Presentation
     {
         public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing", ClutterGroup = "Clutter";
         public const float RoomSpring = 2.6f, CorridorSpring = 1.6f, VaultHalfSpan = 2.0f, VaultRise = 2.5f;
-        public const float WallLampIntensity = 18f * CellarArtTuning.LampBoost, CentreLampIntensity = 18f * CellarArtTuning.LampBoost, CorridorLampIntensity = 11f * CellarArtTuning.LampBoost * CellarArtTuning.CorridorLampScale;
+        public const float WallLampIntensity = 18f * CellarArtTuning.LampBoost * 1.6f, CentreLampIntensity = 18f * CellarArtTuning.LampBoost, CorridorLampIntensity = 11f * CellarArtTuning.LampBoost * CellarArtTuning.CorridorLampScale;
         const float FaceDepth = 0.2f, KitAcross = 0.725f;   // VaultSegment / ArchRib (5 m inside, 6 m outside): 0.725 keeps the outer wall face 2.175 m from the axis, just behind a neighbour's 0.2 m face, inner face 1.83 m (on the wall colliders)
         static readonly Color CandleGold = CellarArtTuning.CandleGold, FillGold = CellarArtTuning.FillGold;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
@@ -57,10 +58,30 @@ namespace SleepingCalamity.Presentation
         enum Edge { Closed, Door, Through }
         enum Bay { Room, StraightNS, StraightEW, Junction }
 
+        const int CoalFloor = 6;   // floors 6-7 (Coal Cellars, Stokehold): square piers, soot walls, oil lanterns
+
+        // B8 wall variant for a room's end walls by floor look (design section 5): limewash on 1-2, brick-infill arch on 3-4, plain ashlar on 5, soot on the coal floors.
+        static string WallPieceFor(int floor, CellarFloorKit kit)
+        {
+            string p = floor <= 2 ? "WallLime" : floor <= 4 ? "WallBrickArch" : floor < CoalFloor ? "WallAshlar" : "WallSoot";
+            return HasPiece(kit, p) ? p : "EndWall";
+        }
+
+        // A room cell takes a groin bay when its room is three or more cells wide and tall, the cell is plain floor and every side runs on into the same room.
+        static bool UseGroinBay(CellarFloorLayout layout, Grid grid, CellarFloorKit kit, int x, int y)
+        {
+            if (!HasPiece(kit, "GroinBay")) return false;
+            PlacedRoom p = layout.Rooms[grid.Room[x, y]];
+            if (p.Width < 3 || p.Height < 3 || p.Room.CellAt(x - p.X, y - p.Y) != CellKind.Floor) return false;
+            foreach (CellSide s in Sides) if (EdgeOf(grid, x, y, s) != Edge.Through) return false;
+            return true;
+        }
+
         static bool HasPiece(CellarFloorKit kit, string name) => kit != null && kit.Pieces != null && kit.Pieces.TryGetValue(name, out GameObject g) && g != null;
 
         static void Dress(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, Transform root, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
+            CellarFloorLookRow look = CellarFloorLook.For(layout.Floor);
             Transform vaults = Group(root, VaultGroup), ceiling = Group(root, CeilingGroup), faces = Group(root, FaceGroup), dressing = Group(root, DressingGroup);
 
             // racks claim their wall face (the niche wall replaces the plain end wall or brick)
@@ -85,7 +106,13 @@ namespace SleepingCalamity.Presentation
                     string id = x + "_" + y;
 
                     // ceiling bay
-                    if (bay == Bay.Junction)
+                    if (room && UseGroinBay(layout, grid, kit, x, y))
+                    {
+                        // B8: an interior cell of a room three or more cells wide each way gets the kit's groin bay (scaled to the room's 2.6 m springing), with its four corner piers
+                        PlacePiece(kit, "GroinBay", ceiling, "GroinBay_" + id, c, Quaternion.identity, new Vector3(1f, RoomSpring / 2.4f, 1f));
+                        result.Vaults++;
+                    }
+                    else if (bay == Bay.Junction)
                     {
                         Shape(ceiling, "Groin_" + id, c + new Vector3(0, spring, 0), Quaternion.identity, Vector3.one, LookTestGeometry.Shape.GroinVault,
                             new Vector3(VaultHalfSpan, VaultRise, 0f), mats.Ceiling, 16);
@@ -137,7 +164,7 @@ namespace SleepingCalamity.Presentation
                             Quaternion inward = Quaternion.LookRotation(-d, Vector3.up);
                             Vector3 facePlane = c + d * (CellSize * 0.5f - FaceDepth);
                             Vector3 kitScale = new Vector3(CellSize / 6f, WallHeight / 4.6f, 0.7f);   // the 6 x 4.6 m end walls to one 4 x 3.6 m cell side, 0.35 m deep
-                            GameObject face = null;
+                            GameObject face = null; Material backingMat = mats.Limewash;
                             if (room && rackFaces.Contains((x, y, s))) face = PlacePiece(kit, "NicheWall", faces, "NicheWall_" + sid, facePlane, inward, kitScale);
                             if (face != null)
                             {
@@ -145,9 +172,14 @@ namespace SleepingCalamity.Presentation
                                 Vector3 sill = facePlane + inward * Vector3.Scale(kitScale, new Vector3(1.3f, 1.31f, -0.08f));
                                 if (!rackEmpty.Contains((x, y, s))) { CandleCluster(dressing, mats, sill, "niche_" + sid, -d * 0.12f + new Vector3(0, 0.25f, 0)); result.Candles++; }   // an empty rack keeps its niche but not its candle
                             }
-                            else if (room && across) face = PlacePiece(kit, "EndWall", faces, "EndWall_" + sid, facePlane, inward, kitScale);
-                            if (face != null)   // the B5 end walls are arch-topped (the 6 m vault's profile): a limewash backing fills the spandrels to 3.6 m
-                                Box(faces, "Backing_" + sid, c + d * (CellSize * 0.5f - 0.05f) + new Vector3(0, WallHeight * 0.5f, 0), Size(alongEdge, WallHeight, 0.1f, ns), mats.Limewash, 2f, false);
+                            else if (room && across)
+                            {
+                                string wallPiece = WallPieceFor(layout.Floor, kit);   // B8: the floor's wall variant (WallLime 1-2, WallBrickArch 3-4, WallAshlar 5, WallSoot 6-7); the old EndWall when the kit lacks it
+                                face = PlacePiece(kit, wallPiece, faces, wallPiece + "_" + sid, facePlane, inward, kitScale);
+                                if (face != null) backingMat = wallPiece == "WallLime" || wallPiece == "EndWall" ? mats.Limewash : mats.Wall;
+                            }
+                            if (face != null)   // the B5 end walls are arch-topped (the 6 m vault's profile): a backing fills the spandrels to 3.6 m
+                                Box(faces, "Backing_" + sid, c + d * (CellSize * 0.5f - 0.05f) + new Vector3(0, WallHeight * 0.5f, 0), Size(alongEdge, WallHeight, 0.1f, ns), backingMat, 2f, false);
                             else
                                 Box(faces, "Face_" + sid, faceMid + new Vector3(0, WallHeight * 0.5f, 0), Size(alongEdge, WallHeight, FaceDepth, ns),
                                     room && across ? mats.Limewash : mats.Wall, 2f, false);
@@ -165,7 +197,17 @@ namespace SleepingCalamity.Presentation
                     }
 
                     // kit piers on pillar cells: three stacked B5 pillars reach the crown
-                    if (room && HasPiece(kit, "Pillar") && layout.Rooms[grid.Room[x, y]].Room.CellAt(x - layout.Rooms[grid.Room[x, y]].X, y - layout.Rooms[grid.Room[x, y]].Y) == CellKind.Pillar)
+                    bool isPillar = room && layout.Rooms[grid.Room[x, y]].Room.CellAt(x - layout.Rooms[grid.Room[x, y]].X, y - layout.Rooms[grid.Room[x, y]].Y) == CellKind.Pillar;
+                    if (isPillar && layout.Floor < CoalFloor && HasPiece(kit, "PillarRound"))
+                    {
+                        // B8: floors 1-5 stand a round drum pillar (top at 2.4 m, stretched to the room's 2.6 m springing) with a plain stone shaft up to the crown; coal floors keep the square pier
+                        PlacePiece(kit, "PillarRound", dressing, "PierRound_" + id, c, Quaternion.identity, new Vector3(1.3f, RoomSpring / 2.4f, 1.3f));
+                        GameObject shaft = Prim(dressing, "PierShaft_" + id, PrimitiveType.Cylinder, c + new Vector3(0, (RoomSpring + crown + 0.15f) * 0.5f, 0), new Vector3(0.9f, (crown + 0.15f - RoomSpring) * 0.5f, 0.9f), mats.Ceiling);
+                        shaft.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                        FillLight(dressing, "PierGlow_" + id, c + new Vector3(0, 0.7f, 0), FillGold, CellarArtTuning.PierGlowIntensity, CellarArtTuning.PierGlowRange);
+                        result.Props++;
+                    }
+                    else if (isPillar && HasPiece(kit, "Pillar"))
                     {
                         const float pierH = 1.61f; float sy = (crown + 0.15f) / (3f * pierH);
                         for (int k = 0; k < 3; k++)
@@ -191,11 +233,15 @@ namespace SleepingCalamity.Presentation
                 PlacedRoom p = layout.Rooms[r];
                 Vector3 a = CellCenter(p.X, p.Y), b = CellCenter(p.X + p.Width - 1, p.Y + p.Height - 1);
                 float span = Mathf.Max(p.Width, p.Height) * CellSize;
-                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, 1.8f, 0), FillGold, CellarArtTuning.FillIntensity, span * 0.75f + 2f);
+                // B8: a room whose lanterns all rolled empty (and that got no centre lamp) on a lit floor would read black; it gets a stronger, higher fill standing in for a lamp
+                bool hasLamp = false; string lampPrefix = "Lamp_r" + r + "_";
+                foreach (Transform lamp in root.Find(LampGroup)) if (lamp.name.StartsWith(lampPrefix)) { hasLamp = true; break; }
+                bool unlit = !hasLamp && !resolved.Atmosphere.Dark;
+                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, unlit || look.Soot > 0.5f ? 2.8f : 1.8f, 0), FillGold, CellarArtTuning.FillIntensity * (1f + 7f * look.Soot) * (look.Limewash >= 0.5f ? 1.3f : 1f) * (unlit ? CellarArtTuning.UnlitFillScale : 1f), span * 0.75f + 2f);
             }
             if (kit.Mote != null)
                 foreach (Transform lamp in root.Find(LampGroup))
-                    if (lamp.Find("Hook") != null) Motes(dressing, "Motes_" + lamp.name, lamp.position + new Vector3(0, 0.2f, 0), new Vector3(3f, 2.2f, 3f), 90, kit.Mote);
+                    if (lamp.Find("Hook") != null || lamp.Find("Sconce") != null) Motes(dressing, "Motes_" + lamp.name, lamp.position + new Vector3(0, 0.2f, 0), new Vector3(3f, 2.2f, 3f), 90, kit.Mote);
         }
 
         // ------------------------------------------------------------------------------------------------ socket dressing
@@ -369,13 +415,23 @@ namespace SleepingCalamity.Presentation
 
         // The one hook the main builder calls after its own pass (lamps, atmosphere): recolours every lamp light to CellarArtTuning.LampGold and sets the fog colour from the
         // tuning block (the base plus the floor's warm offset, halved and clamped), so the colour tuning lives in this file only.
-        static void ArtFinish(Transform root, CellarFloorKit kit, CellarFloorBuild result)
+        static void ArtFinish(Transform root, CellarFloorKit kit, Mats mats, CellarFloorLookRow look, CellarFloorBuild result)
         {
+            // B8: the kit-piece clones hold the kit's shared wall, limewash, stone and floor materials: give them this floor's instances (walls, vaults, piers, flags).
+            if (root != null)
+                foreach (Renderer rd in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] cur = rd.sharedMaterials; bool changed = false;
+                    for (int i = 0; i < cur.Length; i++)
+                        if (cur[i] != null && mats.Swap.TryGetValue(cur[i], out Material to)) { cur[i] = to; changed = true; }
+                    if (changed) rd.sharedMaterials = cur;
+                }
             Transform lamps = root != null ? root.Find(LampGroup) : null;
             if (lamps != null)
                 foreach (Light l in lamps.GetComponentsInChildren<Light>(true))
                 {
-                    l.color = CellarArtTuning.LampGold;
+                    l.color = Color.Lerp(CellarArtTuning.LampGold, look.LampTint, CellarFloorLook.LampTintWeight);
+                    l.intensity *= look.LampScale;   // the dark-floor roll already scaled the intensity; this multiplies on top
                     string owner = l.transform.parent != null ? l.transform.parent.name : "";
                     if (owner.StartsWith("Lamp_c")) l.range *= CellarArtTuning.CorridorLampRangeScale;                 // corridor pools fall off into darker walls between lamps
                     else if (owner.StartsWith("Lamp_r") && owner.EndsWith("_c")) l.intensity *= CellarArtTuning.CentreLampScale;   // the room's hanging centre lamp
@@ -383,7 +439,7 @@ namespace SleepingCalamity.Presentation
             if (kit != null && kit.FogBaseDensity > 0f && result.Dressing != null)
             {
                 result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);
-                RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);
+                RenderSettings.fogColor = CellarArtTuning.FogColor(look.FogTint, fr, fg, fb);
                 HasLastFog = true; LastFogDensity = RenderSettings.fogDensity; LastFogColor = RenderSettings.fogColor;   // the town area look re-applies these when the viewer is in the cellar
             }
         }

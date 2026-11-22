@@ -1,0 +1,611 @@
+{
+  "assetCategories": {
+    "surface": {
+      "historical": {
+        "asian": {}
+      },
+      "stone": {
+        "floor": {}
+      }
+    }
+  },
+  "averageColor": "#000000",
+  "categories": [
+    "surface",
+    "stone",
+    "floor"
+  ],
+  "comp_version": 1,
+  "description": "",
+  "displacementBias": 0.664677,
+  "displacementCalibrationAccuracy": 0.962428,
+  "displacementScale": 6.734693,
+  "environment": {
+    "biome": "undefined",
+    "region": "Asia"
+  },
+  "highest_available_res": 8192,
+  "id": "veilfjxn",
+  "json": {
+    "contentLength": 12778,
+    "uri": "veilfjxn.json"
+  },
+  "maps": [
+    {
+      "averageColor": "#D4D4D4",
+      "bitDepth": 32,
+      "colorSpace": "sRGB",
+      "contentLength": 100083148,
+      "maxIntensity": 255,
+      "mimeType": "image/x-exr",
+      "minIntensity": 100,
+      "name": "AO",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "ao",
+      "uri": "veilfjxn_8K_AO.exr"
+    },
+    {
+      "averageColor": "#D4D4D4",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 37394549,
+      "maxIntensity": 255,
+      "mimeType": "image/jpeg",
+      "minIntensity": 100,
+      "name": "AO",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "ao",
+      "uri": "veilfjxn_8K_AO.jpg"
+    },
+    {
+      "averageColor": "#483E2B",
+      "bitDepth": 16,
+      "colorSpace": "sRGB",
+      "contentLength": 264815005,
+      "maxIntensity": 94,
+      "mimeType": "image/x-exr",
+      "minIntensity": 0,
+      "name": "Basecolor",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "basecolor",
+      "uri": "veilfjxn_8K_Basecolor.exr"
+    },
+    {
+      "averageColor": "#483E2B",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 51087492,
+      "maxIntensity": 94,
+      "mimeType": "image/jpeg",
+      "minIntensity": 0,
+      "name": "Basecolor",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "basecolor",
+      "uri": "veilfjxn_8K_Basecolor.jpg"
+    },
+    {
+      "averageColor": "#808080",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 195971573,
+      "maxIntensity": 255,
+      "mimeType": "image/x-exr",
+      "minIntensity": 0,
+      "name": "Bump",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "bump",
+      "uri": "veilfjxn_8K_Bump.exr"
+    },
+    {
+      "averageColor": "#808080",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 16370146,
+      "maxIntensity": 255,
+      "mimeType": "image/jpeg",
+      "minIntensity": 0,
+      "name": "Bump",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "bump",
+      "uri": "veilfjxn_8K_Bump.jpg"
+    },
+    {
+      "averageColor": "#FFFFFF",
+      "bitDepth": 32,
+      "colorSpace": "sRGB",
+      "contentLength": 206237987,
+      "maxIntensity": 255,
+      "mimeType": "image/x-exr",
+      "minIntensity": 255,
+      "name": "Cavity",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "cavity",
+      "uri": "veilfjxn_8K_Cavity.exr"
+    },
+    {
+      "averageColor": "#FFFFFF",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 47128026,
+      "maxIntensity": 255,
+      "mimeType": "image/jpeg",
+      "minIntensity": 255,
+      "name": "Cavity",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "cavity",
+      "uri": "veilfjxn_8K_Cavity.jpg"
+    },
+    {
+      "averageColor": "#818181",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 262789228,
+      "maxIntensity": 159,
+      "mimeType": "image/x-exr",
+      "minIntensity": 91,
+      "name": "Displacement",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "displacement",
+      "uri": "veilfjxn_8K_Displacement.exr"
+    },
+    {
+      "averageColor": "#818181",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 5183388,
+      "maxIntensity": 159,
+      "mimeType": "image/jpeg",
+      "minIntensity": 91,
+      "name": "Displacement",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "displacement",
+      "uri": "veilfjxn_8K_Displacement.jpg"
+    },
+    {
+      "averageColor": "#2A2A2A",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 119892423,
+      "maxIntensity": 78,
+      "mimeType": "image/x-exr",
+      "minIntensity": 13,
+      "name": "Gloss",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "gloss",
+      "uri": "veilfjxn_8K_Gloss.exr"
+    },
+    {
+      "averageColor": "#2A2A2A",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 39259897,
+      "maxIntensity": 78,
+      "mimeType": "image/jpeg",
+      "minIntensity": 13,
+      "name": "Gloss",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "gloss",
+      "uri": "veilfjxn_8K_Gloss.jpg"
+    },
+    {
+      "averageColor": "#8281F3",
+      "bitDepth": 16,
+      "colorSpace": "Linear",
+      "contentLength": 215461584,
+      "maxIntensity": 198,
+      "mimeType": "image/x-exr",
+      "minIntensity": 84,
+      "name": "Normal",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "normal",
+      "uri": "veilfjxn_8K_Normal.exr"
+    },
+    {
+      "averageColor": "#8281F3",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 81333531,
+      "maxIntensity": 198,
+      "mimeType": "image/jpeg",
+      "minIntensity": 84,
+      "name": "Normal",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "normal",
+      "uri": "veilfjxn_8K_Normal.jpg"
+    },
+    {
+      "averageColor": "#D5D5D5",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 122996010,
+      "maxIntensity": 242,
+      "mimeType": "image/x-exr",
+      "minIntensity": 177,
+      "name": "Roughness",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "roughness",
+      "uri": "veilfjxn_8K_Roughness.exr"
+    },
+    {
+      "averageColor": "#D5D5D5",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 37532931,
+      "maxIntensity": 242,
+      "mimeType": "image/jpeg",
+      "minIntensity": 177,
+      "name": "Roughness",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "roughness",
+      "uri": "veilfjxn_8K_Roughness.jpg"
+    },
+    {
+      "averageColor": "#383838",
+      "bitDepth": 16,
+      "colorSpace": "sRGB",
+      "contentLength": 234330857,
+      "maxIntensity": 56,
+      "mimeType": "image/x-exr",
+      "minIntensity": 56,
+      "name": "Specular",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "specular",
+      "uri": "veilfjxn_8K_Specular.exr"
+    },
+    {
+      "averageColor": "#383838",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 29258164,
+      "maxIntensity": 56,
+      "mimeType": "image/jpeg",
+      "minIntensity": 56,
+      "name": "Specular",
+      "physicalSize": "2x2",
+      "resolution": "8192x8192",
+      "type": "specular",
+      "uri": "veilfjxn_8K_Specular.jpg"
+    }
+  ],
+  "meta": [
+    {
+      "key": "scanArea",
+      "name": "Scan Area",
+      "value": "2x2 m"
+    },
+    {
+      "key": "height",
+      "name": "Height",
+      "value": "0.053 m"
+    },
+    {
+      "key": "tileable",
+      "name": "Tileable",
+      "value": true
+    },
+    {
+      "key": "tiling_directions",
+      "name": "Tiling Directions",
+      "value": [
+        "x",
+        "y"
+      ]
+    },
+    {
+      "key": "texelDensity",
+      "name": "Texel Density",
+      "value": "4096 px/m"
+    },
+    {
+      "key": "calibration",
+      "name": "Calibration",
+      "value": "GretagMacbeth ColorChecker Color Rendition Chart"
+    },
+    {
+      "key": "scanner",
+      "name": "Scanner",
+      "value": "MKX"
+    }
+  ],
+  "models": [],
+  "name": "Mossy Stone Floor",
+  "pack": {
+    "_id": "japanese-shrine",
+    "name": "Japanese Shrine"
+  },
+  "physicalSize": null,
+  "points": 2,
+  "previews": {
+    "images": [
+      {
+        "contentLength": 243872,
+        "resolution": "360x360",
+        "tags": [
+          "thumb"
+        ],
+        "uri": "veilfjxn_Grid_360.png"
+      },
+      {
+        "contentLength": 331284,
+        "resolution": "420x420",
+        "tags": [
+          "thumb"
+        ],
+        "uri": "veilfjxn_Grid_420.png"
+      },
+      {
+        "contentLength": 983139,
+        "resolution": "720x720",
+        "tags": [
+          "thumb",
+          "retina"
+        ],
+        "uri": "veilfjxn_Grid_720.png"
+      },
+      {
+        "contentLength": 1342427,
+        "resolution": "840x840",
+        "tags": [
+          "thumb",
+          "retina"
+        ],
+        "uri": "veilfjxn_Grid_840.png"
+      },
+      {
+        "contentLength": 3057555,
+        "resolution": "1440x768",
+        "tags": [
+          "preview",
+          "clay"
+        ],
+        "uri": "veilfjxn_PopupClay_1440.png"
+      },
+      {
+        "contentLength": 5758409,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview",
+          "clay"
+        ],
+        "uri": "veilfjxn_PopupClay_1920.png"
+      },
+      {
+        "contentLength": 12335775,
+        "resolution": "2880x1536",
+        "tags": [
+          "preview",
+          "clay",
+          "retina"
+        ],
+        "uri": "veilfjxn_PopupClay_2880.png"
+      },
+      {
+        "contentLength": 23472932,
+        "resolution": "3840x2160",
+        "tags": [
+          "preview",
+          "clay",
+          "retina"
+        ],
+        "uri": "veilfjxn_PopupClay_3840.png"
+      },
+      {
+        "contentLength": 3167559,
+        "resolution": "1440x768",
+        "tags": [
+          "preview",
+          "tiled"
+        ],
+        "uri": "veilfjxn_PopupTiled_1440.png"
+      },
+      {
+        "contentLength": 5935780,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview",
+          "tiled"
+        ],
+        "uri": "veilfjxn_PopupTiled_1920.png"
+      },
+      {
+        "contentLength": 12653918,
+        "resolution": "2880x1536",
+        "tags": [
+          "preview",
+          "tiled",
+          "retina"
+        ],
+        "uri": "veilfjxn_PopupTiled_2880.png"
+      },
+      {
+        "contentLength": 23936237,
+        "resolution": "3840x2160",
+        "tags": [
+          "preview",
+          "tiled",
+          "retina"
+        ],
+        "uri": "veilfjxn_PopupTiled_3840.png"
+      },
+      {
+        "contentLength": 3166870,
+        "resolution": "1440x768",
+        "tags": [
+          "preview"
+        ],
+        "uri": "veilfjxn_Popup_1440.png"
+      },
+      {
+        "contentLength": 5925278,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview"
+        ],
+        "uri": "veilfjxn_Popup_1920.png"
+      },
+      {
+        "contentLength": 12596638,
+        "resolution": "2880x1536",
+        "tags": [
+          "preview",
+          "retina"
+        ],
+        "uri": "veilfjxn_Popup_2880.png"
+      },
+      {
+        "contentLength": 23746953,
+        "resolution": "3840x2160",
+        "tags": [
+          "preview",
+          "retina"
+        ],
+        "uri": "veilfjxn_Popup_3840.png"
+      }
+    ],
+    "relativeSize": "1x1",
+    "scaleReferences": []
+  },
+  "process_date": "2024-04-16 23:12:28",
+  "properties": [],
+  "referencePreviews": {
+    "maps": [],
+    "models": []
+  },
+  "references": [],
+  "revised": false,
+  "revision": 0,
+  "semanticTags": {
+    "architectural_style": {},
+    "asset_type": "surface",
+    "color": [
+      "Brown",
+      "Gray",
+      "Green"
+    ],
+    "contains": [
+      "moss",
+      "dirt",
+      "stone",
+      "pine needles",
+      "tiles"
+    ],
+    "country": "Japan",
+    "descriptive": [
+      "mossy",
+      "rough",
+      "weathered",
+      "dirty",
+      "wet",
+      "damp",
+      "moist"
+    ],
+    "environment": [
+      "ancient"
+    ],
+    "industry": [
+      "archviz",
+      "games",
+      "VFX"
+    ],
+    "interior_exterior": [
+      "exterior"
+    ],
+    "locations": {
+      "Asia": {
+        "Japan": {}
+      }
+    },
+    "maxSize": 2,
+    "minSize": 2,
+    "name": "Mossy Stone Floor",
+    "orientation": [
+      "floor"
+    ],
+    "region": "Asia",
+    "resolution": 8192,
+    "state": [
+      "old",
+      "damaged"
+    ],
+    "subject_matter": "manmade",
+    "theme": [
+      "exterior",
+      "rural",
+      "japanese",
+      "shrines"
+    ]
+  },
+  "tags": [
+    "brown",
+    "gray",
+    "green",
+    "exterior",
+    "rural",
+    "japanese",
+    "moss",
+    "dirt",
+    "stone",
+    "pine needles",
+    "mossy",
+    "rough",
+    "weathered",
+    "dirty",
+    "wet",
+    "damp",
+    "moist"
+  ],
+  "texelDensity": 4096,
+  "texture_type": "basic",
+  "ue_plugin_archives": [
+    {
+      "contentLength": 323285510,
+      "gltfVersion": "2.0",
+      "tier": 0,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_0/veilfjxn_tier_0.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 101566005,
+      "gltfVersion": "2.0",
+      "tier": 1,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_1/veilfjxn_tier_1.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 26068436,
+      "gltfVersion": "2.0",
+      "tier": 2,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_2/veilfjxn_tier_2.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 2255868,
+      "gltfVersion": "2.0",
+      "tier": 3,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_3/veilfjxn_tier_3.zip",
+      "version": 1
+    }
+  ],
+  "version": 2
+}

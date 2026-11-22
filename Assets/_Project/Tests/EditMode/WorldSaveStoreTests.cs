@@ -224,7 +224,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.That(WorldSaveStore.Upgrade(GoldenV1), Is.EqualTo(GoldenV1));
             Assert.That(WorldSaveStore.Upgrade("not json"), Is.EqualTo("not json"));
-            Assert.That(WorldSaveStore.Upgrade("{\"schemaVersion\": 0}"), Does.Contain("schemaVersion"));
+            Assert.That(WorldSaveStore.Upgrade("{\"schemaVersion\": 0}"), Is.EqualTo("{\"schemaVersion\": 0}"));
         }
 
         // Catches: a type error in one section ("kind": "x" into an int, a recorded list that is a number) making the whole file unreadable
@@ -494,13 +494,102 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Bags_OneBadEntry_IsDroppedAlone()
         {
-            string bags = "{ \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 5 }, { \"identity\": 1, \"id\": \"bbb\", \"gold\": \"lots\" }, { \"identity\": 77, \"id\": \"ccc\", \"gold\": 1 } ] }";
+            string bags = "{ \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 5 }, { \"identity\": \"x\", \"id\": \"bbb\", \"gold\": 2 }, { \"identity\": 77, \"id\": \"ccc\", \"gold\": 1 } ] }";
             File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"bags\": " + bags + ", \"players\""));
             WorldSaveStore store = Load();
             Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "named so the original is kept");
             Assert.That(store.Current.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa" }));
             Assert.That(store.Current.Bags.Players[0].Gold, Is.EqualTo(5));
             Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        const string BagsHead = "\"bags\": ";
+
+        static string BagsFile(string playersJson) => GoldenV1.Replace("\"players\"", BagsHead + "{ \"players\": [ " + playersJson + " ] }, \"players\"");
+
+        // Catches: a file written by today's code (WorldSaveStore's own serializer, camelCase, indented) not loading exactly after the bag rows changed. The text is committed as a fixture.
+        const string TodaysBagsJson = @"{
+      ""players"": [
+        {
+          ""identity"": 1,
+          ""id"": ""aaa"",
+          ""gold"": 7,
+          ""stash"": [
+            { ""itemId"": 104, ""count"": 3 },
+            { ""itemId"": 110, ""count"": 1 }
+          ],
+          ""satchel"": {
+            ""floor"": 2,
+            ""items"": [ 110, 111 ]
+          }
+        },
+        { ""identity"": 1, ""id"": ""bbb"", ""gold"": 0, ""stash"": [], ""satchel"": null }
+      ]
+    }";
+
+        [Test]
+        public void Bags_FileWrittenByTodaysCode_StillLoadsExactly()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", BagsHead + TodaysBagsJson + ", \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.Current.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa", "bbb" }));
+            PlayerBagSave a = store.Current.Bags.Players[0];
+            Assert.That(a.Gold, Is.EqualTo(7));
+            Assert.That(a.Stash.Select(r => r.ItemId + ":" + r.Count), Is.EqualTo(new[] { "104:3", "110:1" }));
+            Assert.That(a.Satchel.Floor, Is.EqualTo(2)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110, 111 }));
+        }
+
+        // Catches: one mistyped value inside a bag entry costing the player's whole bag (gold, stash and satchel).
+        [Test]
+        public void Bags_BadGold_KeepsStashAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": \"lots\", \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "named so the original is kept");
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(0));
+            Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadStashRow_KeepsTheOtherRowsGoldAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 }, { \"itemId\": 105, \"count\": \"two\" }, { \"itemId\": 106, \"count\": 1 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }));
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9));
+            Assert.That(a.Stash.Select(r => r.ItemId), Is.EqualTo(new[] { 104, 106 }));
+            Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_ScalarStash_KeepsGoldAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": 5, \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash, Is.Empty); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadSatchelItem_KeepsTheRestOfTheSatchelGoldAndStash()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110, \"x\" ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }));
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadSatchelFloor_DropsOnlyTheSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": \"two\", \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel, Is.Null);
         }
 
         // Catches: HostWorld dropping the bags section, writing a pristine one into a file that has none, or writing bags of players the world does not record.
@@ -662,6 +751,21 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(old.Current.Dive.ClearedMask, Is.EqualTo(3));
         }
 
+        // Catches (PARKING_LOT :66, the 3-player extra-slot owner lives in dive.extraSlotOwner): a bad owner value costing the rest of the dive section or the file. A malformed id drops only the owner.
+        [Test]
+        public void DiveExtraSlotOwner_BadValue_KeepsTheRestOfTheDiveSectionAndFile()
+        {
+            foreach (string bad in new[] { "\"not-a-bag-id\"", "\"Nope:abc\"", "5", "\"\"" })
+            {
+                File.WriteAllText(_path, WithSection("dive", "{ \"inDive\": false, \"checkpointHeld\": true, \"bossBeaten\": true, \"extraSlotOwner\": " + bad + " }"));
+                WorldSaveStore store = Load();
+                Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), bad);
+                Assert.That(store.Current.Dive.ExtraSlotOwner, Is.Null, bad);
+                Assert.That(store.Current.Dive.CheckpointHeld, Is.True, bad + ": the rest of the dive section is kept");
+                Assert.That(store.Current.Dive.BossBeaten, Is.True, bad);
+            }
+        }
+
         // Catches (sc-netcode "World save"): a mistyped suspend section failing the whole WorldSave parse, so the world rolls back to .bak.
         [Test]
         public void Suspend_MistypedSection_KeepsTheRestOfTheFile()
@@ -753,6 +857,81 @@ namespace SleepingCalamity.Tests.EditMode
             return players.ToSave();
         }
 
+        // Catches (N2): a scalar where a list belongs ("heroes": 5) dropping the whole weapons section, with every player's weapon growth, instead of only that list.
+        [Test]
+        public void Weapons_ScalarWhereHeroesListBelongs_KeepsWeapons()
+        {
+            WorldSaveStore writer = Load();
+            WorldSave w = WorldSaveRules.New(7UL);
+            w.Weapons = OneWeapon("me", 1);
+            writer.Replace(w);
+            Assert.That(writer.FlushIfDirty(), Is.True);
+            Newtonsoft.Json.Linq.JObject root = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(_path));
+            root["weapons"]["heroes"] = 5;   // a scalar where the heroes list belongs
+            File.WriteAllText(_path, root.ToString());
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionWeapons }));
+            Assert.That(store.Current.Weapons, Is.Not.Null, "the weapons section stays");
+            Assert.That(store.Current.Weapons.Weapons, Has.Count.EqualTo(1));
+            Assert.That(store.Current.Weapons.Heroes, Is.Empty);
+        }
+
+        // Catches (N2): the same loss for each other section whose list holds a scalar; the file's other sections (players) always stay.
+        [Test]
+        public void ScalarWhereAListBelongs_CostsOnlyThatList_InEverySection()
+        {
+            (string section, string json, string name)[] cases =
+            {
+                ("weapons", "{ \"weapons\": 5, \"heroes\": [] }", WorldSaveRules.SectionWeapons),
+                ("bags", "{ \"players\": 5 }", WorldSaveRules.SectionBags),
+                ("stock", "{ \"pieces\": 5, \"residents\": [ \"baker\" ] }", TownSaveRules.SectionStock),
+                ("stock", "{ \"pieces\": [ 100 ], \"residents\": 5 }", TownSaveRules.SectionStock),
+                ("town", "{ \"buildings\": 5 }", TownSaveRules.SectionTown),
+                ("residents", "{ \"residents\": 5 }", TownSaveRules.SectionResidents),
+            };
+            foreach ((string section, string json, string name) in cases)
+            {
+                File.WriteAllText(_path, WithSection(section, json));
+                WorldSaveStore store = Load();
+                Assert.That(store.Rejected, Is.EqualTo(new[] { name }), section + " is named as partly dropped");
+                Assert.That(store.Current.Players, Is.Not.Null, section + ": the players section stays");
+                Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2), section + ": the recorded players stay");
+                Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), section + ": the file itself loads");
+            }
+            File.WriteAllText(_path, WithSection("stock", "{ \"pieces\": 5, \"residents\": [ \"baker\" ] }"));
+            Assert.That(Load().Current.Stock.Residents, Is.EqualTo(new[] { "baker" }), "the sibling list stays");
+            File.WriteAllText(_path, WithSection("stock", "{ \"pieces\": [ 100 ], \"residents\": 5 }"));
+            Assert.That(Load().Current.Stock.Pieces, Is.EqualTo(new[] { 100 }), "the sibling list stays");
+        }
+
+        // Catches (N1): a migration step that leaves the file at its old version (migrated again on every load) or a step that re-runs after it was saved.
+        [Test]
+        public void MigrationStep_IsSavedWithTheNewVersion_AndNotRunAgain()
+        {
+            int runs = 0;
+            WorldSaveStore.TargetVersionOverrideForTests = 2;
+            WorldSaveStore.MigrationStepsForTests = new Dictionary<long, Action<Newtonsoft.Json.Linq.JObject>> { { 1, root => runs++ } };
+            try
+            {
+                File.WriteAllText(_path, GoldenV1);
+                WorldSaveStore store = Load();
+                Assert.That(runs, Is.EqualTo(1), "the v1 file runs the 1 to 2 step");
+                Assert.That(store.Current.SchemaVersion, Is.EqualTo(2));
+                Assert.That(store.Save(), Is.True);
+                StringAssert.Contains("\"schemaVersion\": 2", File.ReadAllText(_path));
+
+                store = Load();
+                Assert.That(runs, Is.EqualTo(1), "the saved file is at version 2: no second run");
+                Assert.That(store.Current.SchemaVersion, Is.EqualTo(2));
+                Assert.That(store.IsReadOnly, Is.False);
+            }
+            finally
+            {
+                WorldSaveStore.TargetVersionOverrideForTests = 0;
+                WorldSaveStore.MigrationStepsForTests = null;
+            }
+        }
+
         static HostWorld HostFor(WorldKind kind, params string[] ids)
         {
             var host = new HostWorld();
@@ -812,6 +991,26 @@ namespace SleepingCalamity.Tests.EditMode
             fresh.CaptureTownInto(blank);
             Assert.That(blank.Dive, Is.Null, "no dive section invented");
             Assert.That(blank.Stock, Is.Null);
+        }
+
+        // Catches: a saved frame depth of 4 (pre-D1 worlds put the frame on floor 4) being cleaned away or re-derived to the new floor 2 on the real load path, or lost at the next capture.
+        [Test]
+        public void HostWorld_SavedFrameOnFloor4_SurvivesLoadAndRecapture()
+        {
+            ulong seed = 1UL;
+            Assert.That(PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId], Is.EqualTo(2), "premise: the seed alone would put the frame on floor 2");
+            var depths = new List<PieceDepthSave>();
+            foreach (PieceSpec s in PieceCatalog.Specs)
+                depths.Add(new PieceDepthSave { Id = s.Id, Floor = s.Id == PieceCatalog.FrameId ? 4 : PieceDepths.Assign(seed, PieceCatalog.Specs)[s.Id] });
+            WorldSave file = OldDiveWorld(seed);
+            file.Dive.PieceDepths = depths;
+
+            HostWorld host = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            host.LoadTown(file);   // CleanSnapshot, then ResolvePieceDepths
+            Assert.That(host.PieceFloors[PieceCatalog.FrameId], Is.EqualTo(4), "the saved depth wins over the seed");
+
+            Assert.That(host.CaptureTownInto(file), Is.True);
+            Assert.That(file.Dive.PieceDepths.Single(p => p.Id == PieceCatalog.FrameId).Floor, Is.EqualTo(4), "re-capture still holds 100:4");
         }
 
         // Catches: a live capture (which knows none of the saved-only fields) wiping the saved depths, held checkpoint or extra-slot owner, or the saved suspend section.
@@ -895,6 +1094,79 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(host.Town.Suspend.PresentIds, Is.EqualTo(new[] { "Local:new" }));
             Assert.That(host.Town.Suspend.ExtraSlotOwner, Is.EqualTo("Local:new"));
             Assert.That(host.Town.Dive.ExtraSlotOwner, Is.EqualTo("Local:new"));
+        }
+
+        // ---- audit A9: the save-file gaps ----
+
+        // Catches: a damaged .bak (a crash mid-rotation, a bad disk block) beside a good main file costing the world, reading as a reset, or the next
+        // save not replacing it with the last good main (the only copy the world would then have).
+        [Test]
+        public void CorruptBak_BesideAGoodMain_IsHarmless_AndTheNextSaveRefillsIt()
+        {
+            File.WriteAllText(_path, GoldenV1);
+            File.WriteAllText(_path + ".bak", "{ \"schemaVersion\": 1, \"players\": {{{ damaged");
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), "the main file is read, the .bak is not even looked at");
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.IsReadOnly, Is.False);
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+            Assert.That(File.ReadAllText(_path + ".bak"), Does.Contain("\"aaa\""), "the save rotated the good main over the damaged .bak");
+            File.Delete(_path);
+            WorldSaveStore fromBak = Load();
+            Assert.That(fromBak.LoadedFrom, Is.EqualTo(MetaLoadSource.Backup), "so a lost main now loads the good copy");
+            Assert.That(fromBak.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // The fixed id the golden file is written under (a world's id is its file name).
+        const string GoldenWorldId = "0123456789abcdef0123456789abcdef";
+
+        // The file as written today by a world that holds every section: players with names, weapons, stock, a placed frame, residents, a dive in progress
+        // with its depth table, per-player bags and the bank-room suspend. A fixture file, never regenerated to make a test pass: GoldenV1Full.json in
+        // Fixtures/ is a world written by this build's store (first save of a full world, then loaded and saved again, which changed nothing).
+        static string GoldenV1Full() => File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "_Project/Tests/EditMode/Fixtures/GoldenV1Full.json")).Replace("\r\n", "\n").TrimEnd();
+
+        // Catches (audit A9): a build that can no longer read a world with all of today's sections (the existing golden has only players), drops or alters
+        // one on the way through the file, or starts writing the sections differently (then the pinned text must be re-pinned on purpose, with a migration
+        // if an old file stops loading). It also fails when a section is added to WorldSave without being added to the fixture.
+        [Test]
+        public void GoldenV1Full_LoadsEverySection_AndSavesBackTheSameText()
+        {
+            string path = Path.Combine(_dir, GoldenWorldId + ".json");   // a world's id is its file name
+            File.WriteAllText(path, GoldenV1Full());
+            var store = new WorldSaveStore(path, DefaultSeed);
+            store.Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.Empty, "no section was dropped");
+            Assert.That(store.IsReadOnly, Is.False);
+
+            WorldSave w = store.Current;
+            foreach (System.Reflection.FieldInfo f in typeof(WorldSave).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (f.Name == nameof(WorldSave.Extra) || f.FieldType == typeof(int)) continue;
+                object value = f.GetValue(w);
+                Assert.That(value, Is.Not.Null, "the golden file has no value for " + f.Name + " (a new section needs adding to GoldenV1Full.json)");
+                if (value is string s) Assert.That(s, Is.Not.Empty, f.Name);
+            }
+            Assert.That(w.WorldId, Is.EqualTo(GoldenWorldId));
+            Assert.That(w.Players.Recorded.Select(p => p.Name), Is.EqualTo(new[] { "Ann", "Bob" }));
+            Assert.That(w.Weapons.Weapons.Single().OwnerId, Is.EqualTo("aaa"));
+            Assert.That(w.Weapons.Heroes.Single().Abilities.Unlocked, Is.EqualTo(new[] { "axe_quake" }));
+            Assert.That(w.Stock.Pieces, Is.EqualTo(new[] { 101, 300, 301 }));
+            Assert.That(w.Town.Buildings.Single().BuildingId, Is.EqualTo("bakery"));
+            Assert.That(w.Residents.Residents.Single().FirstMeetBeat, Is.True);
+            Assert.That(w.Dive.InDive, Is.True);
+            Assert.That(w.Dive.CheckpointHeld, Is.True);
+            Assert.That(w.Bags.Players.Single().Gold, Is.EqualTo(7));
+            Assert.That(w.Suspend.Floor, Is.EqualTo(5));
+            Assert.That(w.Suspend.Seed, Is.EqualTo(uint.MaxValue));
+            Assert.That(w.Suspend.Bags[0].OpenedChests, Is.EqualTo((1UL << 63) | 5UL));
+
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+            Assert.That(File.ReadAllText(path).Replace("\r\n", "\n").TrimEnd(), Is.EqualTo(GoldenV1Full()), "the file is written back exactly as pinned");
         }
     }
 }

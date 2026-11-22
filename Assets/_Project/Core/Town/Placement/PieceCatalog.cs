@@ -15,6 +15,7 @@ namespace SleepingCalamity.Core
     public static class PieceCatalog
     {
         public const int FrameId = 100, OvenId = 101, DoorId = 200, SignId = 201, SpareFrameId = 300, SpareOvenId = 301;   // the six bakery piece ids
+        public const int FrameFloor = 2;   // D1: the bakery frame (id 100) always lives on floor 2 in a new world; a saved assignment still wins (TownSaveRules.ResolvePieceDepths)
         public const int BakerId = 400;   // the baker's rescue entry (the id is kept from the old floor-4 bakery)
 
         public static readonly IReadOnlyList<PieceInfo> All = new[]
@@ -32,7 +33,7 @@ namespace SleepingCalamity.Core
         // PieceDepths.Assign(worldSeed, Specs) runs once per world and the save keeps the result.
         public static readonly IReadOnlyList<PieceSpec> Specs = new[]
         {
-            new PieceSpec(FrameId, 0, false), new PieceSpec(OvenId, 0, false),
+            new PieceSpec(FrameId, FrameFloor, false), new PieceSpec(OvenId, 0, false),   // D1 (2026-11-11): the frame is always on floor 2 in a new world, so the first dive that clears one floor brings home something to place
             new PieceSpec(DoorId, 0, false), new PieceSpec(SignId, 0, false),
             new PieceSpec(SpareFrameId, 0, true),  new PieceSpec(SpareOvenId, 0, true),
             new PieceSpec(BakerId, BakerFloor, false),

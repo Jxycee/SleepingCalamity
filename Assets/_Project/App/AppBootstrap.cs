@@ -43,6 +43,8 @@ namespace SleepingCalamity.App
         public DevFlags DevFlags { get; private set; }
         public SceneFlow SceneFlow => sceneFlow;
         public WorldSaveFlow WorldSaveFlow => worldSaveFlow;
+        public FrontDoorModel FrontDoor { get; private set; }
+        public PauseMenuModel PauseMenu { get; private set; }   // PL-4 4.1: local on every peer; its view sits on the App's PauseMenu child object
         public HostRoster Roster { get; private set; }
         public HostWorld World { get; private set; }
         public NetworkObject PlayerPrefab => playerPrefab;
@@ -165,12 +167,22 @@ namespace SleepingCalamity.App
             // Order matters: SceneFlow resets the world for the new session before WorldSaveFlow loads the saved one over it.
             sceneFlow = new SceneFlow(session, NetworkManager, bus, Roster, World);
             worldSaveFlow = new WorldSaveFlow(session, NetworkManager, bus, World);
-            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster);
+            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster, World);
+
+            // The front door (PL-3): local on every peer, it only asks. Built after SceneFlow, the roster and the world library exist, and subscribed to
+            // the session after theirs, so by the time it hears Ended the flow has already saved and gone back to the Lobby.
+            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster, World));
+            FrontDoorView view = GetComponent<FrontDoorView>();
+            if (view != null) view.Bind(FrontDoor, session, input);
+            PauseMenu = new PauseMenuModel(session, input, PauseMenuView.QuitGame, () => worldSaveFlow != null && worldSaveFlow.CanSave);
+            PauseMenuView pauseView = GetComponentInChildren<PauseMenuView>(true);
+            if (pauseView != null) pauseView.Bind(PauseMenu, input);
         }
 
         private void Update()
         {
             worldSaveFlow?.Tick();
+            spawner?.Tick(Time.unscaledTime);   // host only (no-op elsewhere): spawns a hero a one-shot scene hook missed (audit A4)
         }
 
         // Hands over to the Lobby scene, then lets a dev auto-start (command line, MPPM tag or the editor's Auto Solo) begin a session.
@@ -236,6 +248,14 @@ namespace SleepingCalamity.App
 
             spawner?.Detach();
             spawner = null;
+            FrontDoorView view = GetComponent<FrontDoorView>();
+            if (view != null) view.Bind(null, null);
+            FrontDoor?.Dispose();
+            FrontDoor = null;
+            PauseMenuView pauseViewOnExit = GetComponentInChildren<PauseMenuView>(true);
+            if (pauseViewOnExit != null) pauseViewOnExit.Bind(null, null);
+            PauseMenu?.Dispose();
+            PauseMenu = null;
             sceneFlow?.Dispose();
             sceneFlow = null;
             worldSaveFlow?.Dispose();

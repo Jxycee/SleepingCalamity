@@ -40,7 +40,7 @@ Capture cameras (1920x1080, PHASE1 3.7), built by `BeautyCornerBuilder`:
 
 ## 3. Scoring (calibrated to the user, 2026-10-30)
 The user reads our rubric scores about 8-10 points low ("your 20/40 is more like a 30/40 to me"). So:
-- **Moving target (user, 2026-10-30):** 25/40 is the floor, not the finish. If your first review already reaches 25, the target becomes **first score + 5** (so 25 on round 1 means aim for 30). Max about 4 rounds; each round needs a visible gain of at least 1.5 points or you stop and report.
+- **Moving target (user, 2026-10-30):** 25/40 is the floor, not the finish. If your first review already reaches 25, the target becomes **first score + 5** (so 25 on round 1 means aim for 30). At most 3 rounds (`.claude/rules/session-usage.md`); each round needs a visible gain of at least 1.5 points or you stop and report.
 - Score with the `sc-asset-review` rubric as written; the old rule was to stop at 25/40. That is shippable for this corner. Don't chase past it in this round; park extra ideas in `docs/PARKING_LOT.md`.
 - Score only what the three cameras see (section 2). Don't deduct for hidden faces, topology, UV layout or code structure.
 - Each fix must be a change visible at the mid camera. Name it as a visible change ("roof ridge sags 4 cm/m", "darker grime band at the cobble line"), never "improve quality".

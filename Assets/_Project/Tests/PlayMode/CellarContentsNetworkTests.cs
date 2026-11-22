@@ -207,6 +207,37 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Loot(c), Is.EqualTo(1), "an open chest does not pay twice");
         }
 
+        // BUGS 18a: the carrier dies where no hero can stand (a wall / off the walkable cells): the host settles the key on the nearest walkable cell, so it can still be picked up.
+        [UnityTest]
+        public IEnumerator CarrierDiesOffTheWalkableCells_KeySettlesOnAWalkableCell_AndCanBePickedUp()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            GateKeyCarrier car = c.Layout.Carrier;
+            bool[,] ok = CellarKeyDrop.Walkable(c.Layout, c.Floor.Built.Dressing);
+            int n = CellarFloorLayout.GridSize; CellPos bad = default; bool found = false; int best = int.MaxValue;
+            for (int x = 0; x < n; x++) for (int y = 0; y < n; y++)
+            {
+                if (ok[x, y]) continue;
+                int d = (x - car.X) * (x - car.X) + (y - car.Y) * (y - car.Y);
+                if (d < best) { best = d; bad = new CellPos(x, y); found = true; }
+            }
+            Assert.That(found, Is.True, "the grid has a cell nobody can stand on");
+
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.GateKeyCarrierEnemy != null, Timeout, "no carrier enemy");
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + new Vector3(8f, 0f, 0f);   // keeps the room entered, out of pickup range
+            Enemy carrier = c.Contents.GateKeyCarrierEnemy;
+            carrier.transform.position = Cell(c, bad.X, bad.Y);
+            Kill(carrier);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.GateKey == 1, Timeout, "the gate key never dropped");
+
+            Vector3 l = c.Floor.Built.Root.InverseTransformPoint(c.Peer.State.GateKeyPos);
+            int kx = Mathf.FloorToInt(l.x / CellarFloorBuilder.CellSize), ky = Mathf.FloorToInt(-l.z / CellarFloorBuilder.CellSize);
+            Assert.That(ok[kx, ky], Is.True, "the key lies on a walkable cell (" + kx + "," + ky + "), not at the dead carrier's cell (" + bad.X + "," + bad.Y + ")");
+            c.Players[c.HostId] = c.Peer.State.GateKeyPos + new Vector3(0.5f, 0f, 0f);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "the settled key could not be picked up");
+        }
+
         [UnityTest]
         public IEnumerator CarrierDrop_PickupUnlocksExit_KeyChestOpensTheDoor_OnEveryPeer()
         {
@@ -623,6 +654,80 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(c.Contents.HunterEnemy, Is.Null, "a player stands on the hunter cell: no respawn");
             c.Players[c.HostId] = Cell(c, h.X, h.Y) + Vector3.right * 80f;
             yield return PlayModeHarness.WaitUntil(() => c.Contents.HunterEnemy != null, Timeout, "the hunter never respawned once the player left");
+        }
+
+        // A seed with a plain (no Ambush twist, no modifier) templated combat room that has a second wave at the host's party size of two (host + one client), and that room's template. A second wave needs 2-3 stir extras
+        // per room, which a live party never reaches (the latch gives 1), so the test feeds the host this plan through CellarContentsSync.PlanOverride.
+        private static uint FindTwoWaveSeed(out int floor, out CellarEncounterPlan plan, out int room, out CellarTemplateRoom tpl)
+        {
+            foreach (int fl in new[] { 4, 7 })
+            foreach (int extra in new[] { 2, 3, 4 })
+            for (uint s = 1; s < 3000; s++)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, fl);
+                if (FloorModifierSet.For(s, fl).A != FloorModifier.None) continue;
+                CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, d, extra, false);
+                if (p.Twist == FloorTwist.Ambush) continue;
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    CellarTemplateRoom t = CellarTemplateSpawns.Resolve(l, d, p, r, 2);
+                    if (t != null && System.Linq.Enumerable.Any(t.InWave(0)) && System.Linq.Enumerable.Any(t.InWave(1))) { floor = fl; plan = p; room = r; tpl = t; return s; }
+                }
+            }
+            Assert.Fail("no seed with a two-wave template room"); floor = 0; plan = null; room = -1; tpl = null; return 0;
+        }
+
+        // Catches: wave 1 of a template room never appearing after wave 0 dies, wave 1 spawning on top of a player (it keeps the ambush distance rule), the room clearing between the waves,
+        // or the client not seeing wave 1's enemies / the room clear. Host authority: the spawns are the host's (CellarContentsSync.TickWaveTwo); the client only sees replicated enemies and the cleared bit.
+        [UnityTest]
+        public IEnumerator TwoWaveRoom_Wave0Cleared_Wave1WaitsForThePlayerToStepAway_ThenSpawnsOnTheHost_ClientSeesIt_ClearsAfterwards()
+        {
+            uint seed = FindTwoWaveSeed(out int floor, out CellarEncounterPlan plan, out int room, out CellarTemplateRoom tpl);
+            int n0 = 0, n1 = 0; foreach (TemplateSpawn ts in tpl.Spawns) { if (ts.Wave == 0) n0++; else n1++; }
+            CellPos wave1Cell = System.Linq.Enumerable.First(tpl.InWave(1)).Cell;
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            c.Contents.PlanOverride = () => plan;
+            Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(0), "nothing spawns before a player enters");
+
+            c.Players[c.HostId] = Cell(c, wave1Cell.X, wave1Cell.Y);   // standing on a wave-1 cell
+            yield return RoomSpawned(c, room, n0, false);
+            yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == n0, Timeout, "the client does not see wave 0");
+
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Kill(e);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.AliveInRoom(room) <= 1, Timeout, "wave 0 never went down");
+            float hold = Time.realtimeSinceStartup + 1.5f;   // well inside the 8 s safety cap
+            while (Time.realtimeSinceStartup < hold) { PlayModeHarness.Pace(); yield return null; }
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(n0), "wave 1 spawned on top of the player");
+            Assert.That((c.Contents.State.Cleared & (1UL << room)) != 0, Is.False, "the room cleared between the waves");
+
+            c.Players[c.HostId] = Cell(c, wave1Cell.X, wave1Cell.Y) + Vector3.right * 80f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == n0 + n1, 2.5f, "wave 1 did not spawn within ~2 s of the player stepping away (the distance release, not the 8 s cap)");
+            Assert.That(c.Contents.AliveInRoom(room), Is.EqualTo(n1), "wave 1 is alive and the held count is settled");
+            yield return PlayModeHarness.WaitUntil(() => { int alive = 0; foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) if (e.Alive) alive++; return alive == n1; }, Timeout, "the client does not see wave 1");
+            Assert.That((c.Peer.State.Cleared & (1UL << room)) != 0, Is.False, "the room is not clear while wave 1 lives");
+
+            foreach (Enemy e in EnemiesOn(c.HostNm)) if (e.Alive) Kill(e);
+            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Cleared & (1UL << room)) != 0, Timeout, "the client never saw the room cleared after wave 1");
+        }
+
+        // Catches: a player camping a wave-1 cell stalling the room forever (WaveTwoMaxWaitSeconds, 8 s, must release wave 1 anyway), and the cap firing early (nothing may spawn at 5 s).
+        [UnityTest]
+        public IEnumerator TwoWaveRoom_PlayerCampsAWaveOneCell_Wave1SpawnsAnywayAfterTheCap()
+        {
+            uint seed = FindTwoWaveSeed(out int floor, out CellarEncounterPlan plan, out int room, out CellarTemplateRoom tpl);
+            int n0 = 0, n1 = 0; foreach (TemplateSpawn ts in tpl.Spawns) { if (ts.Wave == 0) n0++; else n1++; }
+            CellPos wave1Cell = System.Linq.Enumerable.First(tpl.InWave(1)).Cell;
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            c.Contents.PlanOverride = () => plan;
+            c.Players[c.HostId] = Cell(c, wave1Cell.X, wave1Cell.Y);
+            yield return RoomSpawned(c, room, n0, false);
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Kill(e);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.AliveInRoom(room) <= 1, Timeout, "wave 0 never went down");
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup < start + 5f) { PlayModeHarness.Pace(); yield return null; }
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(n0), "the cap fired early: wave 1 spawned on the camping player before 8 s");
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == n0 + n1, 8f, "wave 1 never spawned although the player camped its cell past the 8 s cap");
         }
 
         // Catches: BUGS 18, a save with piece 0 already home left piece id 101 without a collectible sphere (spot i was mapped to PieceId(floor, i), the spot count to the remaining count).

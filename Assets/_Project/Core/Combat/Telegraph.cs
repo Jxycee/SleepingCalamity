@@ -96,5 +96,44 @@ namespace SleepingCalamity.Core.Combat
         public static bool LungeEndsBeforeStrike(AttackData a) => a.LungeMeters <= 0f || a.Lunge.End <= a.HitOn.Start;
 
         public static bool ReachMatchesLook(AttackData a, EnemyDefinition def) => a.Origin == HitOrigin.GroundAtTarget || a.Range <= def.VisualReach + ReachSlack + 1e-4f;
+
+        // Every rule above, for one attack as it stands now (after a tuning edit): null when all hold, else the first one broken. The owners are the enemy
+        // definitions whose attack list holds it; the two attacks no list holds answer an event (break-free: the Warden, riposte: the broom). The test
+        // nova has no rules.
+        public static string Problem(AttackData a)
+        {
+            if (a == null) return "no attack";
+            if (a == AttackCatalog.TestNova) return null;
+            string tell = TellProblem(a);
+            if (tell != null) return tell;
+            if (a.HitOn.IsEmpty) return "the hit window is empty";
+            if (a.HitOn.End > a.TotalFrames) return "the hit window ends (" + a.HitOn.End + ") after totalFrames (" + a.TotalFrames + ")";
+            if (!LungeEndsBeforeStrike(a)) return "the lunge ends (" + a.Lunge.End + ") after the hitbox opens (" + a.HitOn.Start + ")";
+            bool owned = false;
+            foreach (EnemyDefinition def in OwnersOf(a))
+            {
+                owned = true;
+                int floor = WindUpFloor(a, def);
+                if (a.HitOn.Start < floor) return "wind-up of " + a.HitOn.Start + " frames is under the " + floor + "-frame floor for " + def.Name;
+                if (!ReachMatchesLook(a, def)) return "range " + a.Range + " m is beyond what " + def.Name + " visibly reaches (" + def.VisualReach + " m + " + ReachSlack + ")";
+                for (int tier = 1; tier <= 2; tier++)
+                {
+                    int punish = PunishFrames(a, def.Kind, tier);
+                    if (punish < MinPunishFrames) return "only " + punish + " punish frames at tier " + tier + " for " + def.Name + " (at least " + MinPunishFrames + ")";
+                }
+            }
+            if (!owned && a.HitOn.Start < WindUpFloor(a, null)) return "wind-up of " + a.HitOn.Start + " frames is under the " + WindUpFloor(a, null) + "-frame floor";
+            return null;
+        }
+
+        static System.Collections.Generic.IEnumerable<EnemyDefinition> OwnersOf(AttackData a)
+        {
+            bool any = false;
+            foreach (EnemyDefinition def in EnemyCatalog.All)
+                if (Array.IndexOf(def.Attacks, a) >= 0) { any = true; yield return def; }
+            if (any) yield break;
+            if (a == AttackCatalog.WardenBreakFree) yield return EnemyCatalog.DoughWarden;
+            else if (a == AttackCatalog.BroomRiposte) yield return EnemyCatalog.Broom;
+        }
     }
 }

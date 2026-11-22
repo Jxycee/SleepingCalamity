@@ -2,16 +2,18 @@
 
 Action RPG in the Dark Cloud tradition: dive into dungeons (the Hearthdeep), bring back pieces to rebuild ruined towns, grow weapons by using them, calm side activities between dives. Solo, or co-op for 2-4 players with difficulty scaling (rules below). Original IP: a spiritual successor, never a remake. Unity 6000.6.5f1 (URP 17.6), Netcode for GameObjects 2.13, Unity Multiplayer Services (Relay + Lobby join codes), Input System, Cinemachine, ProBuilder.
 
-Sources of truth: `docs/STORY.md` (once locked), `docs/PHASE1.md` (once written), and the founding handoff `docs/superpowers/handoff/2026-10-29-new-project-handoff.md` (its "User decisions" list is settled; the rest is recommendation). Don't re-litigate agreed items. Ideas for later go in `docs/PARKING_LOT.md` with a date.
+Sources of truth: `docs/STORY.md` (locked 2026-10-29), `docs/PHASE1.md`, and the founding handoff `docs/superpowers/handoff/2026-10-29-new-project-handoff.md` (its "User decisions" list is settled; the rest is recommendation). Don't re-litigate agreed items without a reason. Ideas for later go in `docs/PARKING_LOT.md` with a date.
+
+**Decisions have leeway (user, 2026-11-13).** A decision is the current direction, not a lock. Record it as "decided (date)", never as final or irreversible, and say so plainly when building on it. When the game would be better served by changing one (playtest, a bug, a better idea), raise it with the reason and let the user choose; don't treat "decided" as a reason to stop thinking. The IP rule and the no-anti-cheat rule are the exceptions that stay firm.
 
 ## Settled design rules
-- **Players and saves (user, 2026-10-29):** a world is either solo or multiplayer, never both. A multiplayer world needs 2+ players to start and records up to 4 unique players; once 4 are recorded, nobody else can join it (a fifth friend starts a new world with three of them). Any subset of the recorded players can play it, and difficulty scales to the players present.
+- **Players and saves (user, 2026-10-29):** a world is either solo or multiplayer, never both. A multiplayer world needs 2+ players to start and records up to 4 unique players; once 4 are recorded, nobody else can join it (a fifth friend starts a new world with three of them). Decided 2026-11-13 (audit A3): an unrecorded player may wait in a full world's lobby so the host can rename them as a recorded friend whose ID changed, or send them away; Start stays refused while they are unrecorded. Any subset of the recorded players can play it, and difficulty scales to the players present.
 - **IP:** none of Dark Cloud's names, characters, story, text, music or assets. Research notes in `docs/research/` are in our own words: mechanics and numbers only. Game copies, ISOs, BIOS and decompiled output stay in the scratchpad, never in the repo. Copyrighted style frames live in gitignored `Reference/private/`.
 - **Art target:** Dark Cloud's whimsical shapes and town/dungeon themes rendered in the stylised realism of the 2026 Ocarina of Time remake (real PBR materials, storybook proportions, saturated day colour, heavy atmosphere). Handoff section 2.
 - Quality-first performance target; ignore generic "60+ FPS on all platforms" rules from skills.
 
 ## Running handoff
-The main (controller) session opens with the `sc-steward` skill, which reads `docs/superpowers/handoff/CURRENT.md`. The controller keeps it current after every meaningful step with `sc-handoff`, then commits and pushes it to `main`. Feature branches never edit it.
+The main (controller) session opens with the `sc-steward` skill, which reads `docs/superpowers/handoff/CURRENT.md`. A session taking the coordinator role reads the `sc-coordinator` skill first, once: it is the playbook for running the other sessions. The controller updates it with `sc-handoff` when something lands on `main` or the user decides something, inside that merge or work commit rather than a commit of its own (`.claude/rules/session-usage.md`, "The game comes first"). Feature branches never edit it.
 
 ## Unity
 - Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|gate|exec> -OutDir <scratchpad dir>` on the PC, `bash Tools/cloud/unity.sh <same command> --out <scratchpad dir>` in the cloud. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks. `gate` (compile + EditMode, no PlayMode) is the fast gate a branch push of Assets/Packages/ProjectSettings changes needs (guard.sh; waive with `SC_GATE_SKIP=1` when no licence); full `check` stays required for merges into main.
@@ -22,6 +24,7 @@ The main (controller) session opens with the `sc-steward` skill, which reads `do
 - PlayMode tests must never wait on `WaitForEndOfFrame` under `-nographics`: it never resumes. Put a timeout inside every wait loop.
 - Editor scripts build scenes and prefabs (`SleepingCalamity.EditorTools.*`, wired into `ProjectBuilder.RunAll`); never edit `.unity`/`.prefab` YAML by hand (a hook blocks it).
 - Logs and test results go in the session scratchpad, never in the repo.
+- No approval needed for: re-running the wrapper after a FAIL or TIMEOUT you have diagnosed, retrying a busy tool or port, merging `origin/main` into your branch, pushing your own branch, and merging a checked tip under the Git rules. Ask first for networking, save-data or milestone merges (`sc-merge`) and anything irreversible.
 - `test-edit`, `gate` and `check` run the fast EditMode tier (`-testCategory "!Soak"`); the 1000+ seed sweeps are `[Category("Soak")]`. Run `unity.ps1 soak` (cloud: `unity.sh soak`) before merging anything under Core/Cellars (floor generation); it records no merge marker, and a failing soak seed becomes a fixed fast-tier case.
 
 ## Cloud sessions (Linux)
@@ -31,7 +34,8 @@ A cloud session works like a PC session (user, 2026-10-30): it can be the contro
 - LSP tool → `python3 Tools/cloud/sc_lsp.py def|refs|hover <file>:<line> <name>` or `symbols <query>`: cloud Claude Code never offers the LSP tool, so this drives the same csharp-ls server directly.
 - `C:\Dev\FishGame` → `add_repo` Jxycee/FishGame (read), `git clone --depth 1 https://github.com/Jxycee/fishgame /home/user/fishgame`; don't register it as a session root (its own CLAUDE.md and skills would load). Same rules: copy from it, never edit it.
 - Blender MCP → the "SleepingCalamity Art" cloud environment (setup script with `SC_PROFILE=art`) serves a live Blender as the `blender` MCP server (`Tools/cloud/sc_blender_mcp.py`, also a CLI). Headless `blender -b` works everywhere.
-- Not in the cloud: the Unity MCP and `sc-walk` (they drive an editor window), `Reference/private/`, a GPU.
+- Not in the cloud: the Unity MCP and `sc-walk` (they drive an editor window), `Reference/private/`, a GPU, a Windows player build.
+- **No hybrid sessions (user, 2026-11-13).** If any step of a job needs the PC (Windows build, GPU captures or bakes, the Unity MCP, a walk, `Reference/private/`), the whole job runs as one local PC session. Don't split it into a cloud part plus a PC part; decide where a job runs before writing its brief.
 
 ## Code conventions
 - Code under `Assets/_Project/`, one assembly per folder: Core (pure C#, no engine), Data, Runtime, Gameplay, Presentation, UI, App, Networking, Editor, Tests/EditMode, Tests/PlayMode. `ArchitectureTests` enforces the forbidden references (Gameplay, Presentation and UI never touch Unity Services or transports).
@@ -43,7 +47,7 @@ A cloud session works like a PC session (user, 2026-10-30): it can be the contro
 - Art and asset rules live in `.claude/rules/art-assets.md`. The asset skills (`sc-asset-craft`, `-budget`, `-review`, `-adopt`, `sc-texture-paint`, `sc-foliage`, `sc-scene-look`, `sc-water-look`, `sc-reference`) follow the style bible in `docs/PHASE1.md` section 3 (rewritten 2026-10-30). Some FishGame tools they mention are legacy; see the tool-status table in `sc-asset-craft` section 0b.
 
 ## Git
-- Commit and push to `main` as each piece lands (user, 2026-10-29). Never force-push. Bigger features may use a branch; merge it yourself once reviewed and `check` is green on the tip (no check needed when nothing under `Assets/`, `Packages/` or `ProjectSettings/` changes). Merge commits, never squash. No pull requests. Skill `sc-merge`.
+- Commit and push to `main` as each piece lands (user, 2026-10-29). Never force-push. Bigger features may use a branch; merge it yourself once reviewed and `check` is green on the tip (no check needed when nothing under `Assets/`, `Packages/` or `ProjectSettings/` changes); a checked tip merges into fresh main without a second check when git merges it cleanly. Merge commits, never squash. No pull requests. Skill `sc-merge`.
 - Never commit `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `.vscode/`, `*.csproj`, `*.slnx`. Binaries (`.blend`, FBX, PNG, JPG) go through Git LFS (`.gitattributes`).
 
 ## Agents and review
@@ -51,7 +55,7 @@ A cloud session works like a PC session (user, 2026-10-30): it can be the contro
 - Review scaled to risk: `risk-reviewer` (Opus) for networking, host sync and save data (once per milestone when a final branch review follows, `sc-delegate`); `branch-reviewer` (Opus, high, never xhigh) before a big merge that touches networking, save data or cross-assembly wiring, skipped for pure Core, docs, data, tests or art (`sc-delegate`); `reviewer` (Sonnet) otherwise; a fix of 30 lines or fewer gets the controller's own diff read. Reviewers follow `REVIEW.md`.
 - Plan big features in a short design session with the user before code. Multi-agent workflows only with the user's go-ahead and a stated agent count.
 - Long research reads, Unity runs and walks go to subagents that return short summaries; the controller keeps its own context small. Walk recipes: `sc-walk`.
-- `.claude/settings.json` turns off unused plugins and MCP servers. REA is on (Phase 0 research). Blender stays denied except in art sessions: deny lists merge across settings files, so drop `blender`/`Blender` from `deniedMcpServers` in that session's own checkout and don't commit the edit.
+- `.claude/settings.json` turns off unused plugins and MCP servers. REA is on (Dark Cloud decomp research). Blender stays denied except in art sessions: deny lists merge across settings files, so drop `blender`/`Blender` from `deniedMcpServers` in that session's own checkout and don't commit the edit.
 
 # Compact instructions
 When compacting, keep: the current branch and worktree, files modified, live agent IDs and what each is doing, the last `check`/test result with its commit, open review findings, and the next step.

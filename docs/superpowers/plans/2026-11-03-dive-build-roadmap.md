@@ -1,6 +1,6 @@
 # Dive build roadmap (2026-11-03)
 
-Turns spec section 12 (`docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md`), steps 1-3, plus the metrics gym into four plans (row 5, floors 8-10, was added 2026-11-06 and is Phase 2). **One plan per fresh session** (`.claude/rules/session-usage.md`). Plan 1 is written in full; plans 2-4 get their detailed plan (writing-plans skill) at the start of their own session, because each depends on code the earlier plans change.
+Turns spec section 12 (`docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md`), steps 1-3, plus the metrics gym into four plans for rows 1-4 (row 5, floors 8-10, was added 2026-11-06 and is Phase 2, so it has no plan here). **One plan per fresh session** (`.claude/rules/session-usage.md`). Plan 1 is written in full; plans 2-4 get their detailed plan (writing-plans skill) at the start of their own session, because each depends on code the earlier plans change.
 
 Workflow for every plan (from the 2026-11-03 workflow discussion):
 - Pure rules in Core, test first (test-driven-development skill); the cloud runs them with `python3 Tools/cloud/sc_core_tests.py`, no Unity licence needed.

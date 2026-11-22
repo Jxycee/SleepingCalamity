@@ -75,14 +75,38 @@ namespace SleepingCalamity.EditorTools
             SkyThickness = 1.0f, SkyExposure = 1.0f, SkyTint = new Color(0.5f, 0.45f, 0.5f),
         };
 
-        public static Look For(BeautyCornerBuilder.Preset preset) => preset == BeautyCornerBuilder.Preset.Midday ? Midday : LowSun;
+        // B3: Morning and Evening are the B0 states (design section 4) and take the town. They keep the corner's own profile, HDRI sky, fog and ambient (BeautyCornerBuilder.ApplyPreset);
+        // the Look only carries the town's overview haze (FogDensity is the play-distance density, from the design table). Midday and LowSun stay for the old captures.
+        public static readonly Look Morning = new Look { FogDensity = 0.0048f, OverviewFog = 0.0016f };
+        public static readonly Look Evening = new Look { FogDensity = 0.006f, OverviewFog = 0.002f };
+
+        public static Look For(BeautyCornerBuilder.Preset preset)
+        {
+            switch (preset)
+            {
+                case BeautyCornerBuilder.Preset.Midday: return Midday;
+                case BeautyCornerBuilder.Preset.LowSun: return LowSun;
+                case BeautyCornerBuilder.Preset.Morning: return Morning;
+                case BeautyCornerBuilder.Preset.Evening: return Evening;
+                default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
 
         public static void Apply(BeautyCornerBuilder.Preset preset) => Apply(preset, For(preset));
 
         // The corner's preset first (sun, fill, ambient colours, lamps), then the town's profile, sky, haze and ambient scale on the open scene.
         public static void Apply(BeautyCornerBuilder.Preset preset, Look look)
         {
+            For(preset);   // throws for a preset the town has no look for
             BeautyCornerBuilder.ApplyPreset(preset);
+            if (preset == BeautyCornerBuilder.Preset.Morning || preset == BeautyCornerBuilder.Preset.Evening)
+            {
+                RenderSettings.fogDensity = look.FogDensity;   // the corner's HDRI sky, profile, fog colour and sky ambient stand as B0 tuned them
+                Transform sh = GameObject.Find(ShaftsRoot)?.transform;
+                if (sh != null && RenderSettings.sun != null) foreach (Transform spot in sh) spot.rotation = RenderSettings.sun.transform.rotation;
+                DynamicGI.UpdateEnvironment();
+                return;
+            }
             bool day = preset == BeautyCornerBuilder.Preset.Midday;
             VolumeProfile profile = EnsureProfile(day ? DayProfileName : LowSunProfileName, day ? BeautyCornerBuilder.ProfileName : BeautyCornerBuilder.LowSunProfileName, look);
             Volume post = Object.FindFirstObjectByType<Volume>();

@@ -45,13 +45,14 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         }
 
         [Test]
-        public void LevelCost_Is40Times1PlusHalfL_AsFloat()
+        public void LevelCost_Is40Plus40L_AsFloat()
         {
+            // 40 x (1 + 0.5 L) until the Run 5 balance (2026-11-15): per level 20 -> 40, base stays 40.
             Assert.That(WeaponGrowth.LevelCost(0), Is.EqualTo(40f));
-            Assert.That(WeaponGrowth.LevelCost(1), Is.EqualTo(60f));
-            Assert.That(WeaponGrowth.LevelCost(2), Is.EqualTo(80f));
-            Assert.That(WeaponGrowth.LevelCost(5), Is.EqualTo(140f));
-            Assert.That(WeaponGrowth.LevelCost(7), Is.EqualTo(180f));
+            Assert.That(WeaponGrowth.LevelCost(1), Is.EqualTo(80f));
+            Assert.That(WeaponGrowth.LevelCost(2), Is.EqualTo(120f));
+            Assert.That(WeaponGrowth.LevelCost(5), Is.EqualTo(240f));
+            Assert.That(WeaponGrowth.LevelCost(7), Is.EqualTo(320f));
         }
 
         [Test]
@@ -78,8 +79,8 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         public void AddAbs_OneBigGain_LevelsSeveralTimes_AndKeepsTheRemainder()
         {
             var w = Axe();
-            // 40 + 60 + 80 = 180 pays levels 1-3; 25 is left toward level 4 (cost 100).
-            Assert.That(w.AddAbs(205f), Is.EqualTo(3));
+            // 40 + 80 + 120 = 240 pays levels 1-3; 25 is left toward level 4 (cost 160). (Run 5 balance 2026-11-15: per level 40, was 20.)
+            Assert.That(w.AddAbs(265f), Is.EqualTo(3));
             Assert.That(w.Level, Is.EqualTo(3));
             Assert.That(w.Abs, Is.EqualTo(25f).Within(1e-4f));
             Assert.That(w.Stats.Atk, Is.EqualTo(22f + 6f));
@@ -139,7 +140,7 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         {
             var w = Axe();
             w.Fit(AttachmentKind.Heartwood);
-            w.AddAbs(100f);   // levels 1 and 2
+            w.AddAbs(120f);   // levels 1 and 2 (40 + 80)
             Assert.That(w.Level, Is.EqualTo(2));
             Assert.That(w.Stats.Atk, Is.EqualTo(22f + 2f + 4f));
         }

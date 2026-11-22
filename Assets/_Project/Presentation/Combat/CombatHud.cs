@@ -164,7 +164,7 @@ namespace SleepingCalamity.Presentation
             }
 
             GUI.Label(new Rect(Screen.width - 520f, Screen.height - (_help ? 170f : 26f), 510f, 170f), _help
-                ? "<b>Controls</b> (F1 hides)\nLMB attack x2 + finisher; hold LMB 0.6 s, release = charge\nLeft Ctrl dodge (i-frames)  Tab lock-on (Q/R switch)  Shift sprint  Space jump (air combo)\nRMB: dagger guard (tap at the hit = parry), bow aim + LMB shoots, staff spell\nF5 swap heirloom   F6 skip wave   hold E near a downed ally = revive\nF2 ground attack markers (assist): " + (CombatAssists.GroundTelegraph ? "on" : "off")
+                ? "<b>Controls</b> (F1 hides)\nLMB attack x2 + finisher; hold LMB 0.6 s, release = charge\nLeft Ctrl dodge (i-frames)  Tab lock-on (Q/R switch)  Shift sprint  Space jump (air combo)\nRMB: dagger guard (tap at the hit = parry), bow aim + LMB shoots, staff spell\nF eat a loaf (D-pad up)   F5 swap heirloom   F6 skip wave   hold E near a downed ally = revive\nF2 ground attack markers (assist): " + (CombatAssists.GroundTelegraph ? "on" : "off")
                 : "F1 controls", _label);
         }
 

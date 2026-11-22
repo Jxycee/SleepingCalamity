@@ -46,8 +46,10 @@ namespace SleepingCalamity.EditorTools
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                 foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(8f, true, true);   // motes exist in the edit-mode render
                 LookTestCapture.WarmUp(cams);
+                string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "Wide,Close": only the cameras whose name contains one of the words
+                bool Pick(Camera c) { if (string.IsNullOrEmpty(only)) return true; foreach (string w in only.Split(',')) if (c.name.Contains(w.Trim())) return true; return false; }
                 foreach (Camera cam in cams)
-                    if (cam.name.StartsWith("Cap_Cellar_")) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + ".png"));
+                    if (cam.name.StartsWith("Cap_Cellar_") && Pick(cam)) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + ".png"));
             }
             finally
             {

@@ -1,6 +1,6 @@
 ---
 name: fixer
-description: Escalation fixer for a SleepingCalamity problem the implementer and reviewers couldn't solve (a fix that failed twice, a bug nobody can root-cause). Use only after a failed attempt, with the failing evidence.
+description: LAST-RESORT escalation fixer (Fable, very expensive: the user can afford about one Fable use a week). Use only after an Opus 5.5 high attempt also failed, with the failing evidence, and only with the user's OK. Never for a first or second failure.
 model: fable
 effort: high
 ---

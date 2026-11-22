@@ -7,7 +7,7 @@ description: Build or refine Sleeping Calamity foliage in the locked stylised-re
 
 **The look:** clean yellow-green by day (PHASE1 3.1: foliage `#6f8a34`, moss `#616e2e` / `#b6ab28`; foliage may take +10-15% chroma, the only place that boost is wide), chunky readable crown masses with light tops and dark undersides, dense dressing in every corner (handoff 2.1). Leaves are real PBR (albedo with alpha, normal, ORM), clean rather than photo-dull. Phase 1 needs ivy, crack weeds, grass clumps, one orchard tree and moss tufts for the beauty corner, and roots trickling into the cellar (PHASE1 section 4, B9).
 
-Tools: FishGame's tree generator, atlas painter and season machinery were built for its palette-slot toon look and are not ported; build the B9 generator fresh with the methods below. Tool status: sc-asset-craft 0b.
+Tools: the B9 generator lives in Art/Blender/town/ (sc_b9_lib.py, sc_foliage_town.py, sc_road_trees.py); extend it rather than starting a new file. FishGame's tree generator, atlas painter and season machinery were built for a palette-slot toon look and are not ported. Tool status: sc-asset-craft 0b.
 
 ## How a tree crown is built (card crowns)
 Each tree is a trunk-and-limbs mesh plus alpha-cut foliage cards. The look comes from four decisions (FishGame's best-reading trees, style-independent):
@@ -43,7 +43,7 @@ A bush built like a tree (lobes only at the stem tips) reads as a lollipop on st
 Prefer **shader wind**: vertex offset by height times a world-space sine, card tips more than the trunk. It costs no bones and no animation import and stays in sync for all clients. The project has no wind yet; treat it as a design task.
 
 ## Budgets
-PHASE1 3.3 has no foliage row yet (B9 is tier T2/T3). Size a scattered kind like a T3 piece (50-400 tris, one shared set per family), and the orchard tree against the hero props around it; state the number in the header and ask the controller if it runs high.
+PHASE1 3.3 has no foliage row yet (B9 is tier T2/T3). Size a scattered kind like a T3 piece (50-400 tris, one shared set per family), and the orchard tree against the hero props around it; state the number in the header. The per-camera budget binds (visible tris and GPU cost at the eye cameras, `sc-asset-budget`), not the per-kind guide (user, 2026-11-18).
 
 ## Review
 sc-asset-review, with these foliage checks:

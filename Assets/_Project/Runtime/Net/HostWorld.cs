@@ -11,10 +11,15 @@ namespace SleepingCalamity.Runtime
     // Authority: host only (a plain C# object, never replicated; a client never evaluates the world rules for itself).
     // The host's world-player gate (user decision 2026-10-29, rules in Core/World/WorldPlayers):
     //  - Admit is called by ConnectionApprover for every join, the host's own included, after JoinRules approved it. It refuses a join to a
-    //    Solo world (SoloWorldClosed), refuses a key of another identity kind and refuses a new key when 4 players are recorded (WorldFull).
-    //    It records nothing: RecordEntered writes a key down once its client has actually connected (the approver's connection event).
+    //    Solo world (SoloWorldClosed), refuses a key of another identity kind and refuses a new key when 4 players are recorded (WorldFull) once the session has started.
+    //    Before the start an unrecorded player may wait in a full world's lobby (user decision 2026-11-13): the host renames them as a friend
+    //    (RenameRecorded) or sends them away, and TryStartSession refuses (WorldFull) while they are there.
+    //    It records nothing, and neither does a connection coming up (NoteConnected only keeps the display name): a player is written into the
+    //    world when they PLAY it (user decision 2026-11-13, audit A2) - at the session start for everyone present, or, for a join into a session
+    //    that is already running, when their hero spawns (RecordHeroSpawned). A lobby visitor who leaves before Start is never recorded.
     //  - TryStartSession is THE start gate. SceneFlow calls it before loading the first gameplay scene. A Multiplayer world is created at the
-    //    first start and every start needs 2 or more of its recorded players connected; a Solo world starts with its owner alone.
+    //    first start and every start needs 2 or more players connected (recorded or recordable: the gate records them); a Solo world starts with
+    //    its owner alone.
     //    Until it returns Ok the host sits in the lobby: clients can connect but no gameplay scene loads. The 2-player rule is a START rule
     //    only (user ruling 2026-10-30): once a session runs, players dropping to 1 does not end it (no kick mid-dive); ScalePlayers falls to 1.
     // Before the world exists (Players == null) the session mode decides what it will be (PendingKind). The world save flow loads a saved
@@ -23,6 +28,8 @@ namespace SleepingCalamity.Runtime
     {
         private readonly List<PlayerKey> _scratch = new List<PlayerKey>(NetworkConstants.MaxPlayers);
         private readonly Dictionary<ulong, PlayerKey> _pendingNew = new Dictionary<ulong, PlayerKey>(NetworkConstants.MaxPlayers);   // approved new players not yet recorded, by client id
+        private readonly List<ulong> _pendingDone = new List<ulong>(NetworkConstants.MaxPlayers);                                   // scratch for ForgetPendingOf
+        private readonly Dictionary<PlayerKey, string> _namesWhileConnected = new Dictionary<PlayerKey, string>(NetworkConstants.MaxPlayers);   // display names of connected players, kept until they are recorded
 
         // The recorded players of this machine's world; null until the world exists (first start, or loaded from the save).
         public WorldPlayers Players { get; private set; }
@@ -111,6 +118,9 @@ namespace SleepingCalamity.Runtime
         private TownSnapshot _town = new TownSnapshot();
         private ITownSource _townSource;
 
+        // Test seam: runs (once) at the start of the next LoadTown, so a test can make the town load throw. Null in the game.
+        internal static Action LoadTownFaultForTests;
+
         // The sections as last loaded or captured: separate copies, never the file's own objects. Sections an older save lacks are null.
         public TownSnapshot Town => _town;
 
@@ -122,6 +132,9 @@ namespace SleepingCalamity.Runtime
         // world means the old world's town must not write into it.
         public void LoadTown(WorldSave saved)
         {
+            Action fault = LoadTownFaultForTests;   // a test makes the next load throw once (audit A7/A11: the save flow must survive it)
+            LoadTownFaultForTests = null;
+            fault?.Invoke();
             _townSource = null;
             _town = saved == null ? new TownSnapshot()
                 : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags, Suspend = saved.Suspend }, null);
@@ -131,7 +144,7 @@ namespace SleepingCalamity.Runtime
         }
 
         // Writes PieceFloors into the host's dive section so the next save keeps them. Only when a dive section exists: creating one here would make Reconcile read every piece as lost
-        // (the dive section is the authority on what is still on the floors), and a fresh world without one gets its depths from the seed again, identically.
+        // (the dive section is the authority on what is still on the floors), and a world with no dive section (never stamped, untouched) gets its depths re-derived from the seed at each load. That re-derivation is stable only while PieceDepths.Assign is unchanged: D1 reshuffled the non-frame pieces of such worlds (frame on floor 2).
         private void StampPieceDepths()
         {
             if (_town.Dive == null || PieceFloors.Count == 0) return;
@@ -176,6 +189,10 @@ namespace SleepingCalamity.Runtime
             if (live.Suspend == null) return;
             if (Players == null) { live.Suspend = null; live.SuspendKnown = false; return; }
             live.Suspend = SuspendSaveRules.OnlyRecorded(live.Suspend, key => Players.IsRecorded(key));
+            // The suspend records of players the host let go stay in the file too (same promise as their bags).
+            if (live.Suspend != null && _town.Suspend?.Bags != null)
+                foreach (SuspendedBag b in _town.Suspend.Bags)
+                    if (b != null && !Players.IsRecorded(new PlayerKey((IdentityKind)b.Identity, b.Id)) && !live.Suspend.Bags.Exists(k => k.Identity == b.Identity && k.Id == b.Id)) live.Suspend.Bags.Add(b);
         }
 
         // The bags of the recorded players only; null (the previous copy is kept) when the source said nothing or the world has no players yet.
@@ -185,6 +202,10 @@ namespace SleepingCalamity.Runtime
             var kept = new BagsSave { Extra = bags.Extra };
             foreach (PlayerBagSave p in bags.Players)
                 if (p != null && Players.IsRecorded(new PlayerKey((IdentityKind)p.Identity, p.Id))) kept.Players.Add(p);
+            // A player the host let go (audit A2) keeps what the file already holds of theirs: "what they grew here waits in the file".
+            if (_town.Bags?.Players != null)
+                foreach (PlayerBagSave p in _town.Bags.Players)
+                    if (p != null && !Players.IsRecorded(new PlayerKey((IdentityKind)p.Identity, p.Id)) && !kept.Players.Exists(k => k.Identity == p.Identity && k.Id == p.Id)) kept.Players.Add(p);
             return kept;
         }
 
@@ -229,6 +250,7 @@ namespace SleepingCalamity.Runtime
             Players = players;
             Started = false;
             _pendingNew.Clear();
+            _namesWhileConnected.Clear();
         }
 
         // A new session starts: the world stays, the started flag and a pending kind reset.
@@ -237,9 +259,36 @@ namespace SleepingCalamity.Runtime
             PendingKind = pendingKind;
             Started = false;
             _pendingNew.Clear();
+            _namesWhileConnected.Clear();
         }
 
-        // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. Nothing is recorded here.
+        // A player's saved data follows their key: weapons and hero growth (A32), gold, stash and waiting satchel, and a bank-room suspend's record of
+        // them (its bag, present id and the dive's extra-slot owner). Shared by the Solo owner rebind and the Multiplayer rename (audit A3).
+        private void MovePlayerData(PlayerKey from, PlayerKey to)
+        {
+            GrowthSaves.Rename(_weapons, from.Id, to.Id);
+            BagsSaveRules.Rename(_town.Bags, from, to);
+            SuspendSaveRules.Rename(_town.Suspend, from, to);
+            if (_town.Dive != null) _town.Dive.ExtraSlotOwner = SuspendSaveRules.RenameId(_town.Dive.ExtraSlotOwner, from, to);
+        }
+
+        // The host's "this player is now that player" (audit A3; the front door's host lobby): one recorded player of a Multiplayer world takes a
+        // new key (a new PC or a reinstall gave them a new UGS id) and brings their growth, bags and suspend record along. Refused with the
+        // verdict, changing nothing, for what WorldPlayers.RenameRecorded refuses (invalid or other-kind key, an old key that is not recorded, a
+        // new key that already is, a Solo world) and with WorldInProgress once a session runs (the live heroes then hold that state). Raises Changed.
+        public WorldPlayerVerdict RenameRecorded(PlayerKey from, PlayerKey to)
+        {
+            if (Players == null) return WorldPlayerVerdict.NotRecorded;
+            if (Started || _townSource != null || _sources.Count > 0) return WorldPlayerVerdict.WorldInProgress;   // a live source would write the old key back at its next capture
+            WorldPlayerVerdict verdict = Players.RenameRecorded(from, to);
+            if (verdict != WorldPlayerVerdict.Ok) return verdict;
+            MovePlayerData(from, to);
+            ForgetPendingOf(Players);   // the new key is recorded now: its approval must not count a second time
+            RaiseChanged();
+            return WorldPlayerVerdict.Ok;
+        }
+
+        // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. No player is added to the world here (that is the start gate's job), except that a Solo world's owner key is rebound below.
         //  - The HOST is never refused (user ruling 2026-10-30). On a Solo world the owner follows the file: a host key that is not the
         //    recorded owner (a new profile, a copied save) is rebound as the owner and the change is logged. On a Multiplayer world the host is
         //    admitted whatever its key; if its key is not (and cannot be) recorded, the start gate says so with a clear message.
@@ -257,13 +306,7 @@ namespace SleepingCalamity.Runtime
                 PlayerKey previousOwner = world.Recorded.Count > 0 ? world.Recorded[0] : default;
                 if (world.Kind == WorldKind.Solo && !world.IsRecorded(key) && world.RebindSoloOwner(key))
                 {
-                    if (previousOwner.Id != null)
-                    {
-                        GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
-                        BagsSaveRules.Rename(_town.Bags, previousOwner, key);     // so do the owner's gold, stash and waiting satchel
-                        SuspendSaveRules.Rename(_town.Suspend, previousOwner, key);   // and a bank-room suspend's record of them
-                        if (_town.Dive != null) _town.Dive.ExtraSlotOwner = SuspendSaveRules.RenameId(_town.Dive.ExtraSlotOwner, previousOwner, key);
-                    }
+                    if (previousOwner.Id != null) MovePlayerData(previousOwner, key);
                     Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
                     RaiseChanged();
                 }
@@ -271,6 +314,9 @@ namespace SleepingCalamity.Runtime
             }
 
             WorldPlayerVerdict verdict = world.CanJoin(key);
+            // A stranger may sit in the lobby of a full world until the session starts (audit A3): the host can then say who they really are
+            // (RenameRecorded) or send them away. The start gate still refuses with the world-full words, and JoinRules caps the connections.
+            if (verdict == WorldPlayerVerdict.WorldFull && !Started) return WorldPlayerVerdict.Ok;
             if (verdict != WorldPlayerVerdict.Ok) return verdict;
             if (!world.IsRecorded(key))
             {
@@ -283,8 +329,21 @@ namespace SleepingCalamity.Runtime
             return WorldPlayerVerdict.Ok;
         }
 
-        // The client has entered the session (its connection is up): the key is written into the world now, with its display name.
-        // No-op before the world exists. A host whose key cannot be recorded (a full or other-identity Multiplayer world) stays unrecorded;
+        // A client's connection is up (ConnectionApprover). NOTHING is written into the world here (user decision 2026-11-13, audit A2): a
+        // player is recorded when they PLAY the world - at the session start (TryStartSession) or, for a join into a running session, when
+        // their hero spawns (RecordHeroSpawned). So a friend who looks at the lobby and leaves takes none of the world's four places. Their
+        // display name is kept until the moment they are recorded; their approved place stays taken while they are connected (CancelPending
+        // frees it). A player who is already recorded has their name refreshed now, as before.
+        public void NoteConnected(PlayerKey key, ulong clientId, string name = null)
+        {
+            if (!WorldPlayers.IsValidKey(key)) return;
+            if (!string.IsNullOrWhiteSpace(name)) _namesWhileConnected[key] = name;
+            WorldPlayers world = Players;
+            if (world != null && name != null && world.IsRecorded(key) && world.SetName(key, name)) RaiseChanged();
+        }
+
+        // The player is playing the world: the key is written into it now, with the display name their connection brought (name null = the kept
+        // one). No-op before the world exists. A host whose key cannot be recorded (a full or other-identity Multiplayer world) stays unrecorded;
         // TryStartSession then refuses with NotRecorded / WrongIdentityKind.
         public void RecordEntered(PlayerKey key, ulong clientId, string name = null)
         {
@@ -294,15 +353,28 @@ namespace SleepingCalamity.Runtime
             bool changed;
             if (world.Kind == WorldKind.Solo) changed = world.ClaimSoloOwner(key);
             else changed = !world.IsRecorded(key) && world.Record(key) == WorldPlayerVerdict.Ok;
-            if (name != null && world.SetName(key, name)) changed = true;
+            string display = name ?? (_namesWhileConnected.TryGetValue(key, out string kept) ? kept : null);
+            if (display != null && world.SetName(key, display)) changed = true;
             if (changed) RaiseChanged();
+        }
+
+        // A hero spawned for a client in a session that is already running (ArenaPlayerSpawner): that is the moment a player who joined after
+        // the start counts as having played, so the world records them now (user decision 2026-11-13, audit A2). Before the start gate has run
+        // nothing is recorded: the gate records the whole group that is present.
+        public void RecordHeroSpawned(PlayerKey key, ulong clientId)
+        {
+            if (!Started) return;
+            RecordEntered(key, clientId);
         }
 
         // An approved client that never entered (it dropped first): its place is free again. Keyed by client id, so it works whoever
         // else has already forgotten the approval.
         public void CancelPending(ulong clientId) => _pendingNew.Remove(clientId);
 
-        // The start gate. connected: the players connected now (HostRoster.GetConnectedKeys). Creates the world on the first start.
+        // The start gate. connected: the players connected now (HostRoster.GetConnectedKeys). Creates the world on the first start, and - since
+        // 2026-11-13 (user decision, audit A2) - RECORDS the players present here, because starting a session is what makes someone one of the
+        // world's players. CanStartWithNewPlayers checks the group with the newcomers counted as recordable, so nothing is written for a start
+        // that is refused (a refused start must not spend one of the four places).
         public WorldPlayerVerdict TryStartSession(IReadOnlyList<PlayerKey> connected)
         {
             WorldPlayers world = Players;
@@ -311,15 +383,52 @@ namespace SleepingCalamity.Runtime
                 WorldPlayerVerdict created = WorldPlayers.TryCreate(PendingKind, connected, out world);
                 if (created != WorldPlayerVerdict.Ok) return created;
                 Players = world;
+                ApplyKeptNames(world, connected);
+                ForgetPendingOf(world);
                 RaiseChanged();
             }
             else
             {
-                WorldPlayerVerdict can = world.CanStart(connected);
+                WorldPlayerVerdict can = world.CanStartWithNewPlayers(connected);
                 if (can != WorldPlayerVerdict.Ok) return can;
+                RecordPresent(world, connected);
             }
             Started = true;
             return WorldPlayerVerdict.Ok;
+        }
+
+        // Writes every player present into the world (the gate said they all fit), with the name their connection brought.
+        private void RecordPresent(WorldPlayers world, IReadOnlyList<PlayerKey> present)
+        {
+            bool changed = false;
+            for (int i = 0; i < present.Count; i++)
+            {
+                PlayerKey key = present[i];
+                if (world.Kind == WorldKind.Solo) changed |= world.ClaimSoloOwner(key);
+                else if (!world.IsRecorded(key) && world.Record(key) == WorldPlayerVerdict.Ok) changed = true;
+            }
+            changed |= ApplyKeptNames(world, present);
+            ForgetPendingOf(world);
+            if (changed) RaiseChanged();
+        }
+
+        // The display names the connections brought, now that the keys are recorded (SetName ignores a key that is not).
+        private bool ApplyKeptNames(WorldPlayers world, IReadOnlyList<PlayerKey> present)
+        {
+            bool changed = false;
+            for (int i = 0; i < present.Count; i++)
+                if (_namesWhileConnected.TryGetValue(present[i], out string name) && world.SetName(present[i], name)) changed = true;
+            return changed;
+        }
+
+        // A recorded player holds a place by their record, not by their approval: a pending entry left for them would count twice in Admit.
+        private void ForgetPendingOf(WorldPlayers world)
+        {
+            if (_pendingNew.Count == 0) return;
+            _pendingDone.Clear();
+            foreach (KeyValuePair<ulong, PlayerKey> pending in _pendingNew)
+                if (world.IsRecorded(pending.Value)) _pendingDone.Add(pending.Key);
+            for (int i = 0; i < _pendingDone.Count; i++) _pendingNew.Remove(_pendingDone[i]);
         }
 
         // Convenience for the host flow: the gate against a roster.

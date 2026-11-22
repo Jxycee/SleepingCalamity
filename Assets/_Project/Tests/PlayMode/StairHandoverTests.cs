@@ -24,12 +24,15 @@ namespace SleepingCalamity.Tests.PlayMode
         private const float MaxSink = 0.1f;   // far tighter than the 1 m brief: with test-rate frames a 0.2 s placement gap only drops a hero ~0.2 m; a latent hero drops metres
         private static readonly Vector3 Home = new Vector3(0f, 0f, -6f), HubStair = new Vector3(0f, 0f, 9f), Origin = new Vector3(200f, 0f, 0f);
         private readonly List<PlayModeHarness.TestClient> _clients = new List<PlayModeHarness.TestClient>();
+        private GameObject _ground;   // the test hub floor, destroyed in TearDown even when the test fails midway
 
         [UnityTearDown]
         public IEnumerator TearDown()
         {
             foreach (PlayModeHarness.TestClient c in _clients) yield return c.LeaveAndDestroy();
             _clients.Clear();
+            if (_ground != null) Object.Destroy(_ground);
+            _ground = null;
             yield return PlayModeHarness.TearDownApp();
         }
 
@@ -175,7 +178,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Stairs_F1ToF3_ThenHome_NoHeroSinksAndTheHoldClears([Values(NetCondition.None, NetCondition.Rtt150Loss2)] NetCondition net)
+        public IEnumerator Stairs_F1ToF3_ThenHome_NoHeroSinksAndTheHoldClears([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             Failures.Clear();
             Rig r = null;
@@ -227,13 +230,12 @@ namespace SleepingCalamity.Tests.PlayMode
             }
 
             // Go home (the abandon path ends the dive like a fail): both heroes are sent to the hub; the floor stays up for the clear delay.
-            var ground = new GameObject("TestHubGround"); ground.transform.position = new Vector3(0f, -0.5f, -6f);
-            ground.AddComponent<BoxCollider>().size = new Vector3(60f, 1f, 60f);   // the rig has no hub, so give the arrival teleport something to stand on
+            _ground = new GameObject("TestHubGround"); _ground.transform.position = new Vector3(0f, -0.5f, -6f);
+            _ground.AddComponent<BoxCollider>().size = new Vector3(60f, 1f, 60f);   // the rig has no hub, so give the arrival teleport something to stand on
             Assert.That(r.Host.ServerAbandonDive(), Is.True);
             yield return Track(r, () => Flat(r.HostHero.transform.position, Home) < 3f && Flat(r.ClientHeroOnHost.transform.position, Home) < 8f && Flat(r.ClientHeroOwn.transform.position, Home) < 8f, "both heroes sent home");
             AssertNoSink(r, "abandon-home hand-over (up to arrival)");
             yield return Track(r, () => !r.HostHero.GetComponent<HeroLocomotion>().HoldVertical && !r.ClientHeroOwn.GetComponent<HeroLocomotion>().HoldVertical, "the gravity hold released after the trip home");
-            Object.Destroy(ground);
             Assert.That(Failures, Is.Empty, string.Join(" | ", Failures));
         }
     }

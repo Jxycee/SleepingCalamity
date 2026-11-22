@@ -98,8 +98,13 @@ namespace SleepingCalamity.Tests.PlayMode
 
             Requests(lead.position);
 
+            // PL-1: in the bank room the go-home / push-on join needs this hero inside the bank prompt range; trailing the lead at up to 3.5 m can leave it just outside (a 3300 s hang on floor 5), so walk to the bank cell
             Vector3 toLead = Flat(lead.position - _hero.position);
             float d = toLead.magnitude;
+            CellarFloorSync bfs = _dir.FloorSync;
+            if (_dir.HaulSync != null && _dir.HaulSync.Current.DivePhase == DivePhase.BankRoom && bfs != null && bfs.Built != null && bfs.Layout != null
+                && CellarFloorBuilder.TryBankWorld(bfs.Layout, bfs.Built, out Vector3 bankPos) && Flat(bankPos - _hero.position).magnitude > 2.5f)
+            { toLead = Flat(bankPos - _hero.position); d = toLead.magnitude; Walk(ref f, dt, bankPos, d); _input.Frame = f; return; }
             Moving = Moving ? d > FollowStop : d > FollowStart;
             if (!Moving) { _progressClock = 0f; _progressPos = _hero.position; _stuckSpells = 0; _farClock = 0f; _input.Frame = f; return; }
             Walk(ref f, dt, lead.position, d);
@@ -130,6 +135,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 {
                     // inside the room the leader's push-on opens the shared choice: the follower joins it (a repeated press by the same player changes nothing)
                     if (sum.ChoiceKind == BankChoiceKind.PushOn) { haul.RequestPushOn(); PushOnRequests++; _nextRequest = Seconds + 2.5f; Say("joined the push-on"); }
+                    else if (sum.ChoiceKind == BankChoiceKind.GoHome) { _dir.RequestGoHome(); PushOnRequests++; _nextRequest = Seconds + 2.5f; Say("joined the go-home"); }   // PL-1: the leader chose to go home (LoopBot); the shared choice needs this second press
                 }
                 else if (!chosen && (sum.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked for the bank room on floor {floor}"); }
             }

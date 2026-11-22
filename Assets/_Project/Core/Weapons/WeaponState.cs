@@ -107,10 +107,11 @@ namespace SleepingCalamity.Core.Weapons
         {
             if (!(amount > 0f) || float.IsInfinity(amount) || Level >= MaxLevel) return 0;
             double a = (double)Abs + amount;
-            // Cost of n levels from level L: sum of 40 + 20(L+k) = 10 n^2 + (30 + 20 L) n.
-            double b = 30.0 + 20.0 * Level;
-            double Total(long n) => 10.0 * n * n + b * n;
-            double estimate = Math.Floor((-b + Math.Sqrt(b * b + 40.0 * a)) / 20.0);
+            // Cost of n levels from level L: sum of B + P(L+k), k = 0..n-1 = (P/2) n^2 + (B + P L - P/2) n, with B and P the tuned base and per-level cost.
+            double cb = Tuning.WeaponGrowthTuning.LevelCostBase, cp = Tuning.WeaponGrowthTuning.LevelCostPerLevel;
+            double b = cb + cp * Level - cp / 2.0;
+            double Total(long n) => cp / 2.0 * n * n + b * n;
+            double estimate = cp > 1e-9 ? Math.Floor((-b + Math.Sqrt(b * b + 2.0 * cp * a)) / cp) : Math.Floor(a / Math.Max(1e-9, b));
             long levels = estimate >= MaxLevel ? MaxLevel : (long)estimate;
             if (levels < MaxLevel)
             {

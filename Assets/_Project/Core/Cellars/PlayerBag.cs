@@ -222,8 +222,15 @@ namespace SleepingCalamity.Core
             b.ChestSeed = dive.ChestSeed; b.ChestFloor = dive.ChestFloor; b.OpenedChests = dive.OpenedChests;
             if (dive.CarriedSatchel != null && dive.CarriedSatchel.Items != null && dive.CarriedSatchel.Items.Count > 0)
             {
-                b.Satchel.Restore(new LostSatchel(dive.CarriedSatchel.Floor, dive.CarriedSatchel.Items));   // a carried satchel and a waiting one never coexist: the carried one wins
-                b.Satchel.PickUp();
+                // The carried satchel takes one carry slot like PickUpSatchel, so the cap holds after a restore. Rule (nothing is lost): with no slot left (a hand-edited file; the live game never
+                // saves one) it stays waiting on its floor instead; a home satchel already waiting is kept then, since a slot holds one satchel.
+                var carriedSatchel = new LostSatchel(dive.CarriedSatchel.Floor, dive.CarriedSatchel.Items);
+                if (b._carried.Count < MaxCarried)
+                {
+                    b.Satchel.Restore(carriedSatchel);   // a carried satchel and a waiting one never coexist: the carried one wins
+                    b.Satchel.PickUp();
+                }
+                else if (b.Satchel.Waiting == null) b.Satchel.Restore(carriedSatchel);
             }
             if (dive.Picks != null)
                 foreach (int p in dive.Picks)

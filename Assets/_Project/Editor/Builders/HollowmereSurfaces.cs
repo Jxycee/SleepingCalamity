@@ -18,7 +18,7 @@ namespace SleepingCalamity.EditorTools
     {
         const string TexFolder = "Assets/_Project/Content/Textures/Hollowmere/Surfaces", MatFolder = "Assets/_Project/Content/Materials/Hollowmere";
         const string TexPath = TexFolder + "/T_HM_SoftBlob.png";
-        const float DecalLift = 0.075f;   // above the cobble bed: the setts stand a few cm proud, taller ones show through like grit in the wash
+        const float DecalLift = 0.03f;   // above the draped ground (B3: the setts are gone and the cobble bed is flat; was 0.075 for the proud setts), over the B3 decals (<= 0.024)
         static readonly Regex PropName = new Regex("sack|crate|barrel|stall|cask|keg", RegexOptions.IgnoreCase);
 
         static Texture2D _blob;
@@ -81,6 +81,7 @@ namespace SleepingCalamity.EditorTools
             m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF"); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             LookTestBuilder.MakeTransparent(m);
             m.SetShaderPassEnabled("MotionVectors", true);
+            MaterialValidation.Validate(m);   // B3 polish: settle the state a graphics editor would (MaterialValidationTests flagged Surf_Moss and Surf_Stain)
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -138,8 +139,8 @@ namespace SleepingCalamity.EditorTools
             int n = 0;
             float Y(float x, float z) => HollowmereLayout.Ground(t, x, z) + DecalLift;
             // tone patches: 8 m cells, two per cell, sizes 5-11 m by 3-7 m, random yaw; the order stack keeps the larger ones under the smaller
-            int cx = 0;
-            for (float cellX = x0; cellX < x1; cellX += 8f, cx++)
+            int cx = 0;   // B3 round 2: the tone patches and pale stains were tuned for dark setts and show as hard pale polygons on the T01 ground
+            for (float cellX = x0; cellX < x0; cellX += 8f, cx++)
             {
                 int cz = 0;
                 for (float cellZ = z0; cellZ < z1; cellZ += 8f, cz++)
@@ -153,7 +154,7 @@ namespace SleepingCalamity.EditorTools
                     }
             }
             // small stains and a few pale scuffs, 1.2-3 m, scattered over the whole square
-            for (int i = 0; i < 90; i++)
+            for (int i = 0; i < 0; i++)
             {
                 float px = Mathf.Lerp(x0, x1, H(i, 1, 70)), pz = Mathf.Lerp(z0, z1, H(i, 2, 71));
                 float s = 1.2f + 1.8f * H(i, 3, 72);

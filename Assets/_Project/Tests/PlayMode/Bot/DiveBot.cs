@@ -46,6 +46,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public readonly HashSet<int> ClearedFloors = new HashSet<int>();   // floors the bot left by their stair (1-4, 6) and the guardian floor once its guardian fell (5)
         public readonly HashSet<int> EnteredFloors = new HashSet<int>();
         float _bankRoomClock, _pushKeyAt = -1f;
+        public bool GoHomeAtBank;                          // PL-1: in the bank room press the go-home button (Secondary) instead of pushing on
+        public bool TownExternal;                          // PL-1: a LoopBot owns the town (it presses the trapdoor itself): no hub bake, no hub stair goal
         public bool Tough;                                 // test-only: the host tops the hero up below 50% HP, so the run explores floors 3-4 instead of measuring difficulty
         public int DiveFails, Deaths;
         float _teleportCheckAt = -1f; Bounds _teleportBounds;
@@ -111,7 +113,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (!_vitals.IsUp || d.HasPendingTeleport) { _input.Frame = f; return; }
 
             SyncFloor(d);
-            if (BankRoom(d, dt)) { if (_pushFrame) { _pushFrame = false; f.PrimaryPressed = true; } _input.Frame = f; return; }
+            if (BankRoom(d, dt)) { if (_pushFrame) { _pushFrame = false; if (GoHomeAtBank) f.SecondaryPressed = true; else f.PrimaryPressed = true; } _input.Frame = f; return; }
             if (_bakeAt > 0f && Seconds >= _bakeAt) { _bakeAt = -1f; Bake(_bakeArea); _corners.Clear(); EntryProbe(); }
             if (_bakeAt > 0f) { _input.Frame = f; return; }
             if (_teleportCheckAt > 0f && Seconds >= _teleportCheckAt)
@@ -220,7 +222,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Bounds b = fs.Built.Bounds;
                 _teleportCheckAt = Seconds + 3f; _teleportBounds = b;
-                _bakeAt = Seconds + 0.5f; _bakeArea = new Bounds(new Vector3(b.center.x, 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f));   // after the old floor's objects are gone
+                _bakeAt = Seconds + 0.5f; _bakeArea = new Bounds(new Vector3(b.center.x, b.min.y + 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f));   // after the old floor's objects are gone
                 _fellThisFloor = false;
                 _navDoorOpen = Contents(d) != null && Contents(d).State.DoorOpen;
                 Say($"floor {built} seed {fs.Layout.Seed} preset {fs.Layout.Preset} rooms {fs.Layout.Rooms.Count} chests {fs.Layout.Chests.Count} locked {fs.Layout.HasLockedRoom}");
@@ -228,7 +230,7 @@ namespace SleepingCalamity.Tests.PlayMode
             else
             {
                 Vector3 hub = (d.NetHome.Value + d.NetHubStair.Value) * 0.5f;
-                Bake(new Bounds(hub, new Vector3(70f, 20f, 70f)));
+                if (!TownExternal) Bake(new Bounds(hub, new Vector3(70f, 20f, 70f)));
                 if (Finished) Say("back in the hub");
             }
         }
@@ -245,7 +247,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (c.GateBlocking && !timedOut) return;
                 _navDoorOpen = true; _doorSeenAt = -1f;
                 Bounds b = fs.Built.Bounds;
-                Bake(new Bounds(new Vector3(b.center.x, 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f)));
+                Bake(new Bounds(new Vector3(b.center.x, b.min.y + 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f)));
                 Say("locked door opened: NavMesh re-baked");
                 if (c.GateBlocking) Note("Door", "the door reads open (DoorOpen) but its gate object still blocks after 2 s");
             }
@@ -288,7 +290,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var list = new List<Target>();
             if (Floor == 0)
             {
-                if (Finished) return null;
+                if (Finished || TownExternal) return null;
                 list.Add(new Target { Goal = Goal.HubStair, Pos = d.NetHubStair.Value, Range = DiveDirector.PromptRadius - 0.5f, Name = "hub stair" });
                 return list[0];
             }
@@ -452,6 +454,8 @@ namespace SleepingCalamity.Tests.PlayMode
                     }, 6f);
                     return;
                 case Goal.HubStair:
+                    // The result card of the dive just ended owns Interact (and the trapdoor prompt) until it is dismissed: press once to dismiss it, look again half a second later.
+                    if (SleepingCalamity.UI.DiveResultCard.ShowingCount > 0) { if (_pressCheck == null) { _pressNext = true; Check(0.5f, () => { }); } return; }
                     if (d.Prompt != DiveDirector.PromptKind.Descend) Note("Prompt", $"at the hub stair ({Flat(t.Pos - _hero.position).magnitude:0.0} m) but the prompt is '{d.Prompt}'", "hub");
                     Press(t, () => { if (!Dir.NetActive.Value) { Note("Interact", "pressed interact at the hub stair and no dive started (6 s)", "hub"); GiveUp(t); } }, 6f);
                     return;

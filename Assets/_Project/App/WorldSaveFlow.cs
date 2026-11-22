@@ -8,7 +8,9 @@
 //  - weapon growth (the "weapons" section) is captured from the live CombatHosts at every save below and marks the file dirty only when it changed,
 //  - on the first session start (last-played time) and then at most every FlushSeconds when anything else marks the file dirty,
 //  - when the session ends: on ShuttingDown or Failed (before NGO shuts down), again on Ended, and on quit.
-// A client never opens a world file. A newer build's world loads read-only (a toast says so). One-time migration: the old single
+// A client never opens a world file. A newer build's world loads read-only (a toast says so). A selected world that is damaged or gone is never replaced
+// by another one (a toast says so), and a fault while opening leaves the session playable with nothing attached and HostWorld cleared (audits A6, A7,
+// A11: the file is attached only after its weapons and town loaded). One-time migration: the old single
 // world{suffix}.json becomes a world in the library.
 using System;
 using System.Collections.Generic;
@@ -20,7 +22,7 @@ using UnityEngine;
 
 namespace SleepingCalamity.App
 {
-    public sealed class WorldSaveFlow : IDisposable
+    public sealed class WorldSaveFlow : IDisposable, IFrontDoorWorlds
     {
         public const float FlushSeconds = 10f;       // a dirty file is on disk within this
 
@@ -58,6 +60,9 @@ namespace SleepingCalamity.App
 
         // The attached store while hosting (tests read it), else null.
         public WorldSaveStore Store => store;
+
+        // True while hosting a world that a leave or quit will write (a store is attached and not read-only). False for a full library or a read-only world.
+        public bool CanSave => store != null && !store.IsReadOnly;
 
         // The world the next hosted session opens (set by Select / CreateWorld); null = the most recently played, or a new one.
         public string SelectedWorldId { get; private set; }
@@ -105,6 +110,38 @@ namespace SleepingCalamity.App
             return SelectedWorldId;
         }
 
+        // Lets one of a multiplayer world's recorded players go, so one of its four places is free again (the host's own action in the world
+        // picker; audit A2, user decision 2026-11-13). Refused while that world is the one being hosted (its players are live in HostWorld), for
+        // a world that is not there or loads read-only, for a Solo world and for a key that is not recorded (WorldPlayers.Remove).
+        // The player's own weapons and bags stay in the file: nothing reads them while they are not recorded, and adding them back finds them.
+        public bool RemovePlayer(string worldId, PlayerKey key)
+        {
+            if (store != null && store.Current.WorldId == worldId) return false;
+            WorldSaveStore target = Library.Open(worldId);
+            if (target == null || target.IsReadOnly) return false;
+            if (!WorldPlayers.TryRestore(target.Current.Players, out WorldPlayers players, out _)) return false;
+            if (!players.Remove(key)) return false;
+            target.Current.Players = players.ToSave();
+            target.MarkDirty();
+            return target.Save();
+        }
+
+        // Audit A5: false when the world loads read-only (written by a newer build, or its file could not be read), so the front door asks before
+        // starting it. A world that is not there (it would be made new) can be saved.
+        public bool CanSaveWorld(string worldId)
+        {
+            try
+            {
+                WorldSaveStore target = Library.Open(worldId);
+                return target == null || !target.IsReadOnly;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("WorldSaveFlow: could not check whether world " + worldId + " can be saved: " + e.Message);
+                return false;
+            }
+        }
+
         // Sets a world aside (never erases it). Not while it is the world being hosted.
         public bool DeleteWorld(string worldId)
         {
@@ -125,37 +162,85 @@ namespace SleepingCalamity.App
             Open();
         }
 
+        // Opens the world the hosted session plays. Never throws (it runs inside the session's StateChanged, where a throw would only be logged and
+        // swallowed, leaving the session on the previous session's world with no word to the player: audit A7). On a fault, or when no world can be
+        // opened, nothing is attached (nothing gets written this session), HostWorld is cleared and a toast says so; the session stays playable.
         private void Open()
+        {
+            try
+            {
+                OpenWorld();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("SC SAVE world flow: opening the world failed (" + e.Message + "); nothing is saved this session.");
+                Detach();
+                bus.Publish(new ToastRequested("save.world_load_failed", null, 6f));
+            }
+        }
+
+        private void OpenWorld()
         {
             WorldKind kind = session.Mode == SessionMode.Solo ? WorldKind.Solo : WorldKind.Multiplayer;
             IdentityKind identity = session.Mode == SessionMode.Online ? IdentityKind.Ugs : IdentityKind.Local;
-            store = Resolve(kind, identity);
-            if (store == null)
+            WorldSaveStore opened = Resolve(kind, identity, out string refusedKey);
+            if (opened == null)
             {
-                bus.Publish(new ToastRequested("world.library_full", kind.ToString(), 6f));   // 10 worlds of this kind: pick one or delete one
-                world.LoadWeapons(null);   // no stale section from an earlier world
-                world.LoadTown(null);
+                Detach();   // no stale world, weapons or town from an earlier session
+                bus.Publish(refusedKey == null
+                    ? new ToastRequested("world.library_full", kind.ToString(), 6f)   // 10 worlds of this kind: pick one or delete one
+                    : new ToastRequested(refusedKey, null, 6f));
                 return;
             }
+            world.Load(RestoreWorld(opened.Current.Players));
+            world.LoadWeapons(opened.Current.Weapons);   // each returning player's growth is seeded from it when the CombatHost first needs them
+            world.LoadTown(opened.Current);   // the town, stock, residents and dive sections for the hub's ITownSource to restore from
+            // The file is attached only now that every load succeeded (audit A11): a throw above leaves no store, so a later save can never write
+            // the previous world's weapons or town into this file.
+            store = opened;
             SelectedWorldId = store.Current.WorldId;
-            world.Load(RestoreWorld(store.Current.Players));
-            world.LoadWeapons(store.Current.Weapons);   // each returning player's growth is seeded from it when the CombatHost first needs them
-            world.LoadTown(store.Current);   // the town, stock, residents and dive sections for the hub's ITownSource to restore from
             Write();   // stamps the last-played time at once
             nextFlush = Time.unscaledTime + FlushSeconds;
             if (store.IsReadOnly)
                 bus.Publish(new ToastRequested(store.NewerVersionOnDisk > 0 ? "save.world_read_only" : "save.world_load_failed", null, 6f));
         }
 
-        // The selected world if it is one of this kind and identity kind; else the newest of them; else a new one (null when the list is full).
-        private WorldSaveStore Resolve(WorldKind kind, IdentityKind identity)
+        // No world attached, and nothing of an earlier session left in the host's memory. Each clear is guarded alone.
+        private void Detach()
         {
+            store = null;
+            try { world.Load(null); } catch (Exception e) { Debug.LogException(e); }
+            try { world.LoadWeapons(null); } catch (Exception e) { Debug.LogException(e); }
+            try { world.LoadTown(null); } catch (Exception e) { Debug.LogException(e); }
+        }
+
+        // The selected world if it is one of this kind and identity kind; else the newest readable one of them; else a new one (null when the list is full).
+        // Audit A6: a selected world that is damaged or whose file is gone is never replaced by another one (null, refusedKey says why). A selection that
+        // is a readable world of another list (a Solo world left selected, a Multiplayer start) is no pick for this start: the newest of this kind opens.
+        private WorldSaveStore Resolve(WorldKind kind, IdentityKind identity, out string refusedKey)
+        {
+            refusedKey = null;
             List<WorldSummary> worlds = Library.List(kind, identity);
             string id = null;
             if (!string.IsNullOrEmpty(SelectedWorldId))
-                foreach (WorldSummary w in worlds) if (w.Id == SelectedWorldId) id = w.Id;
-            if (id == null && worlds.Count > 0) id = worlds[0].Id;   // most recently played first
-            if (id != null) return Library.Open(id, NewSeed());
+            {
+                WorldSummary picked = worlds.Find(w => w.Id == SelectedWorldId);
+                if ((picked != null && picked.Damaged) || (picked == null && !Library.Exists(SelectedWorldId)))
+                {
+                    refusedKey = "save.world_damaged";
+                    return null;
+                }
+                if (picked != null) id = picked.Id;
+            }
+            if (id == null)
+                foreach (WorldSummary w in worlds)
+                    if (!w.Damaged) { id = w.Id; break; }   // most recently played first
+            if (id != null)
+            {
+                WorldSaveStore existing = Library.Open(id, NewSeed());
+                if (existing == null) refusedKey = "save.world_damaged";   // the file went away between the list and now
+                return existing;
+            }
             return Library.Create(kind, identity, NewSeed());
         }
 

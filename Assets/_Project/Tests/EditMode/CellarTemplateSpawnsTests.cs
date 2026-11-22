@@ -55,7 +55,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Resolve_ScalesWithPartySize_OneExtraEnemyPerExtraPlayer_WhereTheRoomHasSpace()
         {
             int grew = 0, rooms = 0;
-            foreach (var (l, d, p) in Floors(25))
+            foreach (var (l, d, p) in Floors(35))   // 25 seeds gave 98 rooms once plan 5c shifted the twists; the sample size is incidental
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     CellarTemplateRoom solo = CellarTemplateSpawns.Resolve(l, d, p, r, 1);
@@ -72,6 +72,37 @@ namespace SleepingCalamity.Tests.EditMode
                 }
             Assert.That(rooms, Is.GreaterThan(100));
             Assert.That(grew, Is.GreaterThan(rooms), "a bigger party must add enemies in most templated rooms");
+        }
+
+        // Probe (kept: fast): which live party sizes and latch extras reach a second wave in a templated room. CellarContentsSync's two-wave path is only live where this finds rooms.
+        [Test]
+        public void Resolve_WaveOneSurvives_ReportsWhichPartiesReachIt()
+        {
+            var counts = new Dictionary<string, int>(); int rooms = 0;
+            for (uint seed = 1; seed <= 400; seed++)
+                for (int floor = 2; floor <= 7; floor++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    foreach (int extra in new[] { 0, 1 })
+                    {
+                        CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, d, extra, false);
+                        for (int r = 0; r < l.Rooms.Count; r++)
+                            for (int players = 1; players <= 4; players++)
+                            {
+                                CellarTemplateRoom t = CellarTemplateSpawns.Resolve(l, d, p, r, players);
+                                if (t == null) continue;
+                                string key = "players " + players + " extra " + extra;
+                                if (!counts.ContainsKey(key)) counts[key] = 0;
+                                rooms++;
+                                if (t.InWave(1).Any()) { counts[key]++; Assert.That(t.InWave(0).Any(), key + ": wave 1 with no wave 0"); }
+                            }
+                    }
+                }
+            TestContext.WriteLine("WAVE1 PROBE rooms=" + rooms + " " + string.Join(" | ", counts.OrderBy(k => k.Key).Select(k => k.Key + " => " + k.Value)));
+            UnityEngine.Debug.Log("WAVE1 PROBE rooms=" + rooms + " " + string.Join(" | ", counts.OrderBy(k => k.Key).Select(k => k.Key + " => " + k.Value)));
+            Assert.That(rooms, Is.GreaterThan(100));
+            // Tripwire: if this fails, a live party can now reach wave 1; drop the PlanOverride from the two-wave PlayMode tests and fix the CellarContentsSync.PlanOverride comment.
+            Assert.That(counts.Values.Sum(), Is.EqualTo(0), "wave 1 is now reachable by a live 1-4 player party: " + string.Join(" | ", counts.OrderBy(k => k.Key).Select(k => k.Key + " => " + k.Value)));
         }
 
         [Test]
@@ -94,6 +125,28 @@ namespace SleepingCalamity.Tests.EditMode
             for (int r = 0; r < l.Rooms.Count; r++)
                 if (l.Rooms[r].Room.Kind != RoomKind.Combat || RoomEncounterTable.For(l.Rooms[r].Room.Id).Count == 0)
                     Assert.That(CellarTemplateSpawns.Resolve(l, d, p, r, 2), Is.Null, l.Rooms[r].Room.Id);
+        }
+
+        [Test]
+        public void Resolve_NeverPlacesAnEnemyOnTheHuntersCell()
+        {
+            int hunterRooms = 0;
+            for (uint seed = 1; seed <= 60; seed++)
+                foreach (int floor in new[] { 2, 4, 6, 7 })
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, d, 0, true);
+                    if (p.Hunter == null) continue;
+                    for (int players = 1; players <= 4; players++)
+                    {
+                        CellarTemplateRoom t = CellarTemplateSpawns.Resolve(l, d, p, p.Hunter.RoomIndex, players);
+                        if (t == null) continue;
+                        hunterRooms++;
+                        foreach (TemplateSpawn s in t.Spawns)
+                            Assert.That((s.Cell.X, s.Cell.Y), Is.Not.EqualTo((p.Hunter.X, p.Hunter.Y)), "seed " + seed + " floor " + floor + " players " + players + " wave " + s.Wave + ": template enemy on the hunter's cell");
+                    }
+                }
+            Assert.That(hunterRooms, Is.GreaterThan(20), "the sweep must reach templated hunter rooms");
         }
 
         [Test]

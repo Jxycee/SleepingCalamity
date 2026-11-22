@@ -1,0 +1,71 @@
+/* The pause menu: a dim veil over the running world, one column, one screen shown at a time (PauseMenuView toggles them). */
+.pm-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(10, 8, 6, 0.6);
+}
+
+.pm-screen {
+    width: 620px;
+    align-items: stretch;
+}
+
+.pm-heading {
+    font-size: 54px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(244, 232, 208);
+    margin-bottom: 24px;
+}
+
+.pm-text {
+    font-size: 24px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: rgb(244, 232, 208);
+    margin-bottom: 12px;
+}
+
+.pm-why {
+    font-size: 20px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: rgb(214, 208, 196);
+    margin-top: 14px;
+}
+
+.pm-button {
+    height: 60px;
+    font-size: 28px;
+    margin-top: 10px;
+}
+
+.pm-button:focus {
+    border-color: rgb(255, 214, 120);
+    border-width: 3px;
+}
+
+.pm-list {
+    margin-bottom: 8px;
+}
+
+.pm-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+
+.pm-row-action {
+    font-size: 24px;
+    color: rgb(214, 208, 196);
+}
+
+.pm-row-key {
+    font-size: 24px;
+    color: rgb(255, 214, 120);
+}

@@ -43,7 +43,7 @@ High/Low Poly Setup → Cage Setup → Bake Maps → Composite
 | Emission | sRGB PNG | Mask-based |
 | ORM Packed | Linear PNG | R=AO, G=Roughness, B=Metallic (Unreal) |
 
-Naming: `T_[Asset]_[Map]` per `../references/naming-conventions.md`
+Naming: `T_[Asset]_[Map]`
 
 ## Bake Setup
 
@@ -96,7 +96,7 @@ Modular kits share one atlas:
 
 ## Resolution Guidelines
 
-See `../references/polycount-budgets.md` texture section.
+See sc-asset-budget and PHASE1 3.3 (nothing bakes above 2048 px).
 
 ## MCP Integration
 

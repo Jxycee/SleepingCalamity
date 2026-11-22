@@ -17,8 +17,11 @@
 // first time spawns that room's CellarEncounterPlan spawns (DiveHaulSync.EncounterPlan, extras at that moment included) through CombatHost.SpawnEnemy: Tier1 = floor-banded
 // Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (2b) the Ambush floor's ambush room (host-only twist) springs its enemies after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush ring cells, cancelled (room re-armed) if no living player is left when the delay ends; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
 // (2c) ENCOUNTER TEMPLATES (spawner wiring, host only; clients never spawn): for the 12 pool combat rooms CellarTemplateSpawns.Resolve picks the kinds, cells and waves (EncounterBuilder, party size = connected players, isAmbushRoom = plan.AmbushRoom == room)
-// and holds the count to the plan's live count; wave 1 spawns on the host tick after the last wave-0 enemy dies (the room is not cleared in between). Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
+// and holds the count to the plan's live count; wave 1 spawns once the last wave-0 enemy has died and no wave-1 cell is within the ambush distance of a player (or WaveTwoMaxWaitSeconds has passed); the room is not cleared in between. Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
 // (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
+// (4b) ENEMY DROPS (host only): a real death of a tracked enemy (not a despawn, not the hunter or a pump-wave enemy) gives every still-connected player in the enemy's HitLog their OWN roll
+// (CellarLoot.RollEnemyDrop, per roster slot) into their own bag via DiveHaulSync.ServerAddItem, paid on the next host tick (the killing blow joins HitLog after ServerDied fires). A full bag drops nothing
+// for that player and only that player is told (NoticeOwner). The carrier's gate key is unchanged and never loot. Bags already ride the world save, so a drop needs no save field;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
 // Spine hooks: subscribe to the host event ExitUnlocked(int floor) (fired once per floor when the gate key is picked up; State.ExitUnlocked stays true on every peer until the
@@ -39,6 +42,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Runtime;
 
@@ -86,6 +90,7 @@ namespace SleepingCalamity.Presentation
         public CellarFloorSync FloorSync;   // optional; found in the scene when null
         public DiveHaulSync HaulSync;       // optional; found in the scene when null (host needs it for loot, pieces and the plan)
         public System.Action<List<PlayerPos>> PlayersOverride;   // test hook: replaces the player-object scan on the host
+        public System.Func<CellarEncounterPlan> PlanOverride;   // test hook: the host spawns from this plan (when it matches the armed floor) instead of the dive's; a live 1-4 player party never reaches a second wave (probe CellarTemplateSpawnsTests.Resolve_WaveOneSurvives_*: the plan's extras top out at 1 and Resolve trims wave 1 first), so tests need this
 
         // Host only: raised once per floor when the gate key is picked up (the spine opens the stair).
         public event System.Action<int> ExitUnlocked;
@@ -112,6 +117,8 @@ namespace SleepingCalamity.Presentation
         // ---- floor objective read API (any peer; from the replicated state, so a late joiner agrees) ----
         public const float ValveReportReachSlack = 0.5f;          // the host accepts a valve report from this much beyond ValveReachMeters (movement between the owner's check and the RPC)
         public static float PumpSecondsOverrideForTests;          // test hook: > 0 replaces FloorObjectiveTuning.PumpSeconds (progress runs faster; thresholds and waves are fractions of it)
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { PumpSecondsOverrideForTests = 0f; }
         private ContentsState Cur => IsServer ? _st : Net.Value;
         public FloorObjective CurrentObjective => (FloorObjective)Cur.Objective;
         public int ValvesTurned { get { int m = Cur.ValveMask, n = 0; for (int i = 0; i < ValveHold.Count; i++) if ((m & (1 << i)) != 0) n++; return n; } }
@@ -138,7 +145,31 @@ namespace SleepingCalamity.Presentation
         private ContentsState _st;
         private readonly CellarRoomClear _clear = new CellarRoomClear();
         private readonly HashSet<int> _entered = new HashSet<int>();
-        private sealed class Tracked { public int Room; public bool Carrier, Guardian; }
+        private sealed class Tracked { public int Room; public bool Carrier, Guardian; public int DropKey; }
+
+        // ---- per-player enemy drops (host) ----
+        // A real death (not a despawn) of a TRACKED enemy gives every player who hit it and is still connected their own roll (CellarLoot.RollEnemyDrop, keyed by the enemy's per-floor DropKey and the
+        // player's roster slot) into their own bag. The kill is seen inside Enemy.ServerApplyHit, before CombatHost appends the killing blow to HitLog, so the drop is queued here and paid on the
+        // next host tick. DropKey = room * 1024 + the room's spawn count this floor (never reset within a floor, so a respawn after a wipe rolls fresh). The hunter and the pump-wave enemies drop nothing.
+        public const string DropFullText = "Your bag is full: an enemy drop was lost.";
+        public System.Func<int, int, int> EnemyDropRollOverride;   // test seam (host): (player slot, drop key) -> item id, 0 = no drop; null = CellarLoot.RollEnemyDrop
+        public int EnemyDropsGiven { get; private set; }            // host only (tests)
+        public event System.Action<ulong, int> EnemyDropGiven;      // host: (clientId, item id)
+        private struct PendingDrop { public List<HitRecord> Hits; public uint Seed; public int Floor, Key, Tier; }
+        private readonly List<PendingDrop> _drops = new List<PendingDrop>();
+        private readonly Dictionary<int, int> _roomSpawns = new Dictionary<int, int>();
+        /// <summary>Host test entry: queues the drop of an enemy that "died" with these hitters (bag ids, DiveHaulSync.PlayerIdOf), exactly as a tracked death would, so the real roll and payout run without
+        /// spawning a room. False off the host or with no floor armed.</summary>
+        public bool TestQueueEnemyDrop(IEnumerable<string> hitters, int dropKey, int tier = 1)
+        {
+            if (!IsServer || !IsSpawned || _layout == null) return false;
+            var hits = new List<HitRecord>();
+            foreach (string id in hitters) hits.Add(new HitRecord(id, "test", 0.0));
+            _drops.Add(new PendingDrop { Hits = hits, Seed = _layout.Seed, Floor = _layout.Floor, Key = dropKey, Tier = tier });
+            return true;
+        }
+
+        private int NextDropKey(int room) { _roomSpawns.TryGetValue(room, out int n); _roomSpawns[room] = n + 1; return room * 1024 + n; }
         private readonly Dictionary<Enemy, Tracked> _tracked = new Dictionary<Enemy, Tracked>();
         private Enemy _carrierEnemy, _hunter; private bool _hunterSpawned;
         private int _carrierLostRoom = -1;   // the carrier despawned without dying while room-mates lived: its room resets once no tracked enemy is left, so the key stays obtainable
@@ -627,8 +658,35 @@ namespace SleepingCalamity.Presentation
             pos = default; return false;
         }
 
+        // Host: pays the queued enemy deaths (see the per-player enemy drops block) on the NEXT HostTick after the kill. It runs first in HostTick, before a new floor's arm clears the pending list,
+        // so a kill in the same frame a new floor arms may lose its drop (production arms from DiveDirector.ContentsTick with AutoArm = false, so that window is one frame wide).
+        private void TickDrops()
+        {
+            if (_drops.Count == 0) return;
+            PendingDrop[] due = _drops.ToArray(); _drops.Clear();
+            foreach (PendingDrop d in due)
+            {
+                int rankBonus = HaulSync != null && HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(d.Floor) : 0;   // same bonus a chest of this floor gets
+                rankBonus = _mods.ChestRankBonus(rankBonus);
+                var seen = new HashSet<string>();
+                foreach (HitRecord h in d.Hits)
+                {
+                    if (!seen.Add(h.PlayerId) || HaulSync == null || !HaulSync.TryClientOfPlayerId(h.PlayerId, out ulong cid)) continue;
+                    int slot = HaulSync.PlayerSlotOf(cid);
+                    int item = EnemyDropRollOverride != null ? EnemyDropRollOverride(slot, d.Key) : CellarLoot.RollEnemyDrop(d.Seed, d.Floor, d.Key, slot, d.Tier, rankBonus);
+                    if (item <= 0) continue;
+                    PlayerBag bag = HaulSync.ServerBagOf(cid);
+                    if (bag == null) continue;
+                    if (bag.IsFull) { NoticeOwner(cid, DropFullText); continue; }   // only that player is told; nobody else's drop moves
+                    if (!HaulSync.ServerAddItem(cid, item)) continue;
+                    EnemyDropsGiven++; EnemyDropGiven?.Invoke(cid, item);
+                }
+            }
+        }
+
         private void HostTick(CellarFloorSync fs)
         {
+            TickDrops();
             if (HaulSync != null && _subscribedHaul != HaulSync)
             {
                 if (_subscribedHaul != null) _subscribedHaul.DiveFailed -= OnDiveFailed;
@@ -683,10 +741,10 @@ namespace SleepingCalamity.Presentation
         public void ServerClearFloor()
         {
             if (!IsServer) return;
-            UntrackAll();
+            UntrackAll(); _drops.Clear(); _roomSpawns.Clear();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
-            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL;
+            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL; _special = null; _specialFor = null;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -755,7 +813,7 @@ namespace SleepingCalamity.Presentation
         private void UntrackAll()
         {
             foreach (Enemy e in new List<Enemy>(_tracked.Keys)) Unhook(e);
-            _tracked.Clear(); _waveTwo.Clear(); _waveTwoDue.Clear();
+            _tracked.Clear(); _waveTwo.Clear(); _waveTwoDue.Clear(); _waveTwoNoHold.Clear(); _waveTwoSince.Clear();
             if (_hunter != null) Unhook(_hunter);
             ResetPump();
         }
@@ -780,6 +838,8 @@ namespace SleepingCalamity.Presentation
 
         private CellarEncounterPlan CurrentPlan(CellarFloorSync fs)
         {
+            CellarEncounterPlan ov = PlanOverride != null ? PlanOverride() : null;
+            if (ov != null && ov.Floor == _layout.Floor && ov.Seed == _layout.Seed) return ov;
             CellarEncounterPlan p = HaulSync != null ? HaulSync.EncounterPlan : null;
             if (p != null && p.Floor == _layout.Floor && p.Seed == _layout.Seed) return p;
             DiveHaulSync.Summary s = HaulSync != null ? HaulSync.Current : default;
@@ -836,7 +896,11 @@ namespace SleepingCalamity.Presentation
             {
                 foreach (TemplateSpawn ts in tr.InWave(0)) SpawnTemplateEnemy(fs, room, ts);
                 List<TemplateSpawn> second = new List<TemplateSpawn>(tr.InWave(1));
-                if (second.Count > 0 && RoomHasTracked(room)) _waveTwo[room] = second;   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
+                if (second.Count > 0)   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
+                {
+                    _waveTwo[room] = second;
+                    if (!RoomHasTracked(room)) { _waveTwoNoHold.Add(room); _waveTwoDue.Add(room); _waveTwoSince[room] = Time.time; }   // wave 0 placed nothing: wave 1 is due at once (TickWaveTwo, same distance rule and cap), with no held count to settle
+                }
                 _st.Cleared = _clear.ClearedMask;
                 return;
             }
@@ -858,7 +922,7 @@ namespace SleepingCalamity.Presentation
                     if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
                     continue;
                 }
-                _tracked[e] = new Tracked { Room = room, Carrier = carrier, Guardian = warden };
+                _tracked[e] = new Tracked { Room = room, Carrier = carrier, Guardian = warden, DropKey = NextDropKey(room) };
                 if (carrier) _carrierEnemy = e;
                 _clear.Spawn(room);
                 e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
@@ -877,28 +941,45 @@ namespace SleepingCalamity.Presentation
                 if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
                 return;
             }
-            _tracked[e] = new Tracked { Room = room, Carrier = carrier };
+            _tracked[e] = new Tracked { Room = room, Carrier = carrier, DropKey = NextDropKey(room) };
             if (carrier) _carrierEnemy = e;
             _clear.Spawn(room);
             e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
         }
 
         // Host: wave 1 of a template room. Its last wave-0 death leaves the room's alive count at one (Gone skips CellarRoomClear.Died), so the room cannot clear in between; this spawns
-        // wave 1 on the next host tick and then settles that one count, which clears the room only if nothing could be spawned.
+        // wave 1 as soon as WaveTwoSafe allows (distance rule or the cap) and then settles that one count, which clears the room only if nothing could be spawned.
         private readonly Dictionary<int, List<TemplateSpawn>> _waveTwo = new Dictionary<int, List<TemplateSpawn>>();
         private readonly List<int> _waveTwoDue = new List<int>();
+        private readonly HashSet<int> _waveTwoNoHold = new HashSet<int>();   // rooms whose wave 0 placed nothing: no held alive count to settle after wave 1
+        private readonly Dictionary<int, float> _waveTwoSince = new Dictionary<int, float>();
+        private const float WaveTwoMaxWaitSeconds = 8f;   // wave 1 waits at most this long for the player-distance rule, so a player camping its cells cannot stall the room forever
+
+        // Wave 1 keeps the ambush rule: no cell of the wave within CellarSpawnSafety.AmbushMinPlayerMeters of any connected player (PlanePoints, the same points the ambush and the hunter use).
+        // The wave is placed all at once or not at all (a partial wave would let a wave-1 death be skipped by Gone's wave-0 hold); it waits up to WaveTwoMaxWaitSeconds, then spawns anyway.
+        private bool WaveTwoSafe(int room, List<TemplateSpawn> second)
+        {
+            if (_waveTwoSince.TryGetValue(room, out float since) && Time.time - since >= WaveTwoMaxWaitSeconds) return true;
+            List<PlanePoint> pts = PlanePoints();
+            foreach (TemplateSpawn ts in second) if (!CellarSpawnSafety.FarFromAll(ts.Cell, pts, CellarSpawnSafety.AmbushMinPlayerMeters)) return false;
+            return true;
+        }
 
         private void TickWaveTwo(CellarFloorSync fs)
         {
             if (_waveTwoDue.Count == 0) return;
             foreach (int room in _waveTwoDue.ToArray())
             {
-                _waveTwoDue.Remove(room);
-                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) continue;
-                _waveTwo.Remove(room);
+                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) { _waveTwoDue.Remove(room); _waveTwoSince.Remove(room); _waveTwoNoHold.Remove(room); continue; }
+                if (!_waveTwoSince.ContainsKey(room)) _waveTwoSince[room] = Time.time;
+                if (!WaveTwoSafe(room, second)) continue;   // stays due: retried every host tick
+                _waveTwoDue.Remove(room); _waveTwoSince.Remove(room); _waveTwo.Remove(room);
+                bool held = !_waveTwoNoHold.Remove(room);
                 foreach (TemplateSpawn ts in second) SpawnTemplateEnemy(fs, room, ts);
-                if (_clear.Died(room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(room); RoomCleared?.Invoke(room); }
+                if (held && _clear.Died(room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(room); RoomCleared?.Invoke(room); }
                 else _st.Cleared = _clear.ClearedMask;
+                if (_carrierLostRoom == room && _st.GateKey == 0 && !RoomHasTracked(room))   // the same reset Gone does: the carrier was lost without a drop and nothing is left, so the carrier comes back on entry
+                { _clear.ResetRoom(room); _entered.Remove(room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
                 Publish();
             }
         }
@@ -931,10 +1012,12 @@ namespace SleepingCalamity.Presentation
                 if (e == _carrierEnemy) _carrierEnemy = null;
                 bool roomLeft = RoomHasTracked(t.Room);
                 if (roomLeft) { _clear.Despawned(t.Room); if (t.Carrier && _st.GateKey == 0) _carrierLostRoom = t.Room; }
-                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _waveTwo.Remove(t.Room); _waveTwoDue.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
+                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _waveTwo.Remove(t.Room); _waveTwoDue.Remove(t.Room); _waveTwoNoHold.Remove(t.Room); _waveTwoSince.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
+            // The live HitLog is kept on purpose, not a copy: CombatHost appends the killing blow AFTER this runs, and TickDrops reads it a tick later.
+            if (_layout != null) _drops.Add(new PendingDrop { Hits = e.HitLog, Seed = _layout.Seed, Floor = _layout.Floor, Key = t.DropKey, Tier = e.Tier });
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);
             if (_waveTwo.ContainsKey(t.Room) && !RoomHasTracked(t.Room)) { if (!_waveTwoDue.Contains(t.Room)) _waveTwoDue.Add(t.Room); Publish(); return; }   // wave 0 is down: wave 1 follows (TickWaveTwo) before the room can clear
@@ -1073,7 +1156,7 @@ namespace SleepingCalamity.Presentation
             else HaulSync.ServerAddItem(clientId, extra);
         }
 
-        // Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
+        // (Host only: PayRoomClear runs from the host's clear checks.) Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
         public int GoldPaidForClears { get; private set; }   // host only (tests): the total gold handed out by the Crowded / Ambush rewards
         private void PayRoomClear(int room)
         {
@@ -1088,13 +1171,55 @@ namespace SleepingCalamity.Presentation
                 if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom) each += _mods.AmbushRoomGold;
             }
             PayEveryone(each);
+            int rolls = _mods.ExtraRollsOnClear(room, _mods.Has(FloorModifier.FatLarder) ? CurrentPlan(FloorSync).FatRoom : -1);   // Brimming: every room; Fat Larder: the fat room. Same once-per-room guard as the gold above.
+            if (rolls > 0) PayExtraRolls(room, rolls);
+            ApplySpecialJob(room);
         }
 
-        // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
+        // Authority: host only (PayRoomClear, once per room per floor visit via _roomPaid). The special room's job (SpecialJobs.OnClear; Core numbers): a mend of the party, extra loot rolls on their own roll index base,
+        // or a one-floor stir. The special room is a pure function of the layout, resolved once per layout and dropped in ServerClearFloor.
+        private SpecialRoom _special; private CellarFloorLayout _specialFor;
+        private void ApplySpecialJob(int room)
+        {
+            if (_layout == null || HaulSync == null) return;
+            if (!ReferenceEquals(_specialFor, _layout)) { _special = SpecialRoomDive.Resolve(_layout, null, _dressing); _specialFor = _layout; }
+            SpecialJobEffect job = SpecialJobs.OnClear(_special, room);
+            if (!job.Any) return;
+            if (job.ExtraRolls > 0) PayExtraRolls(room, job.ExtraRolls, SpecialJobTuning.ExtraRollChestBase);
+            if (job.MendPercent > 0) HaulSync.ServerMendParty(job.MendPercent);
+            if (job.StirDelta > 0f) HaulSync.ServerShrineStir(_layout.Floor, job.StirDelta);
+        }
+
+        // Authority: host only (runs from the host's clear checks).
+        // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero that has a spawned player object and an existing bag. The roll index is
+        // ExtraRollChestBase + room, then GiveExtraRoll adds 1000 * k: 51000 + room + 1000 * (k - 1) for k = 1.. (Stirred uses chestIndex + 1000 * k with chestIndex < 64: no collision).
+        // Present = has a PlayerObject (downed heroes count; _players is not used). Absent clients are skipped and no bag is created for them.
+        private void PayExtraRolls(int room, int rolls, int chestBase = ExtraRollChestBase)
+        {
+            if (HaulSync == null) return;
+            int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;
+            bonus = _mods.ChestRankBonus(bonus);
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                if (!HasPlayerObject(id)) continue;
+                PlayerBag bag = HaulSync.ServerExistingBagOf(id);
+                if (bag == null) continue;
+                for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, chestBase + room, k, bonus);
+            }
+        }
+        private const int ExtraRollChestBase = 50000;
+
+        private bool HasPlayerObject(ulong id) => NetworkManager.ConnectedClients.TryGetValue(id, out NetworkClient c) && c.PlayerObject != null;
+
+        // Authority: host only. "Present" = every connected client with a spawned player object, downed ones included (they are in the party). Others are skipped, and no bag is created for them.
         private void PayEveryone(int each)
         {
             if (each <= 0 || HaulSync == null) return;
-            foreach (ulong id in NetworkManager.ConnectedClientsIds) if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                if (!HasPlayerObject(id) || HaulSync.ServerExistingBagOf(id) == null) continue;
+                if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            }
         }
 
         public bool ServerTryOpenDoor(ulong clientId)
@@ -1128,7 +1253,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerReportValve(ulong clientId, int valve)
         {
             CellarFloorSync fs = FloorSync;
-            if (!HostReady(fs) || _st.Objective != (byte)FloorObjective.TwoValves || (_st.ValveMask & (1 << valve)) != 0 || !ValveAt(valve, out Vector3 at)) return false;
+            if (valve < 0 || valve >= ValveHold.Count || !HostReady(fs) || _st.Objective != (byte)FloorObjective.TwoValves || (_st.ValveMask & (1 << valve)) != 0 || !ValveAt(valve, out Vector3 at)) return false;
             if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
             float reach = FloorObjectiveTuning.ValveReachMeters + ValveReportReachSlack;
             if (FlatSqr(pos, at) > reach * reach) return false;

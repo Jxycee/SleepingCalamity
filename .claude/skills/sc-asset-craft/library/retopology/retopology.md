@@ -67,7 +67,7 @@ High-Poly Reference → Guide Setup → Block Retopo → Loop Refinement
 
 ## Polycount Targets
 
-See `../references/polycount-budgets.md`. Retopo is where budget is enforced.
+See sc-asset-budget and PHASE1 3.3. Retopo is where budget is enforced.
 
 ## Shrinkwrap Retopo Setup
 

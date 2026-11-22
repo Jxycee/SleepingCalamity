@@ -1,0 +1,129 @@
+/* The front door: plain text on the Lobby's dark backdrop. One column, centred, one screen shown at a time (FrontDoorView toggles them). */
+.fd-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.fd-screen {
+    width: 620px;
+    align-items: stretch;
+}
+
+.fd-title {
+    font-size: 76px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(244, 232, 208);
+    margin-bottom: 36px;
+}
+
+.fd-heading {
+    font-size: 34px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+    color: rgb(244, 232, 208);
+    margin-bottom: 14px;
+}
+
+.fd-text {
+    font-size: 22px;
+    white-space: normal;
+    color: rgb(214, 208, 196);
+    margin-top: 4px;
+}
+
+.fd-why {
+    font-size: 20px;
+    white-space: normal;
+    color: rgb(232, 176, 150);
+    margin-top: 4px;
+}
+
+.fd-code {
+    font-size: 96px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 10px;
+    color: rgb(255, 214, 120);
+    margin-bottom: 8px;
+}
+
+.fd-button {
+    height: 60px;
+    font-size: 28px;
+    margin-top: 10px;
+}
+
+.fd-button:focus {
+    border-color: rgb(255, 214, 120);
+    border-width: 3px;
+}
+
+.fd-button:disabled {
+    opacity: 0.45;
+}
+
+.fd-field {
+    font-size: 28px;
+    margin-top: 10px;
+}
+
+.fd-list {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+.fd-world-row {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.fd-world-row > .fd-world-select {
+    flex-grow: 1;
+    height: 56px;
+    font-size: 22px;
+    -unity-text-align: middle-left;
+    white-space: normal;
+}
+
+.fd-world-row > .fd-world-delete {
+    width: 120px;
+    height: 56px;
+    font-size: 22px;
+}
+
+.fd-world-players {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.fd-world-players > .fd-remove-player {
+    height: 40px;
+    font-size: 18px;
+    margin-right: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.fd-world-select.fd-selected {
+    background-color: rgb(78, 66, 40);
+    border-color: rgb(255, 214, 120);
+}
+
+.fd-player {
+    font-size: 24px;
+    color: rgb(244, 232, 208);
+    margin-top: 2px;
+}
+
+.fd-confirm {
+    margin-top: 8px;
+    padding: 10px;
+    background-color: rgb(50, 36, 34);
+}

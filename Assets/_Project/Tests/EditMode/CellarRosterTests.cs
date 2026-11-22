@@ -51,11 +51,17 @@ namespace SleepingCalamity.Tests.EditMode
         // The pre-roster pick, copied from origin/main (CellarEnemyMix.Tier1Kind before procgen 3): weights and stream pinned here so a drift in the new code fails.
         static EnemyKind OldPick(uint seed, int floor, int room, int index)
         {
-            int[][] weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
+            int[][] weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 30, 50, 20 }, new[] { 30, 40, 30 } };   // floor 3 retuned 20/50/30 -> 30/50/20 (D4, 2026-11-11)
             int[] w = weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
             var rng = new Pcg32(Rng.Derive(seed, "cellars.mix", ((ulong)floor << 32) | ((uint)room << 8) | (uint)index));
             int roll = rng.Range(0, w[0] + w[1] + w[2]);
             return roll < w[0] ? EnemyKind.Slime : roll < w[0] + w[1] ? EnemyKind.Broom : EnemyKind.RatKing;
+        }
+
+        [Test]
+        public void Floor3_Mix_IsSlime30_Broom50_RatKing20()
+        {
+            Assert.That(CellarEnemyMix.WeightsFor(3), Is.EqualTo(new[] { 30, 50, 20 }));
         }
 
         [Test]
@@ -79,7 +85,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Twist_NeverOnTheSetPieces_AtMostOnePerKindPerDive_SharesNearPlaceholders()
         {
-            var count = new int[4]; int floors = 0;
+            var count = new int[5]; int floors = 0;
             for (uint seed = 0; seed < 5000; seed++)
             {
                 var used = new HashSet<FloorTwist>();
@@ -93,19 +99,21 @@ namespace SleepingCalamity.Tests.EditMode
             }
             // The twists are the modifiers now (plan 5 decision 3), so the nominal shares (Crowded and Ambush split the enemies-family hazards evenly) come from FloorModifierTuning: floors 2 and 4 fill one slot (hazard early% of which half are
             // Crowded/Ambush, boon early% of which a third is Sparse); floor 6 is calm; floor 7 rolls both slots (a Sparse boon is lost to an enemies-family hazard, and Crowded/Ambush win TwistOf).
-            double hazardEnemies = 2.0 / 4.0, sparseOfBoons = 1.0 / 3.0;
-            double earlyEnemyHazard = FloorModifierTuning.EarlyAPercent / 100.0 * hazardEnemies;
+            // Plan 5c: six hazards (Crowded, Ambush, Stirred, Hurried, Brimming, FatLarder) and four boons (Sparse, WarmHands, Hushed, StillAir); three hazards are enemies-family (Crowded, Ambush, FatLarder) and each is a twist.
+            double hazardEach = 1.0 / 6.0, sparseOfBoons = 1.0 / 4.0;
+            double earlyEach = FloorModifierTuning.EarlyAPercent / 100.0 * hazardEach;
             double earlySparse = FloorModifierTuning.EarlyBPercent / 100.0 * sparseOfBoons;
-            double lateEnemyHazard = FloorModifierTuning.LateAPercent / 100.0 * hazardEnemies;
-            double lateSparse = FloorModifierTuning.LateBPercent / 100.0 * sparseOfBoons * (1.0 - lateEnemyHazard);
-            double nominalAmbush = (earlyEnemyHazard * 2 / 2 + 0 + lateEnemyHazard / 2) / 4, nominalCrowded = nominalAmbush;   // floors 2, 4, 6 (calm), 7; half of the enemies hazards each
+            double lateEach = FloorModifierTuning.LateAPercent / 100.0 * hazardEach;
+            double lateSparse = FloorModifierTuning.LateBPercent / 100.0 * sparseOfBoons * (1.0 - 3 * lateEach);
+            double nominalAmbush = (earlyEach * 2 + 0 + lateEach) / 4, nominalCrowded = nominalAmbush, nominalFat = nominalAmbush;   // floors 2, 4, 6 (calm), 7
             double nominalThin = (earlySparse * 2 + 0 + lateSparse) / 4;
-            double nominalNone = 1.0 - nominalAmbush - nominalCrowded - nominalThin;
+            double nominalNone = 1.0 - nominalAmbush - nominalCrowded - nominalFat - nominalThin;
             // The first generated floor sits at the nominal share; later floors lose the repeats and dark floors take slot A (Dim), so the measured share is a little under (twists) / over (none).
             Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(nominalAmbush - 0.03, nominalAmbush + 0.01), "ambush (procgen 3b ambush, deliberate)");
             Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(nominalNone - 0.07, nominalNone + 0.07), "none");
             Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(nominalThin - 0.03, nominalThin + 0.01), "thin");
             Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(nominalCrowded - 0.03, nominalCrowded + 0.01), "crowded");
+            Assert.That(count[(int)FloorTwist.FatLarder] / (double)floors, Is.InRange(nominalFat - 0.03, nominalFat + 0.01), "fat larder");
             TestContext.WriteLine("twist shares of the generated floors: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
         }
 
@@ -126,7 +134,7 @@ namespace SleepingCalamity.Tests.EditMode
             var got = new ulong[8];
             foreach (int f in new[] { 1, 2, 4, 6, 7 }) got[f] = CellarFloorRoster.LayerHash(12345, f);
             string all = got[1] + "UL, " + got[2] + "UL, " + got[4] + "UL, " + got[6] + "UL, " + got[7] + "UL";
-            Assert.AreEqual(9929646806074584996UL, got[1], "floor 1; actual " + all); Assert.AreEqual(1000385178204227360UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5465015992139406178UL, got[4], "floor 4; actual " + all);
+            Assert.AreEqual(9929646806074584996UL, got[1], "floor 1; actual " + all); Assert.AreEqual(1000385178204227360UL, got[2], "floor 2; actual " + all); Assert.AreEqual(12384044717834673873UL, got[4], "floor 4; actual " + all);
             Assert.AreEqual(1000385178204227360UL, got[6], "floor 6; actual " + all); Assert.AreEqual(16992731340153690099UL, got[7], "floor 7; actual " + all);
         }
 

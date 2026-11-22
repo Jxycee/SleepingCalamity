@@ -245,7 +245,7 @@ namespace SleepingCalamity.Core
             foreach (PieceSpec spec in PieceCatalog.Specs)
             {
                 if (spec.Id != id) continue;
-                if (spec.FixedFloor != 0) return floor == spec.FixedFloor;
+                if (spec.FixedFloor != 0 && id != PieceCatalog.FrameId) return floor == spec.FixedFloor;   // the frame is fixed on floor 2 for new worlds (D1) but a saved one on floor 4 stays valid: saved worlds keep their assignment
                 foreach (int f in PieceDepths.CandidateFloors(spec.SecondHalf)) if (f == floor) return true;
                 return false;
             }
@@ -462,7 +462,7 @@ namespace SleepingCalamity.Core
             int known = 0;
             foreach (int _ in KnownPieceIds()) known++;
             foreach (string _ in KnownResidentIds()) known++;
-            // PieceDepths is deliberately not part of this: a fresh world's depths come from its seed again at the next load, so they alone are not worth a dive section in the file.
+            // PieceDepths is deliberately not part of this: an untouched, never-stamped world's depths are re-derived from its seed at the next load (and D1 reshuffled those worlds' non-frame pieces), so they alone are not worth a dive section in the file.
             return !s.InDive && s.ClearedMask == 0 && !s.CheckpointReached && !s.CheckpointHeld && !s.BossBeaten && s.ExtraSlotOwner == null && s.BankedPieces.Count == 0 && s.BankedResidents.Count == 0 && s.BankedLoot.Count == 0
                 && s.OnFloorPieces.Count + s.OnFloorResidents.Count == known && s.Extra == null;
         }

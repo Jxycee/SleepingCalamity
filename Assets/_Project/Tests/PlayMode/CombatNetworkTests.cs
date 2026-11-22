@@ -174,7 +174,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(hostEnemy, Is.Not.Null);
             yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(hostEnemy.NetworkObjectId), Timeout, "the client never received the enemy");
             Enemy clientEnemy = ClientCopy(c, hostEnemy);
-            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(136), "80 x 1.7 for two players (P23)");
+            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(120), "80 x 1.5 for two players (P23, Run 5 balance 2026-11-15)");
 
             bool sparked = false;
             System.Action<LocalHit> onHit = h => sparked = true;
@@ -183,15 +183,15 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 yield return PressAttack(c.ClientInput);
                 yield return PlayModeHarness.WaitUntil(() => sparked, 2f, "the attacker's client never played its own hit (spark) locally");
-                yield return PlayModeHarness.WaitUntil(() => hostEnemy.Model.Hp < 136, 3f, "the host never applied the hit intent");
+                yield return PlayModeHarness.WaitUntil(() => hostEnemy.Model.Hp < 120, 3f, "the host never applied the hit intent");
             }
             finally { CombatEvents.LocalHitLanded -= onHit; }
 
-            yield return PlayModeHarness.WaitUntil(() => clientEnemy.NetHp.Value < 136, 3f, "the client never saw the new HP");
+            yield return PlayModeHarness.WaitUntil(() => clientEnemy.NetHp.Value < 120, 3f, "the client never saw the new HP");
             yield return Seconds(0.4f);
-            Assert.That(hostEnemy.Model.Hp, Is.EqualTo(115), "22 x 100/105 = 21 damage from 136, applied once (not once per enemy copy)");
-            Assert.That(hostEnemy.NetHp.Value, Is.EqualTo(115), "the host's copy shows it");
-            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(115), "the client's copy shows it");
+            Assert.That(hostEnemy.Model.Hp, Is.EqualTo(99), "22 x 100/105 = 21 damage from 120, applied once (not once per enemy copy)");
+            Assert.That(hostEnemy.NetHp.Value, Is.EqualTo(99), "the host's copy shows it");
+            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(99), "the client's copy shows it");
             Assert.That(c.ClientCombat.ComboCount, Is.EqualTo(1), "the attacker's own combo counted the hit");
             Assert.That(c.HostCombat.ComboCount, Is.EqualTo(0), "the host hero swung at nothing");
         }
@@ -252,8 +252,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => clientEnemy.Attacking, 2f, "the client never saw the enemy attack");
             yield return PlayModeHarness.WaitUntil(() => clientVitalsOnHost.Model.Hp < 100, 3f, "an enemy hit on a client that did not dodge never reached the host");
             yield return PlayModeHarness.WaitUntil(() => clientVitalsOnClient.Hp < 100, 3f, "the client never saw its own HP drop");
-            Assert.That(clientVitalsOnHost.Model.Hp, Is.EqualTo(92), "the control hit: 8 damage (12 x 0.65 x 100/110 = 7.09 -> 8; was 11, hp 89)");
-            Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(92), "both peers agree");
+            Assert.That(clientVitalsOnHost.Model.Hp, Is.EqualTo(94), "the control hit: 6 damage (12 x 0.5 x 100/110 = 5.45 -> 6; Run 5 balance 2026-11-15)");
+            Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(94), "both peers agree");
 
             // Reset the hero, let the first attack end, and do it again with a roll started as the attack appears.
             yield return Seconds(1.4f);
@@ -325,17 +325,17 @@ namespace SleepingCalamity.Tests.PlayMode
                 b.ServerForceAttack(AttackCatalog.TestNova, at);
                 yield return Seconds(0.5f);   // B's hitbox opens 0.2 s after it starts, so it is judged inside the 0.8 s window
                 Assert.That(c.ClientCombat.HurtGraceActive, Is.True, "still inside the window when B was judged");
-                Assert.That(vHost.Model.Hp, Is.EqualTo(92), "exactly one ServerDamage: the second hit inside the window did nothing");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(94), "exactly one ServerDamage: the second hit inside the window did nothing");
                 Assert.That(hurts.OnOwnerCopy, Is.EqualTo(1), "exactly one HurtClientRpc (owner's copy)");
                 Assert.That(hurts.OnHostCopy, Is.EqualTo(1), "exactly one HurtClientRpc (host's copy)");
-                Assert.That(vOwner.Hp, Is.EqualTo(92));
+                Assert.That(vOwner.Hp, Is.EqualTo(94));
 
                 // 2. After the window a new hit lands.
                 yield return PlayModeHarness.WaitUntil(() => !c.ClientCombat.HurtGraceActive, 3f, "the grace window never ended");
                 yield return Seconds(0.8f);   // let A and B finish their attacks
                 d.ServerForceAttack(AttackCatalog.TestNova, at);
-                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 92, 3f, "a hit after the window never landed");
-                Assert.That(vHost.Model.Hp, Is.EqualTo(84));
+                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 94, 3f, "a hit after the window never landed");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(88));
                 yield return PlayModeHarness.WaitUntil(() => hurts.OnOwnerCopy == 2, 3f, "the second hurt never reached the owner's copy");
                 yield return Seconds(1.0f);
                 vHost.ServerFullReset();
@@ -348,7 +348,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 b.ServerForceAttack(AttackCatalog.TestNova, at);
                 yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 100, 3f, "the same-frame hit never landed");
                 yield return Seconds(1.0f);
-                Assert.That(vHost.Model.Hp, Is.EqualTo(92), "two enemies in the same frame give one damage");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(94), "two enemies in the same frame give one damage");
                 Assert.That(hurts.OnOwnerCopy - before, Is.EqualTo(1));
             }
             finally { hurts.Dispose(); }

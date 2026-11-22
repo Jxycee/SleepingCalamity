@@ -7,7 +7,7 @@ description: Make or tune Sleeping Calamity's PBR surface materials - tileables,
 
 The skill name is historical: nothing is hand-painted. Every surface is a real PBR set (albedo, normal, ORM) made **once per area as a smart material**: a CC0 scan plus procedural layers in the `sc_aaa_mats2.py` style, shared by every kit piece that uses it (PHASE1 3.2, handoff 3.5). This is where most of the quality comes from, and a fix here reaches every piece.
 
-Tools (status in sc-asset-craft 0b): ported in M8 as `sc_aaa_mats2.py`, `sc_aaa_scan.py`, `sc_fetch_textures.py` (Poly Haven fetch with a source record), `sc_pack_unity.py` (`--orm`). The batch pipeline is `Art/Blender/textures/sc_tex_batches.py` (grade + ORM + seam ratio + SOURCES.md), `sc_tex_b3.py` (trim sheets, decals) and `sc_tex_sheet.py` (contact sheet, calibrated so 50% grey reads 0.5, plus the `sc_ref_palette.py` measure), helper library `Art/Blender/tools/sc_texgrade.py`. Scans live in `C:\Dev\_private\textures_src\`, outside git. `sc_ref_palette.py` is current. FishGame's texture-array generator and `fg_texture_proto.py` were for the old grey-centred painted arrays and don't apply.
+Tools (status in sc-asset-craft 0b): ported in M8 as `sc_aaa_mats2.py`, `sc_aaa_scan.py`, `sc_fetch_textures.py` (Poly Haven fetch with a source record), `sc_pack_unity.py` (`--orm`). The batch pipeline is `Art/Blender/textures/sc_tex_batches.py` (grade + ORM + seam ratio + SOURCES.md), `sc_tex_b3.py` (trim sheets, decals) and `sc_tex_sheet.py` (contact sheet, calibrated so 50% grey reads 0.5, plus the `sc_ref_palette.py` measure), helper library `Art/Blender/tools/sc_texgrade.py`. Scans live in `C:\Dev\_private\textures_src\`, outside git. `sc_ref_palette.py` is current. FishGame's texture-array generator and `fg_texture_proto.py` (FishGame, not ported) were for the old grey-centred painted arrays and don't apply.
 
 ## 0. Who uses it? (decide first)
 A material nobody samples is the most expensive mistake (FishGame built a whole layer that no mesh read).
@@ -40,7 +40,7 @@ A material nobody samples is the most expensive mistake (FishGame built a whole 
 1. **3 x 3 tiling sheet** at the consumer's texel density: nothing you can point at twice (a bright flake, one big stone, a stain). A recognisable feature that is large against the tile (very roughly over 1/8 of it) tends to become a repeated blob: crop, swap the source, or break it with a second, larger-scale variation layer.
 2. **2 x 2 seam check:** look for a band just inside the edge as well as the edge itself.
 3. **On a model:** apply it to its consumer kit piece and render studio plus mood (sc-asset-review). A tileable that looks right flat can look wrong at a grazing angle or beside its neighbour.
-4. **Against photos:** `ref_match.py` is not ported (sc-asset-craft 0b); compare a flat-on crop of the material with 2-3 flat-on photo crops of the same material, by eye and with `sc_ref_palette.py --k 7` on each.
+4. **Against photos:** `ref_match.py` is not ported (sc-asset-craft 0b; `Art/Blender/tools/sc_ref_palette.py` replaces it); compare a flat-on crop of the material with 2-3 flat-on photo crops of the same material, by eye and with `sc_ref_palette.py --k 7` on each.
 5. Colour and value inside PHASE1 3.1 on the render, measured with `sc_ref_palette.py --k 7`.
 
 ## 3b. Shape language on trims
@@ -53,4 +53,4 @@ Trim sheets and mouldings carry the style's shape rules (PHASE1 3.4, placeholder
 - **Cloud sessions** can fetch Poly Haven and prototype, but commit the script, not the bakes; the PC rebakes and proves it in Unity.
 
 ## 5. Proving a change
-Blender renders are proxies. For a tileable change that touches many pieces, ask the PC for one round of Unity captures of the kit in its corner (PHASE1 3.7 cameras once built) and compare before and after, with the numbers you changed.
+Blender renders are proxies. For a tileable change that touches many pieces, ask the PC for one round of Unity captures of the kit in its corner (the PHASE1 3.7 corner cameras) and compare before and after, with the numbers you changed.

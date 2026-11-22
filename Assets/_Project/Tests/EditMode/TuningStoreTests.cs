@@ -269,14 +269,14 @@ namespace SleepingCalamity.Core.Tuning.Tests
         [Test]
         public void Enemies_TierMultipliersOverride_BadValuesKeepDefault_ResetRestores()
         {
-            Assert.AreEqual(0.65f, Combat.EnemyCatalog.Tier1Atk);
+            Assert.AreEqual(0.5f, Combat.EnemyCatalog.Tier1Atk);   // 0.65 until the Run 5 balance (2026-11-15)
             Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""tier1Atk"": 0.4, ""tier2Life"": ""x"", ""bogus"": 1 } }", "e.json"));
             Assert.AreEqual(0.4f, Combat.EnemyCatalog.Tier1Atk);
             Assert.AreEqual(3f, Combat.EnemyCatalog.Tier2Life);
             Assert.AreEqual(2, _log.Count);
-            Assert.AreEqual(Combat.EnemyCatalog.Slime.Atk * 0.4f, new Combat.EnemyModel(Combat.EnemyCatalog.Slime, 1, 1).Atk, 1e-4f);
+            Assert.AreEqual(Combat.EnemyCatalog.Slime.Atk * 0.4f * Combat.EnemyCatalog.SoloAtk, new Combat.EnemyModel(Combat.EnemyCatalog.Slime, 1, 1).Atk, 1e-4f);
             TuningStore.Reset();
-            Assert.AreEqual(0.65f, Combat.EnemyCatalog.Tier1Atk);
+            Assert.AreEqual(0.5f, Combat.EnemyCatalog.Tier1Atk);
         }
 
         [Test]
@@ -286,8 +286,8 @@ namespace SleepingCalamity.Core.Tuning.Tests
             int solo = new Combat.EnemyModel(slime, 1, 1).MaxHp, duo = new Combat.EnemyModel(slime, 1, 2).MaxHp;
             float soloAtk = new Combat.EnemyModel(slime, 1, 1).Atk, duoAtk = new Combat.EnemyModel(slime, 1, 2).Atk;
             Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""soloAtk"": 0.5, ""soloLife"": 0.5 } }", "s.json"));
-            Assert.AreEqual(solo / 2, new Combat.EnemyModel(slime, 1, 1).MaxHp);
-            Assert.AreEqual(soloAtk * 0.5f, new Combat.EnemyModel(slime, 1, 1).Atk, 1e-4f);
+            Assert.AreEqual((int)System.Math.Ceiling(slime.Hp * 0.5), new Combat.EnemyModel(slime, 1, 1).MaxHp, "the override replaces the default 0.75 (solo was " + solo + ")");
+            Assert.AreEqual(slime.Atk * Combat.EnemyCatalog.Tier1Atk * 0.5f, new Combat.EnemyModel(slime, 1, 1).Atk, 1e-4f, "the override replaces the default 0.6 (solo was " + soloAtk + ")");
             Assert.AreEqual(duo, new Combat.EnemyModel(slime, 1, 2).MaxHp, "2 players: unchanged");
             Assert.AreEqual(duoAtk, new Combat.EnemyModel(slime, 1, 2).Atk, 1e-4f);
         }
@@ -298,7 +298,7 @@ namespace SleepingCalamity.Core.Tuning.Tests
             Assert.AreEqual(1, Combat.EnemyCatalog.CellarsMaxTier);
             Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 1));
             Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 3), "cellars: every regular enemy is tier 1");
-            Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, true, 4), "the Warden keeps tier 2");
+            Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, true, 4), "the Warden is tier 1 since the Run 5 balance (2026-11-15; wardenTier 2 restores tier 2)");
             Assert.AreEqual(1, Combat.EnemyCatalog.CappedTier(2));
             Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""cellarsMaxTier"": 2 } }", "t.json"));
             Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, false, 3));

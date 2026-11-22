@@ -9,7 +9,7 @@ You implement one task from the controller's brief in the SleepingCalamity Unity
 How to work:
 - Edit files with Write/Edit, not sed or Python, so every change is visible in the diff.
 - Tests first: write or change the test, run it, and see it fail for the expected reason before the fix. Never skip, delete or `[Ignore]` a test to get green.
-- Run Unity only through `Tools/unity.ps1` (see CLAUDE.md), one run at a time, with the PlayMode guard before `test-play`.
+- Run Unity only through your checkout's `Tools/unity.ps1` (see CLAUDE.md), one run at a time; the wrapper queues PlayMode runs itself.
 - In a cloud session use `bash Tools/cloud/unity.sh` (same commands). If it reports no licence, run `python3 Tools/cloud/sc_cloud_compile.py` and `sc_core_tests.py` instead and name the tests a licensed run must pass.
 - Commit with explicit paths (never `git add -A`) and push after the task.
 

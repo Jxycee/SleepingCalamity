@@ -19,7 +19,7 @@ URP 17.6, Forward+, Render Graph, HDR, GPU Resident Drawer. Build and compare ea
 
 | Layer | Day (Hollowmere square) | Cellars (Undercroft floors 1-4) |
 |---|---|---|
-| Key | one warm sun about 5200 K, cool sky fill; 4 cascades, about 100 m, 4096, soft High | Forward+ lamps, shadows only on the nearest 2-4; emissive lamps and embers |
+| Key | one warm sun about 5200 K, cool sky fill; 4 cascades, about 100 m, 4096, soft High | Forward+ lamps, as many shadowed lamps as the measured per-camera GPU cost allows (measure first, user, 2026-11-18); emissive lamps and embers |
 | GI | Adaptive Probe Volumes | realtime (generated floors can't bake): per-band ambient gradient; if captures read flat, next test is additive room scenes with their own APV bake |
 | AO | SSAO, Depth Normals, radius about 0.35 m, low direct-lighting strength | same |
 | Atmosphere | exponential haze matched to the horizon colour; volumetric god rays; drifting pollen and leaves | dust motes in the lamp shafts; warm haze only, no teal or blue-green tint anywhere (PHASE1 3.1, user 2026-10-30) |
@@ -28,7 +28,7 @@ URP 17.6, Forward+, Render Graph, HDR, GPU Resident Drawer. Build and compare ea
 Phase 1 has no day/night cycle: the town is graded at midday plus one low-sun capture.
 
 ## The evidence loop
-1. **Capture (PC, Unity):** fixed capture cameras per corner (wide, mid, close) at 1920x1080 so every round is identical (PHASE1 3.7). The look-test builder exists: `Assets/_Project/Editor/Builders/LookTestBuilder.cs` builds `LookTest_Day` and `LookTest_Cellar`, and `LookTestCapture.cs` writes the captures to `Art/Textures/looktest/` (1024 px JPGs). The Hollowmere and Cellars corner scenes (M9) will get the same treatment; until then, name the views you used and keep them fixed across rounds.
+1. **Capture (PC, Unity):** fixed capture cameras per corner (wide, mid, close) at 1920x1080 so every round is identical (PHASE1 3.7). The look-test builder exists: `Assets/_Project/Editor/Builders/LookTestBuilder.cs` builds `LookTest_Day` and `LookTest_Cellar`, and `LookTestCapture.cs` writes the captures to `Art/Textures/looktest/` (1024 px JPGs). The corner scenes have their own builders and captures (BeautyCornerBuilder.cs, BeautyCornerCapture.cs, DungeonCornerCapture.cs, HollowmereCapture.cs in Assets/_Project/Editor/Builders/); use those cameras and keep the views fixed across rounds.
 2. **Measure:** `python -I Art/Blender/tools/sc_ref_palette.py <capture.png> --k 7 --sheet <scratch>/palette.png` for value p10/p50/p90, warmth and masses; crop to regions (sky, facade, ground, the focal prop) with `--crop`. Compare with the PHASE1 3.1 bands:
    - Day: value 0.21-0.25 / 0.44-0.50 / 0.80-0.86, warmth +0.12 to +0.20, 3-4 masses (pale plaster or sky, dark timber or shadow, warm mid stone or roof); shadows slate-teal `#2f3a44`.
    - Cellars: value 0.12-0.16 / 0.30-0.40 / 0.65-0.75, warmth +0.20 to +0.30; clean warm firelight, no teal or blue-green: saturated gold lamps (`#d6a24a`) dominant, shadows deep umber to plum (`#2a1c18` to `#3a2430`), warm brick mid, crisp value steps, not muddy or brown-hazy; ember `#c2412a` a small accent; no mass pure black.
@@ -51,7 +51,7 @@ Phase 1 has no day/night cycle: the town is graded at midday plus one low-sun ca
 
 ## Look-test lessons (M8, `Art/Textures/REVIEW.md`)
 - **Volumetrics (A23):** shafts are our own additive light-cone meshes (`SC_LightCone.shader`) plus exponential fog, not the CristianQiu package; try the package later if the cones look cheap.
-- **Which knobs moved the numbers:** day sun intensity, ambient intensity, grade contrast and lift, cobble tint and sky thickness moved day value; cellar lamp intensity, ambient, exposure and white balance moved the Cellar. Lift is easy to overdo (+0.07 washed the day out; 0.02 was enough). In the three tuning rounds the day went from p10/p50/p90 0.16/0.55/0.70 to 0.23/0.52/0.77 and the cellar from 0.07/0.33/0.60 to 0.13/0.35/0.62.
+- **Which knobs moved the numbers:** day sun intensity, ambient intensity, grade contrast and lift, cobble tint and sky thickness moved day value; cellar lamp intensity, ambient, exposure and white balance moved the Cellar. Lift is easy to overdo (+0.07 washed the day out; 0.02 was enough).
 - **Greybox limit:** the flat pale ground and the sky dominate the day p50 and p90, so those two cannot reach the band until real dressing and shadow shapes exist; do not over-tune the grade to compensate.
 - **Capture hygiene:** bake the reflection probe in the capture batch (metals render black without one); a purple cobble was a low-sun fill problem, fixed with a neutral-warm fill; discard incidental `GraphicsSettings` / `QualitySettings` asset re-saves the capture run leaves behind; rebuild the look-test before committing after a capture, because the decal materials flip their premultiply keyword during a run and need their post-build state.
 
@@ -67,10 +67,13 @@ Phase 1 has no day/night cycle: the town is graded at midday plus one low-sun ca
 - **Three depth layers per view:** detailed foreground (a barrel, ivy, a post), lit middle ground (the facade, the fountain), hazy background (the bell tower, the lake below the hilltop) in 2-3 value steps.
 - **Value grouping:** 3-4 big masses at thumbnail size (PHASE1 3.1; the paintings in the reference row show where the darkest dark and lightest light sit). Squint test: shrink the capture to a small thumbnail (about 160 px wide works). If it's mush, the problem is layers 1-2, not assets.
 - **The rebuild arc is visible:** the restored town gains saturated accents, smoke, lit windows, banners and bunting over the bleached, dry square.
-- **Review from play positions,** at the game camera's height and distance, never fly-throughs.
+- **Review from play positions,** at the game camera's height and distance. No fly-throughs; a short frame strip (4 frames over 2 s from one camera) shows motion.
+
+## Judging a whole view (scene judging v2, 2026-11-17)
+Score eye-level views of a whole place with the 10-line /50 world scorecard in `docs/art/scene-judging.md`, never with the per-asset rubric. In short: our frames at 1920x1080 plus two 1:1 crops, the AAA anchor set (`Reference/private/judging-v2/anchors/`) shuffled in under opaque names. Per task, one blind A/B on the changed cameras only; the absolute score (two blind `reviewer` runs, never the builder, mean per frame, third pass when totals differ by more than 4) is for milestones. Every fix round starts with a probe and a one-line cause (`scene-judging.md` 2.8). To tell rounds apart use the same-camera A/B there: `sc_imgdiff.py` gate first (under 0.5 = no change, not sent), a null pair in each batch, the reviewer names the region. `python Tools/art/sc_scene_diag.py` gives supporting numbers (band luminance, haze proxy, tiling peak, bare patches, high-frequency energy), never a score. The first proof put our best views at about 36/50 against 40-45 for the OoT-2026 anchors; the gap is ground contact and weathering, cohesion, clustering of dressing and busy surface noise.
 
 ## The approval gate (PHASE1 3.7)
-Before showing the user: the captures fall inside the 3.1 bands, and a reviewer has scored them with the sc-asset-review rubric against the reference row. The user approves on captures; that is the only sign-off. If the user rejects, their notes are the next round. Approved captures become the reference row for every later batch. Before the M9 captures, compare the targets against the remake's official screens in `Reference/private/` (a check, not a blocker).
+Before showing the user: a reviewer has scored the captures with the world scorecard (`docs/art/scene-judging.md`) beside the anchor set. The 3.1 value, warmth and mass bands are advisory diagnostics, not a gate (user, 2026-11-18); the scene-judging scores and the user decide. The user approves on captures; that is the only sign-off. If the user rejects, their notes are the next round. Approved captures become the reference row for every later batch. Before the M9 captures, compare the targets against the remake's official screens in `Reference/private/` (a check, not a blocker).
 
 ## In the cloud (no Unity)
 You can review assets, measure existing captures, and change C# look constants or builders with tests. Every scene-level change then needs a PC compile and capture: name the exact views to compare and the numbers you expect to move. Never claim a look change works without a capture.

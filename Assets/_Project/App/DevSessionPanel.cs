@@ -1,7 +1,7 @@
 // Not networked; runs locally on every peer. A minimal IMGUI panel on the App object so the foundation can be driven without UI Toolkit:
 // the world picker (two tabs, Solo and Multiplayer, each up to 10 worlds; New world and Delete), Solo, dev-direct host and join (debug builds),
 // online host and join by code (Relay), Start (the host's start gate, SceneFlow.TryStartSession), Leave, and the last toast.
-// It is the manual-walk surface for M1; the real menus replace it later (UI assembly). The picker only chooses which world the NEXT hosted
+// The real menus are the front door (Menus/FrontDoorView); this panel stays for developers and draws only in a debug build or with -dev-panel (ShouldDraw). The picker only chooses which world the NEXT hosted
 // session opens (WorldSaveFlow.Select); joining someone else's session needs no world.
 using System;
 using System.Collections.Generic;
@@ -58,8 +58,26 @@ namespace SleepingCalamity.App
 
         private IdentityKind PickerIdentity => tab == WorldKind.Solo || !onlineWorlds ? IdentityKind.Local : IdentityKind.Ugs;
 
+        // PL-3 task 3.4: the real front door (FrontDoorView) is the player's menu; this panel is for developers. It draws in the editor and in
+        // Development Builds, and in a release build only with the -dev-panel flag.
+        public static bool ShouldDraw(bool isDebugBuild, DevFlags flags) => isDebugBuild || (flags != null && flags.DevPanel);
+
+        // Tests only: pretend the build is (not) a debug build, so a release build's gate can be checked from the editor. Null = the real Debug.isDebugBuild.
+        public static bool? DebugBuildOverrideForTests { get; set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => DebugBuildOverrideForTests = null;
+
+        // True when this panel draws now (the gate above, with this App's flags).
+        public bool IsDrawn => ShouldDraw(DebugBuildOverrideForTests ?? Debug.isDebugBuild, app != null ? app.DevFlags : null);
+
+        // How many times OnGUI got past the gate; tests read it.
+        public int DrawCount { get; private set; }
+
         private void OnGUI()
         {
+            if (!IsDrawn) return;
+            DrawCount++;
             if (!EnsureServices()) return;
             GUILayout.BeginArea(new Rect(12, 12, 460, 720), GUI.skin.box);
             GUILayout.Label("Sleeping Calamity: session (dev panel)");
@@ -138,8 +156,10 @@ namespace SleepingCalamity.App
                 WorldSummary w = listed[i];
                 bool selected = w.Id == flow.SelectedWorldId;
                 GUILayout.BeginHorizontal();
-                string label = (selected ? "> " : "  ") + "World " + (i + 1) + "  [" + string.Join(", ", w.PlayerNames) + "]  " + ShortTime(w.LastPlayedUtc);
-                if (GUILayout.Button(label, GUILayout.Width(340))) flow.Select(w.Id);
+                string label = w.Damaged
+                    ? "  World " + (i + 1) + "  [damaged: cannot be opened]"   // audit A6: it can be set aside, never selected
+                    : (selected ? "> " : "  ") + "World " + (i + 1) + "  [" + string.Join(", ", w.PlayerNames) + "]  " + ShortTime(w.LastPlayedUtc);
+                if (GUILayout.Button(label, GUILayout.Width(340)) && !w.Damaged) flow.Select(w.Id);
                 if (GUILayout.Button("Delete", GUILayout.Width(70)))
                 {
                     status = flow.DeleteWorld(w.Id) ? "World set aside." : "Could not delete that world.";
@@ -148,9 +168,11 @@ namespace SleepingCalamity.App
                 GUILayout.EndHorizontal();
             }
 
-            bool room = listed.Count < WorldSummary.MaxPerList;
+            int readable = 0;
+            foreach (WorldSummary w in listed) if (!w.Damaged) readable++;   // a damaged world takes no place
+            bool room = readable < WorldSummary.MaxPerList;
             GUI.enabled = room;
-            if (GUILayout.Button("New world (" + listed.Count + "/" + WorldSummary.MaxPerList + ")"))
+            if (GUILayout.Button("New world (" + readable + "/" + WorldSummary.MaxPerList + ")"))
             {
                 status = flow.CreateWorld(tab, PickerIdentity) != null ? "World created and selected." : "That list is full.";
                 listDirty = true;

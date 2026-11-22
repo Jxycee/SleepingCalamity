@@ -2,7 +2,7 @@
 // spawned by the host (DiveHub in the dive scene, or a test). It owns the dive FLOW and the party state that outlives a dive: PartyBags, DiveCheckpoint and DivePieces (Core/Cellars); every dive gets a fresh
 // DiveSession over them (Core/Cellars/DiveSession: the rules for floor, phase, stir, momentum). The data stays where it lives: the floor (seed, floor) in CellarFloorSync, the session and its summary in
 // DiveHaulSync (both spawned here once per session and kept: ending a dive sets the floor to NoFloor, it never despawns them, so found pieces, the checkpoint and the bags survive a return dive).
-// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
+// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetEnd (the last dive's end reason plus a counter; the host writes only that, each peer's result card builds its own numbers from its own owner-read bag), NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
 // the three world points NetHome / NetHubStair / NetOrigin (where the party lands, the church trapdoor, where the floors are built).
 // Clients ask by RPC and the host re-checks everything: RequestStartDiveRpc(floor) (trapdoor range, DiveCheckpoint.CanStartOn), RequestDescendRpc (floor 1), RequestStairRpc(fromFloor) (current floor must equal
 // fromFloor, so two presses in one tick advance once; range; gate key; floor 5's stair only after the bank choice), RequestGoHomeRpc (the cleared bank floor, range), RequestFinishRpc (floor 7's EndCell, range),
@@ -19,7 +19,7 @@
 // player that fell out of the world, and the trip home.
 // Contents API (host, stable): Instance (set on spawn, cleared on despawn), RequireGateKey (default false: every stair is open; true: a gate-key stair needs ServerOpenStair(floor) first, the gate key opens floors 1-4 and 6),
 // ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveFailedOn(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
-// Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G cycles the hub prompt's floor pick.
+// Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G also cycles the hub prompt's floor pick (the real button is Lock).
 // Bank room (plan 3 task 8, 8a): the bank press enters the room (DiveHaulSync.ServerEnterBankRoom); inside it a minimal IMGUI bank screen asks for picks, push-on and go-home with the real buttons (move up/down, Jump, Primary, Secondary; the dev keys [ ] P Y N still work as a second path); the
 // shared choice confirms in DiveHaulSync, which raises PushedOn (saved at once) / WentHome (EndDive). Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): a quit in the bank
 // room, or on floor 5 after the push-on, saves a suspend; a loaded one waits as pending and is re-emitted until the trapdoor resumes it (ServerResumeSuspended).
@@ -37,6 +37,17 @@ namespace SleepingCalamity.Presentation
 {
     public enum DiveEndReason : byte { Failed = 0, WentHome = 1, Abandoned = 2, Finished = 3 }
 
+    // PL-2 task 2.3: how the last dive ended, for every peer. Count rises on every ending (so the same reason twice still changes the value); Count 0 = no dive has ended in this session.
+    public struct DiveEndNet : INetworkSerializable, System.IEquatable<DiveEndNet>
+    {
+        public byte Reason;
+        public uint Count;
+        public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter { s.SerializeValue(ref Reason); s.SerializeValue(ref Count); }
+        public bool Equals(DiveEndNet o) => Reason == o.Reason && Count == o.Count;
+        public override bool Equals(object obj) => obj is DiveEndNet o && Equals(o);
+        public override int GetHashCode() => unchecked((int)(Count * 31u) + Reason);
+    }
+
     // Runs before HeroLocomotion (order 0): the gravity hold must be decided in the same frame a replicated floor swap lands, or the owner hero takes one gravity step over cells the new floor lacks
     // (a long frame under load sank a client hero 1.3 m once). ApplyPending also lands the arrival teleport before the hero moves.
     [DefaultExecutionOrder(-30)]
@@ -50,13 +61,19 @@ namespace SleepingCalamity.Presentation
         public static DiveDirector Instance { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { Instance = null; }
+        private static void ResetStatics() { Instance = null; InteractClaims = 0; }
+
+        // A screen that owns the Interact press (the dive result card, in UI, which Presentation cannot see) claims it while it is up: the press that dismisses it must not also start a dive at the trapdoor
+        // the party was just sent home beside. Claims count, so several peers' cards in one process (tests) balance. While any claim stands LocalInteract shows and sends nothing.
+        public static int InteractClaims { get; private set; }
+        public static void ClaimInteract(bool on) { InteractClaims = Mathf.Max(0, InteractClaims + (on ? 1 : -1)); }
         public const float PlacementInterval = 0.2f;
         public const float FloorClearDelay = 0.75f;   // after the party was sent home, the floor stays this long so nobody drops through it first
         public const float PendingTimeout = 10f;      // an owner applies a teleport after this long even when its floor never built
 
         public readonly NetworkVariable<bool> NetActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<bool> NetCheckpointHeld = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
+        public readonly NetworkVariable<DiveEndNet> NetEnd = new NetworkVariable<DiveEndNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // how the last dive ended (host writes in EndDive); a late joiner reads it with the spawn and shows no card for it
+        public readonly NetworkVariable<bool> NetCheckpointHeld =new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
         public readonly NetworkVariable<bool> NetSuspendedDive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // a loaded bank suspend waits: the trapdoor resumes it instead of starting a dive
         public readonly NetworkVariable<int> NetPickableMaxFloor = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the deepest floor the next dive may start on (hub prompt)
         public readonly NetworkVariable<bool> NetStairOpen = new NetworkVariable<bool>(true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the current floor's stair can be used (gate key taken or not required)
@@ -138,7 +155,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // HostWorld.ITownSource (M6 step 0), host only: the hub's town saves through the stock/town/residents/dive/bags sections. Registered in OnNetworkSpawn, unregistered on despawn.
-        // The sections come from TownStock.CaptureWorld over the live session; residents are passed as unknown (null), so the host keeps its saved first-meet beats.
+        // The sections come from TownStock.CaptureWorld over the live session; residents are passed as the director's live ResidentsSave (_residents; null until a first-meet beat latches), so the host keeps its saved first-meet beats.
         // Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): the bank room or floor 5 after the push-on writes one with the bags as carried, a loaded one nobody has
         // resumed yet is re-emitted, anything else is "known, none" (a used or ended suspend leaves the file). The 3-player extra slot's previous owner is saved from DiveHaulSync as a bag id.
         public TownSnapshot CaptureTown()
@@ -457,6 +474,7 @@ namespace SleepingCalamity.Presentation
             ForgetLiveParty();
             int endFloor = _session != null ? _session.Floor : 0;   // the dive's last floor, before the Town-phase session below replaces it
             NetActive.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
+            NetEnd.Value = new DiveEndNet { Reason = (byte)reason, Count = NetEnd.Value.Count + 1u };   // the one new replicated value of the dive result (PL-2 2.3); each peer builds its own numbers
             _session = NewSession();
             if (HaulSync != null) HaulSync.ServerAdopt(_session);
             RefreshHub();
@@ -466,6 +484,7 @@ namespace SleepingCalamity.Presentation
             ResetParty();      // wipe: every hero arrives home up and moving, and the combat host forgets the wipe
             if (reason == DiveEndReason.Failed || reason == DiveEndReason.Abandoned) DiveFailedOn?.Invoke(endFloor);
             DiveEnded?.Invoke(reason);
+            if (_world != null) _world.RequestSave();   // audit A8: the end state (bags settled, party home) goes to disk now, not at the next 10 s flush
             return true;
         }
 
@@ -761,23 +780,47 @@ namespace SleepingCalamity.Presentation
         public PromptKind Prompt { get; private set; }
         public string PromptText { get; private set; } = "";
 
-        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one, the G key (dev builds) cycles PickableFloors().
+        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one it defaults to the deepest pickable floor (the bank floor: the party earned that pick),
+        // and the Lock button (PL-4 4.2; the G dev key too) cycles PickableFloors(). The host re-checks the pick against its checkpoint whatever a peer sends.
         public int PickFloor { get; private set; } = UndercroftPlan.FirstFloor;
+        private bool _pickTouched;   // local: the player cycled the pick since the last start, so the default stays out of the way
 
-        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false)
+        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false, string pickButton = "")
         {
             if (suspended) return "Return to your dive (a save after pushing on resumes at the start of floor 6; otherwise at the bank room)";
             if (!checkpointHeld && floors.Count <= 1) return "Go down the Undercroft";
-            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + "; G changes the floor)";
+            string change = string.IsNullOrEmpty(pickButton) ? "" : "; " + pickButton + " changes the floor";
+            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + change + ")";
         }
 
-        // Host and clients: the pick follows the replicated floors (a pick no longer offered falls back to the first).
+        // Host and clients: the pick follows the replicated floors (a pick no longer offered falls back to the default; an untouched pick follows the checkpoint: the bank floor while it is held, else floor 1).
         private void ClampPick(IReadOnlyList<int> floors)
         {
             if (floors.Count == 0) { PickFloor = UndercroftPlan.FirstFloor; return; }
+            if (!NetCheckpointHeld.Value) _pickTouched = false;
+            int def = NetCheckpointHeld.Value ? floors[floors.Count - 1] : floors[0];
+            if (!_pickTouched) { PickFloor = def; return; }
             bool ok = false;
             foreach (int f in floors) if (f == PickFloor) { ok = true; break; }
-            if (!ok) PickFloor = floors[0];
+            if (!ok) { PickFloor = def; _pickTouched = false; }
+        }
+
+        private string _pickButtonCache;
+        private InputDeviceKind _pickButtonDevice;
+        private IInputService _pickButtonInput;
+
+        // Cached; refreshed only when the input service or its last-used device changes. A display-string fault falls back to the plain words (it must not break the prompt or Interact).
+        private string PickButtonName(IInputService input)
+        {
+            if (input == null) return "the lock-on button";
+            if (_pickButtonCache != null && ReferenceEquals(_pickButtonInput, input) && _pickButtonDevice == input.LastDevice) return _pickButtonCache;
+            string key;
+            try { key = input.GetBindingDisplayString(InputActionNames.Lock); }
+            catch (System.Exception) { key = ""; }
+            _pickButtonCache = string.IsNullOrEmpty(key) ? "the lock-on button" : key;
+            _pickButtonInput = input;
+            _pickButtonDevice = input.LastDevice;
+            return _pickButtonCache;
         }
 
         public void RequestDescend() { RequestDescendRpc(); }
@@ -811,6 +854,7 @@ namespace SleepingCalamity.Presentation
         private void LocalInteract()
         {
             Prompt = PromptKind.None; PromptText = "";
+            if (InteractClaims > 0) return;   // a card owns Interact right now (ClaimInteract)
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             if (player == null || _hasPending) return;
             Vector3 me = player.transform.position;
@@ -821,18 +865,23 @@ namespace SleepingCalamity.Presentation
                 ClampPick(floors);
                 if (Flat(me, NetHubStair.Value, PromptRadius))
                 {
-                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value);
-                    if (floors.Count > 1 && !NetSuspendedDive.Value && HeroInput.ResolveDefault() is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor))
+                    IInputService pickInput = HeroInput.ResolveDefault();
+                    string pickButton = NetCheckpointHeld.Value && floors.Count > 1 && !NetSuspendedDive.Value ? PickButtonName(pickInput) : "";   // resolved only where the text shows it
+                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value, pickButton);
+                    bool cycle = pickInput != null && (pickInput.Intent.LockPressed || pickInput is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor));
+                    if (cycle && floors.Count > 1 && !NetSuspendedDive.Value && NetCheckpointHeld.Value && !LocalHeroIsDown(player))
                     {
                         int at = 0;
                         for (int i = 0; i < floors.Count; i++) if (floors[i] == PickFloor) at = i;
-                        PickFloor = floors[(at + 1) % floors.Count];
-                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false);
+                        PickFloor = floors[(at + 1) % floors.Count]; _pickTouched = true;
+                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false, pickButton);
                     }
                 }
             }
             else
             {
+                // A dive (any peer started it) ends the old pick: the next hub visit defaults again (the bank floor while the checkpoint is held).
+                _pickTouched = false; PickFloor = UndercroftPlan.FirstFloor;
                 ResolveSyncs();
                 if (FloorSync == null || FloorSync.Built == null || FloorSync.Layout == null) return;
                 floor = FloorSync.BuiltFloor;
@@ -860,7 +909,7 @@ namespace SleepingCalamity.Presentation
             if (LocalHeroIsDown(player)) return;   // a downed hero presses nothing (the host refuses it too)
             switch (Prompt)
             {
-                case PromptKind.Descend: RequestStartDive(NetCheckpointHeld.Value && !NetSuspendedDive.Value ? PickFloor : UndercroftPlan.FirstFloor); break;
+                case PromptKind.Descend: RequestStartDive(NetCheckpointHeld.Value && !NetSuspendedDive.Value ? PickFloor : UndercroftPlan.FirstFloor); _pickTouched = false; break;
                 case PromptKind.Stair: RequestStair(floor); break;
                 case PromptKind.Bank: RequestBank(); break;
                 case PromptKind.GoHome: RequestGoHome(); break;
@@ -1030,10 +1079,13 @@ namespace SleepingCalamity.Presentation
             return string.IsNullOrEmpty(s) ? generic : s;
         }
 
-        // Owner (any peer): H eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf).
+        // Owner (any peer): the UseItem button (or the dev key H) eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf: up, hurt, has one).
+        // UseItem arrives through the routed intent, so it is dead in placement, the bank screen and menus (InputContextRouter).
         private void LocalEat()
         {
-            if (!(HeroInput.ResolveDefault() is IDevInput dev) || !dev.WasPressed(DevKey.EatLoaf)) return;
+            IInputService input = HeroInput.ResolveDefault();
+            bool pressed = input != null && input.Intent.UseItemPressed || input is IDevInput dev && dev.WasPressed(DevKey.EatLoaf);
+            if (!pressed) return;
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             HeroVitals v = player != null ? player.GetComponent<HeroVitals>() : null;
             if (v != null) v.RequestEatLoaf();

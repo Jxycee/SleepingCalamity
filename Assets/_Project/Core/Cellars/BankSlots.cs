@@ -32,6 +32,40 @@ namespace SleepingCalamity.Core
             _ => throw new ArgumentOutOfRangeException(nameof(players), players, "1-4 players"),
         };
 
+        // The bank capacity of every present player when the party changes while the room is open (a join, a leave, a rejoin). picks[i] is how many slots player i has filled already (0 for a
+        // player with no visit). Rules, chosen so no player ever loses an item or a pick:
+        //  1. Start from SlotsFor (the shares of TotalSlots(players) for the party as it is now; a shrinking party's players get the bigger shares back).
+        //  2. A slot with a pick in it is never taken away: capacity is at least the picks already made.
+        //  3. If that lifts the party above TotalSlots(players) (a late joiner arriving while others hold more than their new share), the surplus comes out of UNUSED slots only, one at a time
+        //     from whoever has the most unused (ties: the later player, so a joiner is sized from what remains). A slot with a pick is never unused, so capacity never goes below the picks.
+        // The sum is TotalSlots(players) unless the picks alone already exceed it (they cannot when the previous party's total was no bigger, but a hand-edited save could), then it is the picks.
+        public static int[] Allocate(int players, IReadOnlyList<int> presentSlots, int extraSlotOwner, IReadOnlyList<int> picks)
+        {
+            if (presentSlots == null || presentSlots.Count != players) throw new ArgumentException("one slot per player", nameof(presentSlots));
+            var cap = new int[players];
+            var used = new int[players];
+            int sum = 0;
+            for (int i = 0; i < players; i++)
+            {
+                used[i] = picks != null && i < picks.Count ? Math.Max(0, picks[i]) : 0;
+                cap[i] = Math.Max(SlotsFor(players, presentSlots[i], extraSlotOwner), used[i]);
+                sum += cap[i];
+            }
+            int surplus = sum - TotalSlots(players);
+            while (surplus > 0)
+            {
+                int best = -1, bestUnused = 0;
+                for (int i = 0; i < players; i++)
+                {
+                    int unused = cap[i] - used[i];
+                    if (unused > 0 && unused >= bestUnused) { best = i; bestUnused = unused; }
+                }
+                if (best < 0) break;
+                cap[best]--; surplus--;
+            }
+            return cap;
+        }
+
         // The 3-player extra slot's owner: a seeded pick among the present players, skipping the previous owner (-1 = none).
         public static int PickExtraSlotOwner(ulong diveSeed, IReadOnlyList<int> presentSlots, int previousOwner)
         {

@@ -4,10 +4,12 @@
 //   1 a client drops at the bank floor carrying a bag item and found pieces      2 a client drops right after sending a bank / stair / go-home request      3 the builder-lock holder drops (ghost, placed town)
 //   4 a go-home from the bank room with a client already gone                   5 rejoin keeps weapon growth (same PlayerId), a fresh player does not inherit it
 //   6 a world that records four players, only two of them connected: the absent two stay untouched in the save, difficulty scales to the present two
+//   7 the crash-and-relaunch takeover (audit A9): the same key joins while its old connection is still up, so the approver kicks the old client mid-dive
 // Rules the code applies and these tests pin: the found pieces are the PARTY's (DivePieces, host-only, safe on pickup); a dropped hero's bag (PartyBags, keyed by PlayerKey) stays and comes home / waits in a satchel with the party, it is not
 // forfeited to the leaver and not dropped on the floor. NGO destroys the leaver's player object. The stir meter's player factor and the difficulty scale follow who is connected.
 // The bank cases run at the bank floor (5): the dive starts there through the held checkpoint (plan 3 decision 2), the bank press opens the bank room, and going home is the shared choice.
-// NOT covered: a crash-style drop (transport timeout rather than a graceful leave), relay latency, scene-managed clients, a host that drops (no host migration in Phase 1), visuals.
+// NOT covered: a real transport timeout (case 7 stands in for the crash path by joining with the same key while the old connection is still up), relay latency, scene-managed
+// clients, a host that drops (no host migration in Phase 1), visuals.
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -587,6 +589,57 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That((a.Level, a.Abs), Is.EqualTo((levelA, seedA)), "absent player A's growth is untouched");
             Assert.That((bW.Level, bW.Abs), Is.EqualTo((levelB, seedB)), "absent player B's growth is untouched");
             Assert.That(GrowthSaves.Restore("c", PlayModeHarness.PlayerId(21), file.Weapons).Weapon(Axe).Abs, Is.EqualTo(earned), "the present client's earned growth was saved");
+        }
+
+        // ================================================================ case 7
+
+        // Catches (audit A9): the stale-connection takeover never being executed - ConnectionApprover.TakeOverStaleConnection calls
+        // nm.DisconnectClient for ONE client from inside ANOTHER client's approval callback, mid-dive, which no test reached (an EditMode
+        // NetworkManager is not running, and the other cases here leave gracefully). This is the crash-and-relaunch path: the player's game is
+        // gone but the host's transport has not timed it out yet, so the same key joins while the old connection is still up. Pinned: the old
+        // client is the one that goes, the rejoining player keeps their roster slot, their bag (keyed by PlayerKey) and a hero, the party's
+        // finds are untouched, and the dive carries on consistently.
+        // NOT covered: Relay and real transport timing (the clients are process-local TestClients), the Lobby seat (UgsSeatTests covers the
+        // rule; the live check is USER_TODO 3a), and a client-side reconnect UI.
+        [UnityTest]
+        public IEnumerator Case7_SameKeyJoinsWhileTheOldConnectionIsUp_TakesOver_KeepsBagSlotAndHero()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r, 1);
+            yield return StartAtBank(rig);
+            ulong oldId = rig.ClientId(0);
+            string pid = KeyIdOf(rig, oldId);
+            Assert.That(rig.App.Roster.TryGetSlot(oldId, out byte slot), Is.True, "case7: the client holds a roster slot");
+            Assert.That(rig.Haul.ServerAddItem(oldId, 101), Is.True, "the player is carrying one item when their game dies");
+            PlayerBag bag = rig.Haul.ServerBagOf(oldId);   // the bag object itself: the client id is about to change
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+            yield return Consistent(rig, "case7 before the takeover");
+
+            // The same player relaunches and joins by code while the host still lists their old client. Nothing leaves gracefully here: the
+            // approver's takeover is what disconnects the stale client.
+            yield return PlayModeHarness.StartClients(rig.App, 1, false, rig.Clients, 20);
+            int back = rig.Clients.Count - 1;
+            ulong newId = rig.ClientId(back);
+            rig.Dropped.Add(0);
+            Assert.That(newId, Is.Not.EqualTo(oldId), "the rejoin got a new client id");
+            yield return AfterDrop(rig, oldId, "case7");
+            yield return PlayModeHarness.WaitUntil(() => !rig.ClientNm(0).IsConnectedClient, Timeout, "case7: the stale client was not disconnected by the takeover");
+
+            Assert.That(rig.App.Roster.ConnectedCount, Is.EqualTo(2), "host + the player who came back, not three");
+            Assert.That(rig.App.Roster.TryFindConnected(PlayerKey.Local(pid), out ulong found) && found == newId, Is.True, "the roster maps the key to the new client");
+            Assert.That(rig.App.Roster.TryGetSlot(newId, out byte newSlot) && newSlot == slot, Is.True, "the same slot came back (spawn positions follow it)");
+            Assert.That(rig.Haul.ServerBagOf(newId), Is.SameAs(bag), "the very same bag, keyed by PlayerKey");
+            Assert.That(bag.Carried, Is.EqualTo(new[] { 101 }), "the item they were carrying is still theirs");
+            Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(1), "the party's finds are untouched");
+            Assert.That(rig.Haul.Current.CurrentFloor, Is.EqualTo(UndercroftPlan.BankFloor), "the dive carries on where it was");
+
+            // The host gives them a hero again and the floor is built for them.
+            rig.HostNm.SpawnManager.InstantiateAndSpawn(rig.App.PlayerPrefab, newId, false, true, false, Home + new Vector3(2f, 0f, 0f), Quaternion.identity);
+            NetworkManager cnm = rig.ClientNm(back);
+            yield return PlayModeHarness.WaitUntil(() => cnm.LocalClient != null && cnm.LocalClient.PlayerObject != null, Timeout, "case7: the player who came back never received a hero");
+            rig.ClientHeroes.Add(cnm.LocalClient.PlayerObject);
+            yield return FloorBuilt(rig, UndercroftPlan.BankFloor, "[case7 rejoin]");
+            yield return Consistent(rig, "case7 after the takeover");
         }
     }
 }

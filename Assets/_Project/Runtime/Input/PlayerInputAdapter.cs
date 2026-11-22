@@ -16,7 +16,7 @@ namespace SleepingCalamity.Runtime
         private ISettings _settings;
 
         private InputActionMap _playerMap, _uiMap;
-        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge;
+        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge, _useItem;
         private InputAction _uiCancel;
         private InputAction[] _deviceProbe = Array.Empty<InputAction>();
 
@@ -59,6 +59,15 @@ namespace SleepingCalamity.Runtime
 
         public PlayerIntent Intent => _intent;
         public bool HasFocus => _hasFocus;
+
+        // Tests only (PL-4 4.1): a batch-mode editor reports no window focus, so the adapter would hand every gameplay system neutral input. A device-level PlayMode test forces
+        // focus on; OnApplicationFocus then no longer changes it.
+        private bool _focusForced;
+        public void ForceFocusForTests()
+        {
+            _focusForced = true;
+            _hasFocus = true;
+        }
         public InputDeviceKind LastDevice => _lastDevice;
         public InputActionAsset Actions => _actions;
 
@@ -111,11 +120,12 @@ namespace SleepingCalamity.Runtime
             _lock = _actions.FindAction(InputActionNames.Lock, throwIfNotFound: true);
             _switchTarget = _actions.FindAction(InputActionNames.SwitchTarget, throwIfNotFound: true);
             _dodge = _actions.FindAction(InputActionNames.Dodge, throwIfNotFound: true);
+            _useItem = _actions.FindAction(InputActionNames.UseItem, throwIfNotFound: true);
             _uiCancel = _actions.FindAction(InputActionNames.Cancel, throwIfNotFound: true);
 
             _deviceProbe = new[]
             {
-                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge,
+                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge, _useItem,
                 _actions.FindAction(InputActionNames.Navigate, throwIfNotFound: true),
                 _actions.FindAction(InputActionNames.Submit, throwIfNotFound: true),
                 _uiCancel,
@@ -187,7 +197,9 @@ namespace SleepingCalamity.Runtime
             f.SwitchY = sw.y;
             f.InteractPressed = _interact.WasPressedThisFrame();
             f.InteractHeld = _interact.IsPressed();
-            f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
+            f.UseItemPressed = _useItem.WasPressedThisFrame();
+            // Menu: UI/Cancel (B, Escape) or Player/Pause (gamepad Start, Escape) both close it, so the key that opened the pause menu also closes it. Other contexts (PlacementMode too) read Player/Pause only.
+            f.PausePressed = Context == InputContext.Menu ? (_uiCancel.WasPressedThisFrame() || _pause.WasPressedThisFrame()) : _pause.WasPressedThisFrame();
             return f;
         }
 
@@ -235,6 +247,7 @@ namespace SleepingCalamity.Runtime
 
         private void OnApplicationFocus(bool hasFocus)
         {
+            if (_focusForced) return;
             _hasFocus = hasFocus;
             if (hasFocus)
             {
@@ -292,6 +305,8 @@ namespace SleepingCalamity.Runtime
             InputMaps maps = InputContextRouter.EnabledMaps(ctx);
             SetMapEnabled(_playerMap, (maps & InputMaps.Player) != 0);
             SetMapEnabled(_uiMap, (maps & InputMaps.UI) != 0);
+            // Menu: the Player map is off, but Player/Pause stays on so gamepad Start (not bound to UI/Cancel) closes the menu it opened. Only PauseMenuView reads PausePressed in Menu.
+            if (_pause != null && InputContextRouter.PauseStaysEnabled(ctx)) _pause.Enable();
         }
 
         private static void SetMapEnabled(InputActionMap map, bool enabled)

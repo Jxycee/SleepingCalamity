@@ -206,17 +206,19 @@ namespace SleepingCalamity.Presentation
         {
             DiveStir stir = _session.Stir;
             stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
-            stir.ModifierBonus = _session.Phase == DivePhase.Floor && ModifiersOf(DiveFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;   // Stirred: flat stir while the party is on that floor only (= FloorModifierSet.StirredBonusFor, from the cached set)
+            float bonus = _session.Phase == DivePhase.Floor && ModifiersOf(DiveFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;   // Stirred: flat stir while the party is on that floor only (= FloorModifierSet.StirredBonusFor, from the cached set)
+            if (_session.Phase == DivePhase.Floor) bonus += SpecialJobs.StirBonusOnFloor(_shrineFloor, SpecialJobTuning.ShrineStir, DiveFloor);   // a cleared stir altar adds its delta on its own floor only
+            stir.ModifierBonus = bonus;
             if (_session.Phase == DivePhase.Floor || _session.Phase == DivePhase.BankRoom) stir.UnbankedValuables = _session.Bags.CarriedValuables();
         }
 
         // ---- the collapse (plan 3 task 10; host) ----
         public const float CollapseTargetRadius = 4f;     // placeholder: every living hero within this many metres (flat) of the target cell closes the timer early
-        public const float CollapseFloorWaitSeconds = 3f; // a built floor that lags the dive floor is waited for this long before the collapse begins with no path
+        public const float CollapseFloorWaitSeconds = CollapseStartPlan.WaitCapSeconds; // a floor build that lags the dive floor is waited for this long; then the path comes from the seed's layout (CollapseStartPlan)
         private float _collapseWaitSince = -1f;
 
         // The collapse is pending (stir 100, once per half) on a floor of the dive: it begins with the walk time to this floor's target. With a floor sync in the scene it waits for the layout of
-        // this floor (a few seconds at most); with none (haul-only tests) it begins at once with no path, so the minimum applies.
+        // this floor (up to CollapseFloorWaitSeconds, then it begins with the path of the layout regenerated from the dive seed, never 0; host only); with none (haul-only tests) it begins at once with no path, so the minimum applies.
         private void TickCollapseStart()
         {
             DiveStir stir = _session.Stir;
@@ -224,13 +226,14 @@ namespace SleepingCalamity.Presentation
             ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             bool built = fs != null && fs.Layout != null && fs.Built != null && fs.BuiltFloor == DiveFloor;
-            if (fs != null && !built)
-            {
-                if (_collapseWaitSince < 0f) _collapseWaitSince = Time.unscaledTime;
-                if (Time.unscaledTime - _collapseWaitSince < CollapseFloorWaitSeconds) return;
-            }
+            if (fs != null && !built && _collapseWaitSince < 0f) _collapseWaitSince = Time.unscaledTime;
+            float waited = _collapseWaitSince < 0f ? 0f : Time.unscaledTime - _collapseWaitSince;
+            CollapseStartAction act = CollapseStartPlan.Decide(fs != null, built, waited);
+            if (act == CollapseStartAction.Wait) return;
             _collapseWaitSince = -1f;
-            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
+            float path = act == CollapseStartAction.BeginBuilt ? DiveFloorTable.PathSecondsToTarget(fs.Layout)
+                : act == CollapseStartAction.BeginFromSeed ? CollapseStartPlan.FallbackPathSeconds(DiveSeed, DiveFloor) : 0f;   // past the cap: the path of the layout regenerated from (seed, floor), never 0
+            stir.BeginCollapse(path, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
         }
 
         // A running collapse closes when every living hero (at least one) is at the target: the party is leaving, so the host treats it like the stair (DiveStir.OnStairTaken).
@@ -269,8 +272,7 @@ namespace SleepingCalamity.Presentation
             DiveSession s = _session;
             DiveStir stir = s.Stir;
             int floor = DiveFloor;
-            int found = 0;
-            foreach (int id in s.Pieces.FoundIds) if (!PieceCatalog.IsPerson(id)) found++;
+            int found = s.Pieces.FoundPieceCount;
             int choice = 0, choiceMask = 0, choiceSeconds = 0;
             if (_choice.IsOpen)
             {
@@ -302,7 +304,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerAdopt(DiveSession session)
         {
             if (!IsServer || !IsSpawned || session == null) return false;
-            _session = session; _heal = null; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
+            _session = session; _heal = null; _shrineFloor = 0; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
         // Host only: adopts the session a resumed suspend rebuilt (DiveDirector.ServerResumeSuspended): the saved dive seed, and the bank room's extra-slot owner kept as it was (when it had one it
         // was set before the quit, so PreviousExtraOwner is not written again this visit).
@@ -404,6 +406,16 @@ namespace SleepingCalamity.Presentation
             return NetworkManager != null && clientId == NetworkManager.LocalClientId ? clientId.ToString() : null;
         }
 
+        // Host only: the connected client whose bag key (PlayerIdOf) is `playerId` (CombatHost's HitRecord.PlayerId is the same string), false when that player is not connected.
+        public bool TryClientOfPlayerId(string playerId, out ulong clientId)
+        {
+            clientId = 0;
+            if (!Host || string.IsNullOrEmpty(playerId) || NetworkManager == null) return false;
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds)
+                if (PlayerIdOf(cid) == playerId) { clientId = cid; return true; }
+            return false;
+        }
+
         private readonly System.Collections.Generic.Dictionary<ulong, int> _seenOrder = new System.Collections.Generic.Dictionary<ulong, int>();   // no roster: client id -> order first seen
 
         // 0-3, used for the chest roll stream and the 3-player extra slot. The roster slot (stable across a rejoin); with no roster, the order the host first saw each client id
@@ -435,6 +447,14 @@ namespace SleepingCalamity.Presentation
             if (!Host) return null;
             string id = PlayerIdOf(clientId);
             return id == null ? null : _session.Bags.For(id);
+        }
+
+        // Host only: the client's existing bag, or null (no roster key, or no bag made yet). Never creates one (ServerBagOf does).
+        public PlayerBag ServerExistingBagOf(ulong clientId)
+        {
+            if (!Host) return null;
+            string id = PlayerIdOf(clientId);
+            return id != null && _session.Bags.TryGet(id, out PlayerBag bag) ? bag : null;
         }
 
         public bool ServerAddItem(ulong clientId, int itemId)
@@ -594,7 +614,8 @@ namespace SleepingCalamity.Presentation
             return true;
         }
 
-        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): resize now.
+        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): resize now (host only; same authority as the class). The resize shares
+        // BankSlots.TotalSlots for the party as it is now and never takes a slot that holds a pick, so a late joiner is sized from what remains (BankSlots.Allocate).
         private void EnsureVisit(ulong clientId)
         {
             if (_session.Phase != DivePhase.BankRoom) return;
@@ -689,6 +710,34 @@ namespace SleepingCalamity.Presentation
         {
             if (!IsServer || !IsSpawned) return false;
             _healTuning = tuning; _heal = null; return true;
+        }
+
+        // ---- special-room jobs (host; called once per room per floor visit by CellarContentsSync, which holds the latch) ----
+        private int _shrineFloor;   // host only: the floor whose stir altar was cleared this dive (0 = none); cleared with the session in ServerAdopt
+        public int ShrineFloor => _shrineFloor;   // host only (tests: the stir recompute)
+
+        // Mending spring: every up hero in this world is healed MendPercent of max HP through the healing point's ServerHeal + broadcast path. Clients cannot call it.
+        public bool ServerMendParty(int percent)
+        {
+            if (!Host) return false;
+            var all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (!IsMine(v)) continue;
+                int healed = v.ServerHeal(SpecialJobs.MendAmount(v.MaxHp, percent));
+                if (healed <= 0) continue;
+                HeroCombat c = v.GetComponent<HeroCombat>();
+                if (c != null) c.ServerBroadcastHeal(healed);
+            }
+            return true;
+        }
+
+        // Stir altar: marks `floor` so FeedStir adds the delta while the party is on it (the next host frame feeds it). One floor per dive is enough (the special room is once per dive kind).
+        public bool ServerShrineStir(int floor, float delta)
+        {
+            if (!Host || delta <= 0f || floor < 1) return false;
+            _shrineFloor = floor; FeedStir(); return true;
         }
 
         // ---- healing (host) ----

@@ -139,11 +139,63 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(bags.For("b").Picks, Is.Empty, "... so a pick of theirs is not banked behind their back");
             Assert.That(bags.For("b").Carried.Count, Is.EqualTo(3), "their items stay carried");
 
-            // the party grows to four: one slot each, a's second pick drops from the end
+            // the party grows to four: a's two picks keep their slots (never taken away), the joiners share what remains of the four slots
             Assert.That(s.ResizeBankRoom(Slots(0, 1, 2, 3), IdsOf(0, 1, 2, 3), 12345UL, -1), Is.True);
-            foreach (string id in Ids) { Assert.That(bags.For(id).BankOpen, Is.True, id); Assert.That(bags.For(id).SlotCapacity, Is.EqualTo(1), id); }
-            Assert.That(bags.For("a").Picks, Is.EqualTo(new[] { 0 }), "excess picks drop from the end");
+            foreach (string id in Ids) Assert.That(bags.For(id).BankOpen, Is.True, id);
+            Assert.That(bags.For("a").Picks, Is.EqualTo(new[] { 0, 1 }), "a pick is never dropped by a resize");
+            Assert.That(bags.For("a").SlotCapacity, Is.EqualTo(2));
+            Assert.That(TotalCapacity(bags, 4), Is.EqualTo(BankSlots.TotalSlots(4)), "the party never goes above the total");
             Assert.That(s.ExtraSlotOwner, Is.EqualTo(-1), "four players: no extra slot");
+        }
+
+        static int TotalCapacity(PartyBags bags, int n) { int t = 0; for (int i = 0; i < n; i++) t += bags.For(Ids[i]).SlotCapacity; return t; }
+
+        // PARKING_LOT 2026-11-03 "party shrinks": four players drop to two, the two share the full TotalSlots(2) and keep every pick.
+        [Test]
+        public void ResizeBankRoom_PartyShrinks_PresentPlayersShareTheFullTotal_PicksKept()
+        {
+            var bags = new PartyBags();
+            foreach (string id in Ids) { bags.For(id).Add(101); bags.For(id).Add(102); }
+            DiveSession s = AtBank(4, bags);
+            Assert.That(bags.For("a").Pick(0), Is.True);
+            Assert.That(bags.For("b").Pick(1), Is.True);
+            Assert.That(s.ResizeBankRoom(Slots(0, 1), IdsOf(0, 1), 5UL, -1), Is.True);
+            Assert.That(bags.For("a").SlotCapacity, Is.EqualTo(2));
+            Assert.That(bags.For("b").SlotCapacity, Is.EqualTo(2));
+            Assert.That(TotalCapacity(bags, 2), Is.EqualTo(BankSlots.TotalSlots(2)));
+            Assert.That(bags.For("a").Picks, Is.EqualTo(new[] { 0 }));
+            Assert.That(bags.For("b").Picks, Is.EqualTo(new[] { 1 }));
+        }
+
+        // PARKING_LOT 2026-11-03 "late joiner": two players with all four slots picked, a third joins. The pickers keep every pick; the joiner is sized from what remains (none), so the party stays at 4.
+        [Test]
+        public void ResizeBankRoom_LateJoiner_NeverLiftsThePartyAboveTheTotal_AndNeverTakesAPick()
+        {
+            var bags = new PartyBags();
+            for (int i = 0; i < 3; i++) { bags.For(Ids[i]).Add(101); bags.For(Ids[i]).Add(102); }
+            DiveSession s = AtBank(2, bags);
+            foreach (string id in new[] { "a", "b" }) { Assert.That(bags.For(id).Pick(0), Is.True); Assert.That(bags.For(id).Pick(1), Is.True); }
+            Assert.That(s.ResizeBankRoom(Slots(0, 1, 2), IdsOf(0, 1, 2), 9UL, -1), Is.True);
+            Assert.That(bags.For("a").Picks.Count, Is.EqualTo(2));
+            Assert.That(bags.For("b").Picks.Count, Is.EqualTo(2));
+            Assert.That(bags.For("c").BankOpen, Is.True);
+            Assert.That(bags.For("c").SlotCapacity, Is.EqualTo(0), "nothing left for the joiner");
+            Assert.That(TotalCapacity(bags, 3), Is.EqualTo(BankSlots.TotalSlots(3)));
+        }
+
+        // The joiner takes the unused slots of others (a solo player with one pick of three keeps it and two free slots; the joiner gets one of them).
+        [Test]
+        public void ResizeBankRoom_LateJoiner_TakesOnlyUnusedSlots()
+        {
+            var bags = new PartyBags();
+            bags.For("a").Add(101); bags.For("b").Add(102);
+            DiveSession s = AtBank(1, bags);
+            Assert.That(bags.For("a").Pick(0), Is.True);
+            Assert.That(s.ResizeBankRoom(Slots(0, 1), IdsOf(0, 1), 3UL, -1), Is.True);
+            Assert.That(bags.For("a").Picks, Is.EqualTo(new[] { 0 }));
+            Assert.That(TotalCapacity(bags, 2), Is.EqualTo(BankSlots.TotalSlots(2)));
+            Assert.That(bags.For("a").SlotCapacity, Is.EqualTo(2));
+            Assert.That(bags.For("b").SlotCapacity, Is.EqualTo(2));
         }
 
         [Test]

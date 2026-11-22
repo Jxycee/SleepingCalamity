@@ -28,6 +28,12 @@ namespace SleepingCalamity.Core
             return context == InputContext.Menu ? InputMaps.UI : InputMaps.Player;
         }
 
+        // Player/Pause is enabled on its own in the Menu context (the Player map is off there), so Start closes the pause menu.
+        public static bool PauseStaysEnabled(InputContext context)
+        {
+            return context == InputContext.Menu;
+        }
+
         // LockOn: everything Free passes, except Look is zeroed (the camera follows the target) and the switch input passes.
         private static PlayerIntent RouteLockOn(in PlayerInputFrame f)
         {
@@ -41,7 +47,7 @@ namespace SleepingCalamity.Core
 
         // Placement: every gameplay field is zeroed (the hero stands still; nothing swings, jumps, locks or interacts with the world) and the same buttons arrive on the placement-only
         // fields instead: switch input -> PlaceMoveX/Y (to the neighbouring lot), Primary -> PlacePressed, Secondary -> PickUpPressed, Interact -> NextLotPressed, Jump -> TurnPressed.
-        // Pause passes so the menu still opens (placement mode leaves when it does).
+        // Pause passes so PlacementMode can leave on it; the pause menu itself ignores a press made in Placement (PauseMenuModel.Pause).
         private static PlayerIntent RoutePlacement(in PlayerInputFrame f)
         {
             return new PlayerIntent
@@ -57,8 +63,8 @@ namespace SleepingCalamity.Core
         }
 
         // BankScreen (the bank room's screen): the hero stands still and swings, jumps and interacts with nothing (so a stray press cannot push a party on, and a cursor step does not walk the
-        // hero out of the bank's range). Move -> BankMoveY, Jump -> BankPickPressed, Primary -> BankPushOnPressed, Secondary -> BankGoHomePressed. Look and Pause pass (the camera still turns,
-        // the menu still opens).
+        // hero out of the bank's range). Move -> BankMoveY, Jump -> BankPickPressed, Primary -> BankPushOnPressed, Secondary -> BankGoHomePressed. Look and Pause pass (the camera still turns;
+        // Pause passes, but the pause menu does not open from the bank screen: PauseMenuModel.Pause ignores it).
         private static PlayerIntent RouteBankScreen(in PlayerInputFrame f)
         {
             return new PlayerIntent
@@ -94,6 +100,7 @@ namespace SleepingCalamity.Core
                 SecondaryReleased = f.SecondaryReleased,
                 InteractPressed = f.InteractPressed,
                 InteractHeld = f.InteractHeld,
+                UseItemPressed = f.UseItemPressed,
                 PausePressed = f.PausePressed,
             };
         }

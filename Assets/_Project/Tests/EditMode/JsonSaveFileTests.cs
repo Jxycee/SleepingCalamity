@@ -54,6 +54,32 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(System.IO.File.ReadAllText(_path + JsonSaveFile<WorldSave>.CorruptSuffix), Does.Contain("oddField"), "the original kept as .corrupt");
         }
 
+        // Catches (audit A9): a write that fails (the folder cannot be made, a locked file, a full disk) clearing the dirty mark, so the change is never retried
+        // and the next flush finds "nothing to write"; or throwing into gameplay. The folder cannot be made here because a file sits where it should be.
+        [Test]
+        public void FailedWrite_StaysDirty_AndTheNextFlushWritesIt()
+        {
+            string blocker = Path.Combine(_dir, "blocker");
+            System.IO.File.WriteAllText(blocker, "a file where the folder should be");
+            string target = Path.Combine(blocker, "world.json");
+            var f = new JsonSaveFile<WorldSave>(target, 1, s => s.SchemaVersion, () => WorldSaveRules.New(0xF15F15F1UL), null, "test file", "read-only");
+            f.Load();
+            f.Current.SavedAtUtc = "2026-11-14T10:00:00Z";
+            f.MarkDirty();
+
+            bool flushed = false;
+            Assert.DoesNotThrow(() => flushed = f.FlushIfDirty());
+            Assert.That(flushed, Is.True, "a write was due");
+            Assert.That(f.IsDirty, Is.True, "and it failed, so it is still due");
+            Assert.That(f.Save(), Is.False, "a direct save reports the failure too");
+
+            System.IO.File.Delete(blocker);   // the fault clears
+            Assert.That(f.FlushIfDirty(), Is.True);
+            Assert.That(f.IsDirty, Is.False, "the retry wrote it");
+            Assert.That(System.IO.File.ReadAllText(target), Does.Contain("2026-11-14T10:00:00Z"), "with the change made while the write was failing");
+            Assert.That(f.FlushIfDirty(), Is.False, "and now there is nothing left to write");
+        }
+
         // Catches: the version probe reading a string or a nested field as the schema, or throwing on junk.
         [Test]
         public void TryReadSchemaVersion_OnlyATopLevelInteger()

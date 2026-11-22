@@ -1,6 +1,6 @@
 ---
 name: sc-handoff
-description: Update docs/superpowers/handoff/CURRENT.md, the running SleepingCalamity handoff on main, after a meaningful step (task landed, review, user decision, merge). Keeps it a short, evidence-cited state file.
+description: Update docs/superpowers/handoff/CURRENT.md, the running SleepingCalamity handoff on main, when something lands on main or the user decides something (merge, user decision, session end). Keeps it a short, evidence-cited state file.
 ---
 # Updating CURRENT.md
 
@@ -21,4 +21,6 @@ Keep it a **state file under 300 lines and about 4,000 tokens** (`wc -w` under ~
 - Every status claim cites its evidence: a commit, a check result line (`SC RESULT check PASS`, test counts), or the user's words with a date. No claim without one.
 - History, tooling inventories, finished work and lessons don't belong here. Move them to a dated file in `docs/superpowers/handoff/` (history) or to `CLAUDE.md`, a skill or `.claude/rules/` (lasting rules), and leave a one-line pointer.
 - If the file is over the cap, prune it before adding anything.
-- Commit with a message saying what changed (`handoff: <step>`) and push to `main`.
+- **When:** a merge into `main`, a user decision, or the end of a controller session. Not after every step: in-progress state goes to the session board profile.
+- **Commit it with the work it describes:** inside the merge commit (`sc-merge` step 4) or the task commit. Only when nothing else carries it, push one `handoff: <what changed>` commit at the end of the session.
+- "Now" is one paragraph about today, not a stack of dated entries: when you write a new one, move the old paragraph to the dated history file.

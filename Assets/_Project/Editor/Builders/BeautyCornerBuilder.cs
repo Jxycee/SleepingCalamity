@@ -25,7 +25,14 @@ namespace SleepingCalamity.EditorTools
         public const string RpAssetPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_RPAsset.asset";
         const string MaterialsFolder = "Assets/_Project/Content/Materials/BeautyCorner";
         const string TexturesFolder = "Assets/_Project/Content/Textures/BeautyCorner";
-        public enum Preset { Midday, LowSun }
+        // Midday and LowSun are the approved corner (and the town's two looks, HollowmereLook); Morning and Evening are the B0 lighting-test states (Hollowmere design section 4):
+        // HDRI sky, sky ambient, exponential fog, a cloud-shadow cookie on the sun. Never add a preset without a case in every switch on it (ApplyPreset, HollowmereLook.For).
+        public enum Preset { Midday, LowSun, Morning, Evening }
+        public const string MorningProfileName = "BeautyCorner_Morning_Profile", EveningProfileName = "BeautyCorner_Evening_Profile";
+        public const string MorningSkyFile = "kloofendal_48d_partly_cloudy_puresky_2k.hdr", EveningSkyFile = "belfast_sunset_puresky_2k.hdr";
+        static readonly Quaternion MorningSun = Quaternion.Euler(42f, -32f, 0f), EveningSun = Quaternion.Euler(12f, 62f, 0f);
+        static readonly Color MorningFogStart = new Color(0.725f, 0.776f, 0.812f), EveningFogStart = new Color(0.914f, 0.725f, 0.541f);   // #b9c6cf, #e9b98a
+        public static readonly Vector2 CloudCookieOffset = new Vector2(0.31f, 0.17f);                                                       // a fixed offset for the captures
 
         [MenuItem("SleepingCalamity/Art/Build Beauty Corner")]
         public static void BuildMenu()
@@ -91,8 +98,39 @@ namespace SleepingCalamity.EditorTools
                 LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.97f, 1.0f, 1.0f, 0.0f));
                 Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
             });
+            // B0 states. Post per the design table: Neutral, contrast 20, saturation 0, shadows tinted toward #2f3a44 (its hue at 30%: the colour itself would crush them),
+            // bloom 0.25 / threshold 1.0, vignette 0.18; exposure -0.3 and white balance +6 (Morning), exposure -0.2, white balance +14 and bloom 0.35 (Evening).
+            Vector4 shadowTint = new Vector4(Mathf.Lerp(1f, 0.69f, 0.5f), Mathf.Lerp(1f, 0.85f, 0.5f), 1f, -0.15f);   // round 2: deeper shadow side
+            foreach (var st in new[] { (MorningProfileName, -0.45f, 8f, 0.25f), (EveningProfileName, -0.05f, 34f, 0.35f) })
+                LookTestBuilder.EnsureProfile(st.Item1, p =>
+                {
+                    LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
+                    Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(st.Item4); b.scatter.Override(0.8f); b.clamp.Override(65000f);
+                    ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(st.Item2); c.contrast.Override(20f); c.saturation.Override(0f);
+                    LookTestBuilder.Comp<WhiteBalance>(p).temperature.Override(st.Item3);
+                    LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p).shadows.Override(shadowTint);
+                    Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
+                });
             AssetDatabase.SaveAssets();
         }
+
+        // B0 sky materials: Skybox/Panoramic on a K01 HDRI, turned so the HDRI's own sun sits where the preset's sun is. Null while the HDRI is missing.
+        static Material BuildHdriSky(string matName, string hdrFile, Quaternion sun)
+        {
+            Texture2D tex = B0Fab.ImportSky(hdrFile);
+            if (tex == null) return null;
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + matName + ".mat", Shader.Find("Skybox/Panoramic") ?? throw new System.InvalidOperationException("Skybox/Panoramic not found"));
+            B0Fab.SkyInfo info = B0Fab.ProbeSky(hdrFile);
+            m.SetTexture("_MainTex", tex); m.SetFloat("_Mapping", 1f); m.SetFloat("_ImageType", 0f); m.SetFloat("_MirrorOnBack", 0f);
+            m.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f, 0.5f)); m.SetFloat("_Exposure", 1f);
+            m.SetFloat("_Rotation", B0Fab.SkyRotationDegrees(info, sun));
+            EditorUtility.SetDirty(m);
+            Debug.Log("SC B0 sky material " + matName + " rotation=" + m.GetFloat("_Rotation").ToString("F1") + " (HDRI sun elevation " + info.SunElevation.ToString("F1") + " vs preset " + (sun.eulerAngles.x).ToString("F0") + ")");
+            return m;
+        }
+
+        static Material HdriSky(Preset p) => AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + (p == Preset.Morning ? "/M_BC_Sky_Morning.mat" : "/M_BC_Sky_Evening.mat"));
 
         static void BuildSupportMaterials()
         {
@@ -110,6 +148,8 @@ namespace SleepingCalamity.EditorTools
             skyLow.SetFloat("_SunSize", 0.06f); skyLow.SetFloat("_SunSizeConvergence", 5f); skyLow.SetFloat("_AtmosphereThickness", 1.0f);
             skyLow.SetColor("_SkyTint", new Color(0.66f, 0.56f, 0.64f)); skyLow.SetColor("_GroundColor", new Color(0.42f, 0.38f, 0.33f)); skyLow.SetFloat("_Exposure", 1.0f);
             EditorUtility.SetDirty(skyMid); EditorUtility.SetDirty(skyLow);
+            BuildHdriSky("M_BC_Sky_Morning", MorningSkyFile, MorningSun); BuildHdriSky("M_BC_Sky_Evening", EveningSkyFile, EveningSun);
+            B0Fab.CloudCookie("Morning", 0.35f); B0Fab.CloudCookie("Evening", 0.20f);
             Material cone = LookTestBuilder.Ensure(MaterialsFolder + "/M_BC_LightCone.mat", Shader.Find("SleepingCalamity/LightCone") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/LightCone"));
             cone.SetColor("_Color", new Color(1.0f, 0.86f, 0.62f)); cone.SetFloat("_Intensity", 0.14f); cone.SetFloat("_LengthFade", 0.7f); cone.renderQueue = 3100;
             cone.SetFloat("_HeightFadeTop", 10f); cone.SetFloat("_HeightFadeRange", 5f);   // alpha 1 below 5 m, 0 at 10 m: the beams stop at the roofline
@@ -157,13 +197,16 @@ namespace SleepingCalamity.EditorTools
 
             BeautyCornerArt.EnforceTextureCap();
             Material far = BeautyCornerArt.SurroundGround();   // B6 FarCobble with a macro breakup; the LookTest cobble when that art is missing
+            Material t01 = B0Fab.CobbleGround();               // [T01] square cobbles (Quixel, 2 m): takes the corner's ground when the set is in Art/Source/Fab
+            Debug.Log("SC B0 ground " + (t01 != null ? "T01 cobble (Art/Source/Fab/T01_cobblestone_floor)" : far != null ? "B6 FarCobble" : "LookTest cobble"));
             LookTestBuilder.Box(set, "Surround_Ground (scene fill, not a brief row)", new Vector3(0f, -0.17f, 0f), new Vector3(140f, 0.3f, 140f),
-                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
+                t01 != null ? t01 : far != null ? far : LookTestBuilder.Mat("cobble"), default, t01 != null ? 2f : far != null ? BeautyCornerArt.FarTileMetres : 3f);
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows) PlaceRow(set, row);
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
             Light sun = LookTestBuilder.AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.identity, Color.white, 3f, 10f, LightShadows.Soft);
             LookTestBuilder.AddLight(lighting, "ShadeFill", LightType.Directional, new Vector3(0, 10, 0), Quaternion.Euler(22f, 18f, 0f), new Color(0.78f, 0.84f, 1.0f), 0.5f, 10f, LightShadows.None);   // polish1: soft cool fill from the camera side, no shadows, keeps shaded paint readable
+            sun.gameObject.AddComponent<SleepingCalamity.Presentation.CloudShadowDrift>();   // moves the Morning/Evening cookie in play; idle while the sun has none
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 3f, 3f), new Vector3(30f, 12f, 28f));
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight; RenderSettings.ambientIntensity = 1f;
@@ -310,41 +353,105 @@ namespace SleepingCalamity.EditorTools
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
         }
 
+
         // --------------------------------------------------------------------------------------------- lighting presets
         // Midday: PHASE1 3.5 day (sun about 5200 K, cool sky fill). LowSun: the sun about 12 degrees up, warmer and weaker, warmer haze, a neutral-warm fill.
+        // Morning and Evening (B0): the Hollowmere design section 4 table. Every preset sets every piece of global state it can touch (fog mode, ambient mode, sky, cookie),
+        // because a capture run switches between them in one session and Midday must come back exactly as it was.
         public static void ApplyPreset(Preset preset)
         {
             Light sun = RenderSettings.sun != null ? RenderSettings.sun : Object.FindFirstObjectByType<Light>();
             if (sun == null) throw new System.InvalidOperationException("No sun in the open scene");
             Quaternion rot;
-            if (preset == Preset.Midday)
+            switch (preset)
             {
-                rot = Quaternion.Euler(54f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.91f, 0.83f); sun.intensity = 4.5f;     // about 5200 K
-                RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.016f;
-                RenderSettings.ambientSkyColor = new Color(0.50f, 0.56f, 0.64f); RenderSettings.ambientEquatorColor = new Color(0.47f, 0.48f, 0.49f);
-                RenderSettings.ambientGroundColor = new Color(0.29f, 0.26f, 0.22f);
-            }
-            else
-            {
-                rot = Quaternion.Euler(12f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.68f, 0.42f); sun.intensity = 2.8f;
-                RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f); RenderSettings.fogDensity = 0.016f;
-                RenderSettings.ambientSkyColor = new Color(0.32f, 0.33f, 0.38f); RenderSettings.ambientEquatorColor = new Color(0.34f, 0.29f, 0.24f);
-                RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.14f);
+                case Preset.Midday:
+                    rot = Quaternion.Euler(54f, -32f, 0f);
+                    sun.color = new Color(1.0f, 0.91f, 0.83f); sun.intensity = 4.5f;     // about 5200 K
+                    RenderSettings.fogMode = FogMode.ExponentialSquared;
+                    RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.016f;
+                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                    RenderSettings.ambientSkyColor = new Color(0.50f, 0.56f, 0.64f); RenderSettings.ambientEquatorColor = new Color(0.47f, 0.48f, 0.49f);
+                    RenderSettings.ambientGroundColor = new Color(0.29f, 0.26f, 0.22f);
+                    SetCloudShadows(sun, null, 0f);
+                    break;
+                case Preset.LowSun:
+                    rot = Quaternion.Euler(12f, -32f, 0f);
+                    sun.color = new Color(1.0f, 0.68f, 0.42f); sun.intensity = 2.8f;
+                    RenderSettings.fogMode = FogMode.ExponentialSquared;
+                    RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f); RenderSettings.fogDensity = 0.016f;
+                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                    RenderSettings.ambientSkyColor = new Color(0.32f, 0.33f, 0.38f); RenderSettings.ambientEquatorColor = new Color(0.34f, 0.29f, 0.24f);
+                    RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.14f);
+                    SetCloudShadows(sun, null, 0f);
+                    break;
+                case Preset.Morning:
+                case Preset.Evening:
+                    bool morning = preset == Preset.Morning;
+                    rot = morning ? MorningSun : EveningSun;
+                    sun.color = morning ? new Color(1.00f, 0.91f, 0.83f) : new Color(1.00f, 0.72f, 0.48f); sun.intensity = morning ? 5.8f : 5.2f;   // round 2: Morning sun/ambient ratio up, Evening sun stronger for p90
+                    RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = morning ? 0.0048f : 0.006f;   // plain exponential: the square stays crisp, the far end softens
+                    B0Fab.SkyInfo info = B0Fab.ProbeSky(morning ? MorningSkyFile : EveningSkyFile);
+                    RenderSettings.fogColor = B0Fab.HorizonFog(info, morning ? MorningFogStart : EveningFogStart);
+                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.ambientIntensity = morning ? 0.40f : 0.65f;   // the sky is the fill (no APV bake, see the B0 report)
+                    SetCloudShadows(sun, AssetDatabase.LoadAssetAtPath<Texture2D>(B0Fab.TexRoot + "Sky/CloudCookie_" + (morning ? "Morning" : "Evening") + ".png"), 220f);
+                    break;
+                default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, null);
             }
             Volume post = Object.FindFirstObjectByType<Volume>();
-            if (post != null) post.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/_Project/Content/Rendering/" + (preset == Preset.Midday ? ProfileName : LowSunProfileName) + ".asset");
+            string profile = preset == Preset.Midday ? ProfileName : preset == Preset.LowSun ? LowSunProfileName : preset == Preset.Morning ? MorningProfileName : EveningProfileName;
+            if (post != null) post.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/_Project/Content/Rendering/" + profile + ".asset");
             GameObject fillGo = GameObject.Find("ShadeFill");
-            if (fillGo != null) { Light fill = fillGo.GetComponent<Light>(); fill.intensity = preset == Preset.Midday ? 0.35f : 0.22f; fill.color = preset == Preset.Midday ? new Color(0.78f, 0.84f, 1.0f) : new Color(1.0f, 0.86f, 0.72f); }
-            RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + (preset == Preset.Midday ? "/M_BC_Sky_Midday.mat" : "/M_BC_Sky_LowSun.mat"));
+            if (fillGo != null)
+            {
+                Light fill = fillGo.GetComponent<Light>();
+                fill.intensity = preset == Preset.Midday ? 0.35f : preset == Preset.LowSun ? 0.22f : 0f;   // Morning and Evening: the sky ambient does this job
+                fill.color = preset == Preset.Midday ? new Color(0.78f, 0.84f, 1.0f) : new Color(1.0f, 0.86f, 0.72f);
+            }
+            Material sky = preset == Preset.Midday ? AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_BC_Sky_Midday.mat")
+                : preset == Preset.LowSun ? AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_BC_Sky_LowSun.mat") : HdriSky(preset);
+            RenderSettings.skybox = sky;
             sun.transform.rotation = rot;
             GameObject shafts = GameObject.Find("Shafts");
             if (shafts != null) shafts.transform.rotation = rot;
-            // Hollowmere's lantern-post pools (HollowmereSquare "LampLight"): lit at low sun only. The corner scene has none, its own lights are untouched.
+            // Hollowmere's lantern-post pools (HollowmereSquare "LampLight"): lit at low sun and in the evening. The corner scene has none, its own lights are untouched.
             foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-                if (l.name == "LampLight") l.enabled = preset == Preset.LowSun;
+                if (l.name == "LampLight") l.enabled = preset == Preset.LowSun || preset == Preset.Evening;
             DynamicGI.UpdateEnvironment();
+        }
+
+        // The cloud-shadow cookie on the sun: a tiling map, tileMetres across, at the capture's fixed offset (CloudShadowDrift moves it in play). Null clears it.
+        // Midday and LowSun pass null: they leave the sun's cookie alone (the town keeps its own T_HM_CloudGust_Cookie); a CloudCookie_* left by Morning/Evening is cleared.
+        static void SetCloudShadows(Light sun, Texture2D cookie, float tileMetres)
+        {
+            bool ours = sun.cookie != null && sun.cookie.name.StartsWith("CloudCookie_");
+            if (cookie == null && !ours) return;
+            sun.cookie = cookie;
+            UniversalAdditionalLightData data = sun.GetUniversalAdditionalLightData();
+            data.lightCookieSize = cookie != null ? new Vector2(tileMetres, tileMetres) : Vector2.one;
+            data.lightCookieOffset = cookie != null ? CloudCookieOffset : Vector2.zero;
+        }
+
+        // The sun-elevation test (Hollowmere design section 4: 54, 46, 38 at the Morning colour): turn the open scene's sun and its god-ray cones to the new elevation.
+        public static void SetSunElevation(float elevation)
+        {
+            Light sun = RenderSettings.sun != null ? RenderSettings.sun : Object.FindFirstObjectByType<Light>();
+            Quaternion rot = Quaternion.Euler(elevation, -32f, 0f);
+            sun.transform.rotation = rot;
+            GameObject shafts = GameObject.Find("Shafts");
+            if (shafts != null) shafts.transform.rotation = rot;
+            DynamicGI.UpdateEnvironment();
+        }
+
+        // Proof that the HDRI sun sits where the light is: the ambient probe's brightness toward the sun, away from it, and toward the mirrored azimuth (the other rotation sign).
+        public static void LogSkySunCheck(Preset preset)
+        {
+            Light sun = RenderSettings.sun; Vector3 toSun = -(sun.transform.rotation * Vector3.forward);
+            Vector3 mirrored = new Vector3(toSun.x, toSun.y, -toSun.z).normalized;
+            var dirs = new[] { toSun, -toSun, mirrored };
+            var res = new Color[3];
+            SphericalHarmonicsL2 sh = RenderSettings.ambientProbe; sh.Evaluate(dirs, res);
+            Debug.Log("SC B0 sky-sun check " + preset + ": ambient toward sun=" + res[0].grayscale.ToString("F3") + " away=" + res[1].grayscale.ToString("F3") + " mirrored=" + res[2].grayscale.ToString("F3") + " (toward should be the largest)");
         }
     }
 }

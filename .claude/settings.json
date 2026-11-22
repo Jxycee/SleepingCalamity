@@ -47,6 +47,15 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task|Workflow|mcp__ccd_session__start_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/model-guard.sh\""
+          }
+        ]
       }
     ],
     "SessionStart": [

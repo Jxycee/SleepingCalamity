@@ -90,8 +90,8 @@ Collision and layout bugs from the traversal scan (rebuilt buildings, chests and
     - Related: the Saltwake road's last node sits there (FIXLIST item 10).
     - The Cellars have none (200 floors checked).
 18. **Speculative, from the readers:**
-    - The gate key drops where the carrier dies, with no reachability fallback if the corpse ends up in a wall (`CellarContentsSync.cs:516,530`).
-    - Piece spheres can't be collected if the haul's piece count differs from the floor's arm count (`CellarContentsSync.cs:363-364,551`).
+    - The gate key drops where the carrier dies, with no reachability fallback if the corpse ends up in a wall (`CellarContentsSync.cs:516,530`). FIXED (`b2438821`, host-path test added 2026-11-14).
+    - Piece spheres can't be collected if the haul's piece count differs from the floor's arm count (`CellarContentsSync.cs:363-364,551`). FIXED (`63e237d9`, 2026-11-14).
     - The healing point stays spent on a same-seed retry (`DiveHaulSync.cs:219-221`).
     - The hunter respawns at its cell the tick it despawns, with no distance check from players (`CellarContentsSync.cs:487-496`).
     - One player's press teleports the whole party with no ready check (`DiveDirector.cs:299-323`; probably by design).

@@ -200,7 +200,7 @@ while IFS= read -r seg; do
                 if unity=$(git diff --name-only "main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) && [ -z "$unity" ]; then
                     continue
                 fi
-                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha and a tree-keyed marker in sc-check-pass-tree), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
+                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Run that checkout's own Tools/unity.ps1 check on that commit (a worktree tests itself), or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha and a tree-keyed marker in sc-check-pass-tree), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
             done
             ;;
     esac

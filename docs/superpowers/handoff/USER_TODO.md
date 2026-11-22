@@ -4,9 +4,9 @@ These are the steps only the user can take. Claude keeps this list current: when
 
 ## Tonight (2026-11-02): manual test plan, in order
 Main will be checked and quiet before you start (the coordinator holds Asset merges while you test).
-1. **3c solo, the M6 square loop** (~40 min). Covers the dive too (3b's floors 1-4), now with **tier 1 enemies only** in the Cellars. Note how the solo dive feels: too hard, too easy, too long.
+1. **3b solo, the loop walk** (~30 min; the PL-4 release build). Covers the dive too. Note how the solo dive feels: too hard, too easy, too long.
 2. **Look while you walk:** Terrace and Keep stair flights (should read as steps, no black strip), butterflies/bees, chimney smoke, the square.
-3. **2-player items with Multiplayer Play Mode** (two editors, no second person needed): 3c steps 13-17, then 3b's netcode-only checks. Item 3 (real Relay with a friend) can wait.
+3. **2-player items with Multiplayer Play Mode** (two editors, no second person needed): 3b's two-player steps. Item 3 (real Relay with a friend) can wait.
 4. **Read and answer:** the 6 open questions in `docs/design/m7-proposal.md` section 3 (they shape M7 S2-S8).
 5. **If time:** the Mixamo clips (item 1).
 Also check (stair hand-over fixes, incl. the floor-collider sync `d6eaddbc` that fixed heroes sinking up to 1.27 m): take the F1->F2->F3 stairs as host and as client, go home, abandon at F8, a wipe, and a client joining mid-dive. Nobody should sink or fall at a stair; dodge/sprint may be blocked for a split second right after arriving.
@@ -24,40 +24,31 @@ Tell the coordinator every surprise, a lying prompt, a stuck spot or a crash (pa
    3. When both players show, press "Start session" on the host. Both players should land in Arena_Greybox.
 
    Tell Claude what happened.
-3b. **The M5 Cellars walk, floors 1-4 (2 players; spine `e525a51` + contents `c75c33f8`; an automated host+client run of this script passes).** About 20-30 minutes. The town and the Undercroft stair come in M6, so the dive starts from the Arena_Dive hub. The bottom of the screen shows `[E] ...` whenever an action is in reach; the stir meter sits on screen during a dive.
-   1. Both machines: turn on the dev panel toggle "Start in the Cellars dive hub" (or editor menu `SleepingCalamity/Dev/Dive Hub`, or a build with `-dev-dive`).
-   2. Host: press "Host online (Relay)" and read out the join code. Second player: "Join by code", enter it. Host: "Start session". Both land on the hub pad.
-   3. Walk into the stair mouth to the violet column: `[E] Go down the Undercroft stair`. Either player presses E. Both of you appear at floor 1's entry.
-   4. Floor 1: walk into rooms (enemies spawn when someone first steps into a combat room). One enemy carries the gate key: kill it and a gold cube drops; walk over it. Only now does the stair open.
-   5. On the way: press E at chests (loot goes into the shared haul; a key chest gives the room key, then walk up to the locked gate or press E there to open it). Walk over the bakery pieces (spheres) to pick them up; the "pieces left" count drops for both of you.
-   6. At the stair column: `[E] Take the stair down`. Repeat 4-6 on floors 2 and 3.
-   7. Floor 2 checkpoint (lamp nook): `[E] Bank the haul at the checkpoint`. Banked pieces are safe and the party heals. A healing point may also stand on some floors (walk onto it; 30 s recharge).
-   8. Watch the stir meter climb as you clear floors and carry pieces: at 40 rooms get one extra enemy, at 70 a big rat-king hunts you, at 100 you have 90 s to reach a bank point.
-   9. Floor 4, the bakery: fight past the Dough Warden in the antechamber to the baker's room. `[E] Bank the haul with the baker`, then `[E] Take the party home` at the green column. You are back on the hub pad.
-   10. Optional fail test: start a second dive (the stair offers floor 3 now, as a return dive), pick up a piece, and let the party fall (or host presses F8 to abandon). You return to the hub and the unbanked piece is back on its floor next time.
-   Debug keys (host, dev builds): F7 starts a dive from anywhere, F8 abandons it. Tell Claude what broke, what felt wrong, and whether floors felt samey.
-
-3c. **The M6 square-loop walk (S6), solo then 2 players.** About 30-40 minutes each. An automated host+client run of this loop (`SquareLoopWalkQaTests`) passes; this walk checks what it cannot: keys, prompts, camera, look and feel. Hollowmere is the default start scene now, so do NOT turn on the dive-hub dev toggle. Bottom-of-screen prompts read `[E] ...`; key names below are the defaults (check yours in the controls screen).
-   **Solo**
-   1. Press Solo / Auto Solo. You spawn in Hollowmere by the cistern house. Check the town stands as saved (rebuilt buildings, the ruined bakery lot) and nothing blocks you at the start.
-   2. Walk to the cistern-house stair. `[E] Go down the Undercroft stair` appears. Press E: you land on floor 1.
-   3. Dive as in 3b (steps 4-9): collect bakery pieces (floors 1-3), bank at the floor-2 checkpoint, fight to the floor-4 heart, `[E] Bank the haul with the baker`, then `[E] Take the party home` (green column).
-   4. You are back at the stair top in Hollowmere. The haul should now be town stock: the bakery pieces, loot and the baker. Note anything missing.
-   5. Walk to the bakery lot's build point. `[E] Open placement mode`. Press E: the camera lifts to a top-down view, the hero stands still.
-   6. Choose a lot (move keys / stick move to the neighbouring lot; E cycles to the next free lot). Ghost is green when allowed, red when not. Space turns it a quarter turn. Put it where it would cut a lane or block the path: it must read red and left-click (primary) must do nothing.
-   7. Put it on a legal lot and left-click: the frame appears. Read the three baker wishes in plain words; they tick live as you move the ghost between lots. Try one lot where a wish fails, then settle on one where all three tick.
-   8. Left-click again for each part: oven, door, sign (each appears as it lands). Right-click (secondary) picks up the last thing placed; place it again.
-   9. Left-click once more to place the baker. He appears at his door. All wishes ticked: the service opens.
-   10. Esc leaves placement mode (the world saves). Walk away; the lock is released.
-   11. Go to the stair again and start a dive: you should carry **3 loaves**. Take some damage, eat one (check the key in the controls), HP rises.
-   12. Quit to the main menu, start Solo again (same world). The bakery and baker still stand, the banked stock is the same, the loaves/dive state are sane.
-   **2 players** (two editors with Multiplayer Play Mode, or editor + dev build; Relay as in item 3)
-   13. Host + join by code, Start session. Both land in Hollowmere by the cistern house.
-   14. Host places the bakery frame; the client must see the same ghost, the wish ticks and the placed building live (a "Someone is building" prompt shows for the other player). The client cannot start placing while the host holds the lock.
-   15. Client builds the parts and places the baker; host watches. Try placing the frame in a path-blocking spot from the client: refused.
-   16. Both dive: each gets 3 loaves. Go through bank and home with both. A downed player must not be able to take the stair.
-   17. Host quits; restart as host with the same world and let the client rejoin: town, stock, baker and both players' weapon growth survive.
-   Tell Claude every step that surprised you, any prompt that lied, and whether placement felt clear.
+3a. **Audit checks for the same 2-player Relay walk (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`).** These need real Relay and two machines; no test can run them. About 10 minutes.
+   1. **Crash and rejoin (A1).** Mid-dive, the second player ends the game from Task Manager, relaunches at once and joins by the same code within about 10 seconds. Expected today: the join fails or the player is dropped a few seconds after arriving, and a second try works. Say what the screen showed and how long each step took.
+   2. **Host quits (A10).** Mid-session the host presses Alt+F4. Time how long the second player's game takes to return to the title, and what it says.
+   3. **Join while the host is loading (A4).** The host presses "Start session"; the second player joins by code during the host's loading screen. Does the second player get a hero in the hub?
+3b. **The loop walk on the PL-4 release build (replaces the old 3b M5 and 3c M6 walks; plan `docs/superpowers/plans/2026-11-11-playable-loop.md` section 5).** On the build, no dev panel, no dev keys, no flags. If a step needs any of them, the milestone is not done. The build folder and a title-screen screenshot are named in `Reference/sessions/pl4-way-out/STATUS.md`. Write surprises in `docs/playtest/NOTES.md` and tell Claude every one (a prompt that lied, a stuck spot, a crash: paste the console line).
+   **Solo, about 30 minutes**
+   1. Start the game. A title screen, not a grey box. Choose to play alone, make a new world.
+   2. You stand in Hollowmere. A line on screen tells you to find the stair, and you can see where it is.
+   3. At the trapdoor a prompt appears. Press Interact. You are on floor 1 with a floor card.
+   4. Play down. On floor 2 you find the bakery frame; the pieces-left count drops.
+   5. Come home either way: fall, or reach the bank room on floor 5 and choose to go home. A card says what came home and what was lost.
+   6. The line now points at the bakery lot. Walk there, press Interact, place the frame on a lot that reads green. Try a spot that blocks a lane: refused, in words.
+   7. Press Pause to leave placement. Press Pause again: a menu. Read the controls. Leave to the title.
+   8. Continue the same world. The frame stands. Quit from the menu.
+   9. Stretch: dive again for the oven, door and sign, wake the baker on floor 3, finish the bakery, place the baker, and start the next dive with 3 loaves. Take a hit and eat one with the button the HUD names. After going home from the bank, the trapdoor offers the bank floor first; the prompt names the button that changes the floor (Tab, or right-stick click on a pad).
+   **Two players, about 40 minutes.** A second person on their own PC. Before that, a ten-minute **one-PC Relay rehearsal**: the editor and the build side by side on two profiles (or two builds); this is the first time Relay carries two players.
+   1. Host: play with friends, new multiplayer world. The lobby shows a join code and one name. Start is greyed out and says it needs two players.
+   2. Guest: join, type the code. Guest sees "waiting for the host", host sees two names. Host starts. Both stand in Hollowmere.
+   3. Either player presses Interact at the trapdoor: both are on floor 1. Each finds a piece. One falls; the other revives them with a hold.
+   4. Reach the bank room. One chooses to go home, the other confirms. Each sees their own result card.
+   5. Host places the frame while the guest watches the ghost move. Host leaves placement; guest takes over and places a part. Guest tries a lane-blocking spot: refused.
+   6. Guest opens the pause menu and leaves. Host keeps playing. Guest joins again with the same code and is back in town.
+   7. Host leaves from the pause menu after the warning. Guest sees "the host ended the session" in words and lands on the title.
+   8. Host cannot continue the world alone (a multiplayer world needs two): the lobby says so. Guest joins, host starts: the frame, the part, both players' weapon growth and bags are as they were.
+   Extra for the two-player run: take the trapdoor as the guest with a held checkpoint and change the floor with the pick button; the host starts on the floor the guest picked. Standing on the other hero's head: say whether that is fine or should be blocked.
 
 ## Cloud sessions (so a cloud session can work like the PC)
 - **Set up the cloud environment** (title-bar environment menu > Edit; details in `docs/superpowers/handoff/cloud-environment.md`):

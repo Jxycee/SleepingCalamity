@@ -67,6 +67,48 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(BankSlots.PickExtraSlotOwner(7UL, new List<int>(), 2), Is.EqualTo(-1));
         }
 
+        static int Sum(int[] a) { int t = 0; foreach (int x in a) t += x; return t; }
+
+        [Test]
+        public void Allocate_NoPicks_IsSlotsFor()
+        {
+            Assert.That(BankSlots.Allocate(2, new[] { 0, 1 }, -1, new[] { 0, 0 }), Is.EqualTo(new[] { 2, 2 }));
+            Assert.That(BankSlots.Allocate(3, new[] { 0, 1, 2 }, 1, new[] { 0, 0, 0 }), Is.EqualTo(new[] { 1, 2, 1 }));
+            Assert.That(BankSlots.Allocate(1, new[] { 3 }, -1, null), Is.EqualTo(new[] { 3 }));
+        }
+
+        [Test]
+        public void Allocate_SoloWithThreePicksAndAJoiner_KeepsThePicks_JoinerGetsTheRest()
+        {
+            int[] cap = BankSlots.Allocate(2, new[] { 0, 1 }, -1, new[] { 3, 0 });
+            Assert.That(cap, Is.EqualTo(new[] { 3, 1 }), "a keeps all three picks; the joiner gets what remains of four");
+            Assert.That(Sum(cap), Is.EqualTo(BankSlots.TotalSlots(2)));
+        }
+
+        [Test]
+        public void Allocate_SurplusComesOutOfUnusedSlotsOnly()
+        {
+            // three players, extra owner slot 2 (unused); slot 0 has two picks, slot 1 none: the 5 wanted slots lose the owner's unused extra, not a pick
+            int[] cap = BankSlots.Allocate(3, new[] { 0, 1, 2 }, 2, new[] { 2, 0, 0 });
+            Assert.That(Sum(cap), Is.EqualTo(BankSlots.TotalSlots(3)));
+            Assert.That(cap[0], Is.EqualTo(2));
+            for (int i = 0; i < 3; i++) Assert.That(cap[i], Is.GreaterThanOrEqualTo(i == 0 ? 2 : 0));
+        }
+
+        [Test]
+        public void Allocate_NeverBelowPicks_EvenWhenPicksExceedTheTotal()
+        {
+            int[] cap = BankSlots.Allocate(2, new[] { 0, 1 }, -1, new[] { 3, 3 });
+            Assert.That(cap, Is.EqualTo(new[] { 3, 3 }), "a hand-edited save: nothing is taken from a filled slot");
+        }
+
+        [Test]
+        public void Allocate_ShrinkingParty_ShareTheFullTotal()
+        {
+            Assert.That(Sum(BankSlots.Allocate(2, new[] { 0, 1 }, -1, new[] { 1, 0 })), Is.EqualTo(BankSlots.TotalSlots(2)));
+            Assert.That(Sum(BankSlots.Allocate(1, new[] { 0 }, -1, new[] { 2 })), Is.EqualTo(BankSlots.TotalSlots(1)));
+        }
+
         [Test]
         public void IsStirValuable_OnlyWeaponAndLarge()
         {

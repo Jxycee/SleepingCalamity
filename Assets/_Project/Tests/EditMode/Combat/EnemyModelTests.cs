@@ -22,29 +22,31 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var t1 = new EnemyModel(EnemyCatalog.Broom, 1, 1);
             var t2 = new EnemyModel(EnemyCatalog.Broom, 2, 1);
-            Assert.That(t1.MaxHp, Is.EqualTo(160));
-            Assert.That(t2.MaxHp, Is.EqualTo(480), "life x3");
-            Assert.That(t2.Atk, Is.EqualTo(15f * 1.0f).Within(1e-4f), "attack x1.0 (was x2.3: a x3.5 step from tier 1, retuned 2026-10-30)");
+            // One player, so the solo assist applies (Run 5 balance 2026-11-15, docs/design/balance-dungeon1.md): life x0.75, attack x0.6. Broom life 130.
+            Assert.That(t1.MaxHp, Is.EqualTo(98), "130 x 0.75 = 97.5, rounded up");
+            Assert.That(t2.MaxHp, Is.EqualTo(293), "130 x 3 x 0.75 = 292.5, rounded up (life x3)");
+            Assert.That(t2.Atk, Is.EqualTo(15f * 1.0f * EnemyCatalog.SoloAtk).Within(1e-4f), "attack x1.0 (was x2.3: a x3.5 step from tier 1, retuned 2026-10-30), then the solo x0.6");
             Assert.That(t2.DefStat, Is.EqualTo(15f * 3.3f).Within(1e-4f), "defence x3.3");
         }
 
         [Test]
-        public void Tier1Attack_IsThirtyFivePercentDown_AndTier2IsTheTableValue()
+        public void Tier1Attack_IsHalfTheTable_AndTier2IsTheTableValue_BothTimesTheSoloAssistForOnePlayer()
         {
-            Assert.That(EnemyCatalog.Tier1Atk, Is.EqualTo(0.65f));
+            Assert.That(EnemyCatalog.Tier1Atk, Is.EqualTo(0.5f), "was 0.65 until the Run 5 balance (2026-11-15)");
             foreach (EnemyDefinition def in EnemyCatalog.All)
             {
-                Assert.That(new EnemyModel(def, 1, 1).Atk, Is.EqualTo(def.Atk * 0.65f).Within(1e-4f), def.Name + " tier 1");
-                Assert.That(new EnemyModel(def, 2, 1).Atk, Is.EqualTo(def.Atk * 1.0f).Within(1e-4f), def.Name + " tier 2 is the 6.6 table value");
+                Assert.That(new EnemyModel(def, 1, 1).Atk, Is.EqualTo(def.Atk * EnemyCatalog.Tier1Atk * EnemyCatalog.SoloAtk).Within(1e-4f), def.Name + " tier 1");
+                Assert.That(new EnemyModel(def, 2, 1).Atk, Is.EqualTo(def.Atk * 1.0f * EnemyCatalog.SoloAtk).Within(1e-4f), def.Name + " tier 2 is the 6.6 table value");
+                Assert.That(new EnemyModel(def, 1, 2).Atk, Is.EqualTo(def.Atk * EnemyCatalog.Tier1Atk).Within(1e-4f), def.Name + " tier 1, two players: no solo assist");
             }
-            Assert.That(new EnemyModel(EnemyCatalog.Slime, 1, 1).AttackDamage(AttackCatalog.SlimeHop, PlayerVitals.BaseDef), Is.EqualTo(8), "a slime hop: 12 x 0.65 x 1.0 x 100/110 = 7.09 -> 8 (was 11)");
+            Assert.That(new EnemyModel(EnemyCatalog.Slime, 1, 1).AttackDamage(AttackCatalog.SlimeHop, PlayerVitals.BaseDef), Is.EqualTo(4), "a solo slime hop: 12 x 0.5 x 0.6 x 1.0 x 100/110 = 3.27 -> 4 (was 8)");
         }
 
         [Test]
         public void StatsTable_MatchesSection66()
         {
             // Life roughly doubled for small enemies (combat depth, "fewer, tougher enemies"); the 6.6 table was 40 / 90 / 60 / 600.
-            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 80, 180, 160, 600 }));
+            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 80, 180, 130, 2000 }));   // Run 5 balance 2026-11-15: rat-king stays 180, broom 160 -> 130, Warden 600 -> 2000
             Assert.That(new[] { EnemyCatalog.Slime.Atk, EnemyCatalog.RatKing.Atk, EnemyCatalog.Broom.Atk, EnemyCatalog.DoughWarden.Atk }, Is.EqualTo(new[] { 12f, 18f, 15f, 30f }));
             Assert.That(new[] { EnemyCatalog.Slime.Def, EnemyCatalog.RatKing.Def, EnemyCatalog.Broom.Def, EnemyCatalog.DoughWarden.Def }, Is.EqualTo(new[] { 5f, 10f, 15f, 20f }));
         }
@@ -55,7 +57,7 @@ namespace SleepingCalamity.Tests.EditMode
             var e = new EnemyModel(EnemyCatalog.Slime);
             EnemyHitResult r = e.ApplyHit(Hit(Axe(AttackSet.Hit1)));
             Assert.That(r.Damage, Is.EqualTo(21), "22 x 100/105 = 20.95");
-            Assert.That(e.Hp, Is.EqualTo(59));
+            Assert.That(e.Hp, Is.EqualTo(39), "a solo slime has 80 x 0.75 = 60 life, 60 - 21");
             Assert.That(r.Staggered, Is.True, "axe poise 2 fills the slime's threshold of 2");
             Assert.That(r.Knockback, Is.GreaterThan(0f));
             Assert.That(r.Killed, Is.False);
@@ -65,10 +67,10 @@ namespace SleepingCalamity.Tests.EditMode
         public void Overkill_ClampsDamageToTheLifeLeft_AndKills()
         {
             var e = new EnemyModel(EnemyCatalog.Slime);
-            e.ApplyHit(Hit(Axe(AttackSet.Hit1), atk: 60f));   // 60 x 100/105 = 57.1 -> 58, 22 left
+            e.ApplyHit(Hit(Axe(AttackSet.Hit1), atk: 60f));   // 60 x 100/105 = 57.1 -> 58, 2 left of the solo slime's 60
             EnemyHitResult r = e.ApplyHit(Hit(Axe(AttackSet.Hit2), atk: 60f));
             Assert.That(r.Killed, Is.True);
-            Assert.That(r.Damage, Is.EqualTo(22));
+            Assert.That(r.Damage, Is.EqualTo(2));
             Assert.That(e.Alive, Is.False);
             Assert.That(e.ApplyHit(Hit(Axe(AttackSet.Hit1))).Damage, Is.EqualTo(0), "a dead enemy takes nothing");
         }
@@ -115,8 +117,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var solo = new EnemyModel(EnemyCatalog.DoughWarden, 1, 1);
             var duo = new EnemyModel(EnemyCatalog.DoughWarden, 1, 2);
-            Assert.That(solo.MaxHp, Is.EqualTo(600));
-            Assert.That(duo.MaxHp, Is.EqualTo(1020), "600 x 1.7");
+            Assert.That(solo.MaxHp, Is.EqualTo(1500), "2000 x 0.75 (Run 5 balance 2026-11-15)");
+            Assert.That(duo.MaxHp, Is.EqualTo(3000), "2000 x 1.5");
             EnemyHitResult r = solo.ApplyHit(Hit(Axe(AttackSet.Finisher), prior: 2));
             Assert.That(r.Staggered, Is.False, "super armour");
             Assert.That(r.Knockback, Is.EqualTo(0f));
@@ -177,8 +179,8 @@ namespace SleepingCalamity.Tests.EditMode
             for (int i = 0; i < 7; i++) e.Rage.OnHit();
             e.Rage.Tick(1f);
             int raging = e.AttackDamage(AttackCatalog.RatLunge, PlayerVitals.BaseDef);
-            Assert.That(calm, Is.EqualTo(12), "tier 1 attack is x0.65 (readability pass): 18 x 0.65 = 11.7; 11.7 x 1.1 x 100/110 = 11.7 -> 12 (was 18)");
-            Assert.That(raging, Is.EqualTo(16), "x1.3 = 15.21 -> 16 (was 24)");
+            Assert.That(calm, Is.EqualTo(5), "solo tier 1 attack is x0.5 x 0.6 (Run 5 balance 2026-11-15): 18 x 0.3 = 5.4; 5.4 x 0.85 x 100/110 = 4.17 -> 5 (was 12)");
+            Assert.That(raging, Is.EqualTo(6), "x1.3 = 5.43 -> 6 (was 16)");
         }
 
         // ---- rewards ----
