@@ -9,7 +9,6 @@
 // Trial only: not wired into ProjectBuilder.RunAll (the user picks a hair route from the A/B first).
 using System.Linq;
 using System.Text;
-using AetherStrand;
 using AetherStrand.Editor;
 using SleepingCalamity.Presentation;
 using UnityEditor;
@@ -116,7 +115,7 @@ namespace SleepingCalamity.EditorTools
             phys.drawGizmos = false;
             EditorUtility.SetDirty(phys);
             var headBounds = tobinT.GetComponentsInChildren<SkinnedMeshRenderer>(true).Where(r => r.name.Contains("Head")).Select(r => r.bounds).FirstOrDefault();
-            log.AppendLine("aether roots " + phys.hairRootBones.Count + " chains(rebuilt) " + phys.ChainCount + " head " + realHead.name + " lossyScale " + realHead.lossyScale.ToString("F3")
+            log.AppendLine("aether roots " + phys.hairRootBones.Count + " chains(rebuilt) " + phys.ComputeAudit().totalChains + " head " + realHead.name + " lossyScale " + realHead.lossyScale.ToString("F3")
                 + " up " + realHead.up.ToString("F2") + " fwd " + realHead.forward.ToString("F2") + " headMeshBounds c " + headBounds.center.ToString("F3") + " ext " + headBounds.extents.ToString("F3"));
             foreach (var c in phys.colliders)
                 log.AppendLine("  col " + c.name + " " + c.shape + " centreWS " + c.transform.TransformPoint(c.centerOffset).ToString("F3") + " r " + (c.radius * c.transform.lossyScale.x).ToString("F3") + " h " + c.capsuleHeight.ToString("F3"));

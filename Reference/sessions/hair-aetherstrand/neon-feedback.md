@@ -45,3 +45,18 @@ The plugin is used as shipped. Where we had to work around something, it is said
 18. The rig is always built at the world origin (`Head` bone at 0,0,0), and the lock coordinates assume a head whose bone sits at the origin with +Y forward. A head anywhere else needs the caller to move everything. Use the active head's position, or an explicit head origin.
 19. A cluster's bones follow the averaged spine of its member locks. Locks far from that average are skinned to bones several centimetres away, so they swing around a distant pivot.
 20. The export operator sets neither `path_mode='STRIP'` nor axes. We export with our own call (`axis_forward='-Z', axis_up='Y', FBX_SCALE_ALL`, linear colours, STRIP).
+
+## v3.0.0 intake (2026-11-22): status of the items above
+Fixed in v3 (verified by reading the code):
+- 0: `AS_ShiftTangent`. 1: asmdefs shipped. 2: texture metas shipped (linear, Repeat, Normal as a normal map).
+- 4: `GetComponent` plus an explicit null check. 5: the bone prefix uses `Ordinal`. 6: colliders are computed in world space and converted per bone. `colliderCount` is in the audit.
+- 7: textures load by package path first. 9: fallback wind defaults to 0. 12-14: `_CLUSTER_LIGHT_LOOP`, light layers, additional-light shadows, soft-shadow quality variants and punctual shadow casting.
+- 15/16: the root ring is pinned to Head, with blended weights along the lock. 17: lock rings follow the preset points (12 rings) and are no longer tied to the bone count. 20: the export operator sets STRIP and the axes.
+
+Still open:
+- 3/kink: `maxKinkAngleDeg` is still the absolute angle between segments. A curved groom fails it at rest; see the v3 audit numbers below.
+- 8: the `headMeshWorldBounds` path uses `SkinnedMeshRenderer.bounds`-sized input. On Tobin, in the editor, those bounds are 0.28 m wide (inflated), which gives cranium r = 0.84 × min extent = 0.118 m again. We pass `headHeightOverride` 0.23 m instead. Suggest computing the bounds from the mesh vertices (`sharedMesh.bounds` transformed), or document that callers must pass tight bounds.
+- 10: the zone fallback still uses head-local metre thresholds (`DetectZone`). Names cover it.
+- 18: the rig is still built at the origin. The shipped `PresetGeometry.json` is in viewport units (roots span about 0.54 units ear to ear; Tobin's scalp is about 0.17 m). To use it on a real character, the caller has to scale, turn and place it. We fit it per axis from the root clouds (x 0.317, y 0.433, z 0.375): the preset's skull is narrower and deeper than Tobin's, so a uniform scale left the sides jutting out. The roots then needed a median 17 mm (p90 40 mm) snap onto Tobin's scalp. Suggest: export in metres with a head-origin convention, or ship the scalp the locks were authored on, so a fit can be checked.
+- 19: k-means still averages member spines per cluster. Check folded chains after the v3 audit.
+- Shipped `ExportedLook.json` colours are neutral dark grey (#090a0c / #25272b / #4c5057), not the chestnut in the shared preview image. For the A/B we kept the shipped shader and physics values and set Tobin's chestnut root/base/tip colours.
