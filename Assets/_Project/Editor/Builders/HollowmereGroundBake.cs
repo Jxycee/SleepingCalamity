@@ -20,8 +20,20 @@ namespace SleepingCalamity.EditorTools
             Terrain terrain = set.GetComponentInChildren<Terrain>(true);
             var streets = new System.Collections.Generic.List<Collider>();
             Transform sq = set.Find("SquarePaving");
-            if (sq != null) { Collider c = sq.GetComponent<Collider>(); if (c != null) streets.Add(c); }
-            SCGroundBaker.Result r = SCGroundBaker.Compute(terrain, streets, Min, Size, Resolution);
+            BoxCollider temp = null;
+            if (sq != null)
+            {
+                Collider c = sq.GetComponent<Collider>();
+                if (c == null && sq.GetComponent<MeshFilter>() is MeshFilter mf && mf.sharedMesh != null)
+                {
+                    // the paving slab has no collider (LookTestBuilder.Box strips it): a temporary box of its mesh bounds lets the baker raycast it, then it goes again
+                    temp = sq.gameObject.AddComponent<BoxCollider>(); temp.center = mf.sharedMesh.bounds.center; temp.size = mf.sharedMesh.bounds.size; c = temp;
+                }
+                if (c != null) streets.Add(c);
+            }
+            SCGroundBaker.Result r;
+            try { r = SCGroundBaker.Compute(terrain, streets, Min, Size, Resolution); }
+            finally { if (temp != null) Object.DestroyImmediate(temp); }
             SCGroundBaker.Write(r, HeightPath, AlbedoPath, out TextAsset height, out TextAsset albedo);
             var binder = root.gameObject.GetComponent<SCGroundBlendBinder>() ?? root.gameObject.AddComponent<SCGroundBlendBinder>();
             binder.HeightBytes = height; binder.AlbedoBytes = albedo; binder.Resolution = r.Resolution;
