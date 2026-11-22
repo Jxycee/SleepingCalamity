@@ -3,6 +3,12 @@
 What we found while bringing the plugin into Sleeping Calamity (Unity 6000.6.5f1, URP 17.6, PC renderer = Forward+). The coordinator relays this.
 The plugin is used as shipped. Where we had to work around something, it is said below, and the workaround lives in our code, not in the package.
 
+## Blocker (found in the Unity capture run)
+0. **The shader does not compile on URP 17.6:** `Shader error in 'AetherStrand/SculptedHair_URP': redefinition of 'ShiftTangent' at Packages/com.aetherstrand.sculptedhair/Shaders/AetherStrand_Hair.shader(159) (on dx11)`. URP's included shader library already defines `ShiftTangent`, so the hair renders magenta. Rename it (e.g. `AS_ShiftTangent`), and keep every helper in an `AS_` namespace prefix. The compile-only gate did not catch this: it showed up only when the shader compiled for a graphics device.
+
+## Audit numbers with the shipped defaults (Tobin, MetaPerson head, 44 chains)
+- With AutoSetupPhysics' own head-height estimate (H clamped to 0.28 m, so the cranium sphere has r 0.118 m): `chains 44 penetrating 0 kink 150.3 deg stretch 242.05 % tipSway 10.40 cm` after 90 frames. Head-turn snap: `kink 140.4 stretch 242.32 % tipSway 15.96 cm`. The oversized colliders push the scalp-hugging nodes out, and the root node is not projected, so segment 1 stretches. That is the heuristic in item 8.
+
 ## Packaging
 1. No `.asmdef` files. We added `AetherStrand.Runtime` and an editor-only `AetherStrand.Editor`. Please ship them.
 2. The texture import settings are not in the package (no `.meta` files): GrooveAO, FlowIDShift and AlphaCard need linear + Repeat, Normal needs to be a normal map. We set them with an AssetPostprocessor. Ship `.meta` files with these settings.

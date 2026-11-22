@@ -97,7 +97,12 @@ namespace SleepingCalamity.Tests.PlayMode
                 {
                     float rest = (r[i] - r[i - 1]).magnitude, cur = (b[i].position - b[i - 1].position).magnitude;
                     if (rest > 0.001f) m.stretch = Mathf.Max(m.stretch, Mathf.Abs(cur - rest) / rest * 100f);
-                    if (i < b.Length - 1) m.kink = Mathf.Max(m.kink, Vector3.Angle(b[i].position - b[i - 1].position, b[i + 1].position - b[i].position));
+                    if (i < b.Length - 1)
+                    {   // bend change from rest at joint i (absolute angles include the groom's own curvature and bone-0 pivots)
+                        float now = Vector3.Angle(b[i].position - b[i - 1].position, b[i + 1].position - b[i].position);
+                        float was = Vector3.Angle(r[i] - r[i - 1], r[i + 1] - r[i]);
+                        m.kink = Mathf.Max(m.kink, Mathf.Abs(now - was));
+                    }
                 }
                 float d = (b[^1].position - head.TransformPoint(r[^1])).magnitude * 100f; sway += d; m.tipMax = Mathf.Max(m.tipMax, d);
             }
@@ -105,7 +110,7 @@ namespace SleepingCalamity.Tests.PlayMode
             return m;
         }
 
-        static string Fmt(BoneMetrics m) => $"chains {m.chains} kink {m.kink:F1} deg stretch {m.stretch:F2} % tipSway {m.tipSway:F2} cm (max {m.tipMax:F2})";
+        static string Fmt(BoneMetrics m) => $"chains {m.chains} bendChange {m.kink:F1} deg stretch {m.stretch:F2} % tipSway {m.tipSway:F2} cm (max {m.tipMax:F2})";
 
         [TestCase("hairdeck")]
         [TestCase("aether")]

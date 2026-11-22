@@ -25,6 +25,7 @@ namespace SleepingCalamity.EditorTools
         public const string HairDeckPrefab = Folder + "/Tobin_HairDeck.prefab";
         public const string AetherPrefab = Folder + "/Tobin_AetherStrand.prefab";
         public const string AetherBonePrefix = "Hair_";
+        public const float HeadHeight = 0.23f;   // chin to crown, metres (AutoSetupPhysics headHeightOverride)
         const string TexFolder = "Packages/com.aetherstrand.sculptedhair/Textures/";
 
         public static void Run() { Debug.Log("SC HAIRAB\n" + BuildAll()); }
@@ -117,7 +118,9 @@ namespace SleepingCalamity.EditorTools
                 if (c.GetComponent<AetherStrandCollider>() == null) c.gameObject.AddComponent<AetherStrandCollider>();
             }
 
-            var phys = AetherStrandSetupWindow.AutoSetupPhysics(root, AetherBonePrefix, AetherPresetPath, 0f, hairSmr);
+            // Head height H scales the 6 colliders. The plugin's neck-to-head heuristic clamps to 0.28 m on MetaPerson (cranium r 0.118 m, which swallows
+            // the scalp-hugging lock nodes: stretch 242 %, kink 150 deg in the audit), so pass the plugin's documented MetaPerson value.
+            var phys = AetherStrandSetupWindow.AutoSetupPhysics(root, AetherBonePrefix, AetherPresetPath, HeadHeight, hairSmr);
             if (phys == null) throw new System.InvalidOperationException("AutoSetupPhysics returned null");
             int expected = realHead.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal) && !t.parent.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal));
             if (phys.hairRootBones.Any(t => !t.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal))) throw new System.InvalidOperationException("AetherStrand bound a bone outside Hair_");
