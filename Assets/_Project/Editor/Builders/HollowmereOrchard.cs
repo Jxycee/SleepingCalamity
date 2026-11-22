@@ -180,6 +180,20 @@ namespace SleepingCalamity.EditorTools
 
         static float Gy(Vector2 p) { HollowmereStreets.Surface(p.x, p.y, out float y, out _); return y; }
 
+        // Ground-blend step: SCPlacementGrounding on every direct child of `group` whose name starts with one of `prefixes` (hierarchy order, so two builds agree). Pieces that find no support stay put.
+        static void GroundChildren(Transform group, string[] prefixes, float sink, int minHits)
+        {
+            int ok = 0, skipped = 0;
+            foreach (Transform c in group)
+            {
+                bool match = false;
+                foreach (string p in prefixes) if (c.name.StartsWith(p, System.StringComparison.Ordinal)) { match = true; break; }
+                if (!match) continue;
+                if (SCPlacementGrounding.TryGroundAndSink(c, null, sink, 55f, false, minHits)) ok++; else skipped++;
+            }
+            Count("groundSunk", ok); Count("groundSkipped", skipped);
+        }
+
         // A prefab scaled so its largest dimension is `maxDim`, turned (Euler: Z, then X, then yaw), centred on xz and standing on y (sunk by `sinkM`); colliders stripped, a box when solid.
         static GameObject Put(Transform parent, string code, string name, Vector2 xz, float y, float maxDim, float yaw, float tx, float tz, float sinkM, bool solid = false)
         {
@@ -758,6 +772,8 @@ namespace SleepingCalamity.EditorTools
             for (int k = 0; k < 16; k++) { Vector2 q = new Vector2(36.8f + k * 0.34f + (H(k, 51, 970) - 0.5f) * 0.3f, -58.9f + (H(k, 52, 970) - 0.5f) * 1.2f); Weed(flora, q, 970, k, 0.9f, 1.5f); }
             for (int k = 0; k < 5; k++) { Vector2 q = new Vector2(37.6f + k * 0.95f, -58.6f + (H(k, 53, 970) - 0.5f) * 0.8f); Put(g, "T12b", "GapFernW_" + k, q, Gy(q), 0.85f, H(k, 54, 970) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 6; k++) { Vector2 q = new Vector2(37.4f + k * 0.8f, -58.4f + (H(k, 55, 970) - 0.5f) * 0.9f); Put(g, k % 2 == 0 ? "T05c" : "T19k", "GapStoneW_" + k, q, Gy(q), 0.45f + 0.35f * H(k, 56, 970), H(k, 57, 970) * 360f, (H(k, 58, 970) - 0.5f) * 12f, (H(k, 59, 970) - 0.5f) * 12f, 0.06f); made++; }
+            // ground-blend step: the breach rubble sits IN the ground (five-point footprint on the terrain, sunk 20% of its height); a piece with no support is left as Put placed it
+            GroundChildren(g, new[] { "GapRubble_", "GapHeap_", "GapFore_", "GapStep_", "GapEast_" }, 0.20f, 3);
             Count("gapRubble", made);
             for (int k = 0; k < 10; k++) { Vector2 q = c + t * (k * 0.95f - 3.3f) - n * (1.0f + 2.0f * H(k, 4, 965)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.65f + 0.35f * H(k, 1, 965), H(k, 2, 965) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 26; k++) { Vector2 q = c + t * (k * 0.42f - 3.5f) - n * Mathf.Lerp(0.2f, 3.6f, H(k, 2, 966)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 966, k, 0.9f, 1.6f); }

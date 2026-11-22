@@ -74,6 +74,8 @@ namespace SleepingCalamity.EditorTools
                 for (int j = 0; j < 4; j++) { Vector2 r = q + along * ((j - 1.5f) * 0.9f) + Perp(along) * (H(k, 82 + j, 2100) < 0.5f ? 0.7f : -0.7f); if (OkBank(r, 0.05f)) Weed(flora, r, 2110 + k, j, 0.8f, 1.4f); }
                 k++;
             }
+            // ground-blend step: the foreground slabs (Eye_Orchard's left edge) stood one corner on the slope and floated on the other: five-point footprint on the terrain, sunk 20%, no tilt
+            GroundChildren(g, new[] { "Broken_" }, 0.20f, 3);
         }
 
         // OrchardGap: the foreground in front of the camera (41.9, -52, bearing 38 deg) was a dark mat of clumps. Take out the tall clumps nearest the lens, keep a ground patch of light, add a shadowless fill and readable rubble.
