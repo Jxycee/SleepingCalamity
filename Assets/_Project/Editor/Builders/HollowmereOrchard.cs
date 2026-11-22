@@ -128,9 +128,10 @@ namespace SleepingCalamity.EditorTools
             Nooks(props, flora, dec);
             Path(flora, dec);
             WallFeet(props, flora, dec);
-            WallGap(props, flora, dec);
+            WallGap(ruined, props, flora, dec);
             FillLight(g);
-            EyeClear(ruined);
+            EyeClear(ruined, props, flora);
+            PathFeather(props, flora);
             Allotments(Sub(ruined, "Allotments"));
             SolidPier(ruined, "R2_22");
             var lights = Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None).Count(l => l.type != LightType.Directional);
@@ -708,64 +709,19 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ------------------------------------------------------------------------------------------------ the wall gap: rubble spill 1-2 m out on both sides, ferns and grass at its edges
-        static void WallGap(Transform props, Transform flora, Transform dec)
+        static void WallGap(Transform ruined, Transform props, Transform flora, Transform dec)
         {
             Transform g = Sub(props, "WallGap");
             Vector2 c = new Vector2(44.2f, -57.4f), n = new Vector2(0.51f, -0.86f), t = new Vector2(0.86f, 0.51f);   // 40-42: breach at (43.4,-58.6), crumbled at (46.7,-56.4) and (49.7,-53.9)
             // T07b: the wall fell years ago. The breach's own modules give the courses; the spill is real scanned rubble (T05b/T05c/N03/T11a) stepping down from the wall foot in a
             // heap that buries the module's base, with grass, ferns and moss through it. Larger pieces near the wall, smaller and sparser out into the grass.
-            string[] kinds = { "T05b", "N03", "T05c", "T19k", "T05b", "N03", "T19g" };   // T07c: no T11a here (its albedo averages 53/44/26: black under the crowns), the church-ruin wall kit stones instead
             int made = 0;
-            for (int k = 0; k < 26; k++)
-            {
-                float along = (H(k, 1, 961) - 0.25f) * 9f - 2.8f;                 // about -3.5 .. 5.5 m along the gap
-                float depth = Mathf.Pow(H(k, 2, 962), 1.3f) * 3.6f + 0.1f;       // 0.1 .. 3.7 m out from the wall foot (into the orchard), crowded near the wall
-                Vector2 q = c + t * along - n * depth;
-                float size = Mathf.Lerp(1.9f, 0.55f, depth / 3.8f) * Mathf.Lerp(0.8f, 1.15f, H(k, 3, 963));
-                string kind = kinds[k % kinds.Length];
-                if (!Ok(q, 0.2f, false, false)) continue;
-                float y = Gy(q);
-                Put(g, kind, "GapRubble_" + k, q, y, size, H(k, 8, 963) * 360f, (H(k, 9, 963) - 0.5f) * 30f, (H(k, 10, 963) - 0.5f) * 30f, size * 0.3f);
-                made++;
-            }
-            // the heap that buries the floating module's base: big pieces on the wall line, sunk half in
-            for (int k = 0; k < 9; k++)
-            {
-                Vector2 q = c + t * (k * 0.5f - 0.6f) - n * (0.2f + 1.1f * H(k, 11, 968));
-                if (!Ok(q, 0.2f, false, false)) continue;
-                float size = Mathf.Lerp(1.5f, 2.5f, H(k, 12, 968));
-                Put(g, k % 3 == 0 ? "T19l" : k % 3 == 1 ? "N03" : "T05b", "GapHeap_" + k, q, Gy(q), size, H(k, 13, 968) * 360f, (H(k, 14, 968) - 0.5f) * 24f, (H(k, 15, 968) - 0.5f) * 24f, size * 0.38f);
-                made++;
-            }
+            made += BreachDressing(ruined, g, flora, dec, c, n, t);   // Pass A: scanned heap with a low route, replaces GapRubble/GapHeap
             // the ground east of the breach (the bare cracked plane): rubble, ferns, tufts, litter
             for (int k = 0; k < 7; k++) { Vector2 q = c + t * (3.2f + 0.7f * k) - n * (0.6f + 2.2f * H(k, 16, 969)); if (Ok(q, 0.2f, false, false)) { Put(g, k % 2 == 0 ? "T05c" : "T19k", "GapEast_" + k, q, Gy(q), Mathf.Lerp(0.5f, 1.2f, H(k, 17, 969)), H(k, 18, 969) * 360f, (H(k, 19, 969) - 0.5f) * 20f, (H(k, 20, 969) - 0.5f) * 20f, 0.15f); made++; } }
             for (int k = 0; k < 12; k++) { Vector2 q = c + t * (2.6f + 0.45f * k) - n * (0.5f + 2.6f * H(k, 21, 969)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 969, k, 0.9f, 1.6f); }
             for (int k = 0; k < 4; k++) { Vector2 q = c + t * (3.5f + 1.1f * k) - n * (1.0f + 1.5f * H(k, 22, 969)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFernE_" + k, q, Gy(q), 0.75f, H(k, 23, 969) * 360f, 0f, 0f, 0.03f); }
             Decal(dec, "LeavesB", c + t * 4.2f - n * 1.6f, 3.2f, 3.2f, 30f, "GapLitterE"); Decal(dec, "MossSoft", c + t * 3.4f - n * 0.9f, 2.6f, 2.6f, 80f, "GapMossE"); Decal(dec, "Damp", c + t * 5.0f - n * 1.3f, 3.0f, 2.0f, 20f, "GapDampE");
-            // in front of the floating box of the breach module (seen from Eye_OrchardGap at (41.9,-52.0) bearing 38 deg): two rows of big pieces 3.3-4.9 m out from the camera
-            for (int k = 0; k < 8; k++)
-            {
-                float d = 3.3f + 0.35f * (k % 4) + 0.4f * (k / 4), lat = (k % 4) * 0.75f - 0.9f;
-                Vector2 q = new Vector2(41.9f + 0.616f * d, -52.0f - 0.788f * d) + t * lat;
-                if (!Ok(q, 0.2f, false, false)) continue;
-                float size = Mathf.Lerp(0.9f, 1.7f, H(k, 31, 968));   // T07c: smaller and lighter (was 1.6-2.4 m of T11a)
-                Put(g, k % 3 == 0 ? "N03" : k % 3 == 1 ? "T19k" : "T05b", "GapFore_" + k, q, Gy(q), size, H(k, 32, 968) * 360f, (H(k, 33, 968) - 0.5f) * 20f, (H(k, 34, 968) - 0.5f) * 20f, size * 0.25f);
-                if (Ok(q + t * 0.9f, 0.2f, false, false)) Put(g, "T12b", "GapForeFern_" + k, q + t * 0.9f, Gy(q), 0.8f, H(k, 35, 968) * 360f, 0f, 0f, 0.03f);
-                made++;
-            }
-            // T07c: a dry-stone spill stepping down from the broken courses toward the camera: church-wall skirt, top and block stones in tiers that fall with distance, lying a little off level
-            string[] steps = { "T19g", "T19k", "T19h", "T19k", "T19i", "T19g", "T19j" };
-            for (int tier = 0; tier < 4; tier++)
-                for (int k = 0; k < 5; k++)
-                {
-                    int key = tier * 7 + k;
-                    Vector2 q = c + t * ((k - 1.6f) * 1.35f + (H(key, 41, 970) - 0.5f) * 0.7f) - n * (0.55f + 0.95f * tier + (H(key, 42, 970) - 0.5f) * 0.4f);
-                    if (!Ok(q, 0.2f, false, false)) continue;
-                    string sk = steps[key % steps.Length];
-                    float size = Mathf.Lerp(1.7f, 0.9f, tier / 3f) * Mathf.Lerp(0.8f, 1.15f, H(key, 43, 970)) * (sk == "T19i" || sk == "T19j" ? 0.42f : 1f);
-                    Put(g, sk, "GapStep_" + tier + "_" + k, q, Gy(q), size, YawAlong(t) + (H(key, 44, 970) - 0.5f) * 50f, (H(key, 45, 970) - 0.5f) * 14f, (H(key, 46, 970) - 0.5f) * 14f, 0.06f + 0.05f * tier);
-                    made++;
-                }
             // T07c: the flagged ledge of the breach module west of the gap (the right of the frame) stood bare: moss, litter and damp over it, small stones, ferns and tufts through it
             Decal(dec, "MossSoft", new Vector2(40.2f, -58.7f), 3.4f, 3.0f, 20f, "GapMossW"); Decal(dec, "LeavesB", new Vector2(39.0f, -58.6f), 3.4f, 3.0f, 110f, "GapLitterW");
             Decal(dec, "Damp", new Vector2(41.2f, -58.6f), 3.0f, 2.0f, 60f, "GapDampW"); Decal(dec, "LeavesA", new Vector2(38.2f, -59.2f), 3.0f, 3.0f, 200f, "GapLitterW2"); Decal(dec, "Moss", new Vector2(37.6f, -58.0f), 2.6f, 2.6f, 75f, "GapMossW2");
@@ -773,7 +729,7 @@ namespace SleepingCalamity.EditorTools
             for (int k = 0; k < 5; k++) { Vector2 q = new Vector2(37.6f + k * 0.95f, -58.6f + (H(k, 53, 970) - 0.5f) * 0.8f); Put(g, "T12b", "GapFernW_" + k, q, Gy(q), 0.85f, H(k, 54, 970) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 6; k++) { Vector2 q = new Vector2(37.4f + k * 0.8f, -58.4f + (H(k, 55, 970) - 0.5f) * 0.9f); Put(g, k % 2 == 0 ? "T05c" : "T19k", "GapStoneW_" + k, q, Gy(q), 0.45f + 0.35f * H(k, 56, 970), H(k, 57, 970) * 360f, (H(k, 58, 970) - 0.5f) * 12f, (H(k, 59, 970) - 0.5f) * 12f, 0.06f); made++; }
             // ground-blend step: the breach rubble sits IN the ground (five-point footprint on the terrain, sunk 20% of its height); a piece with no support is left as Put placed it
-            GroundChildren(g, new[] { "GapRubble_", "GapHeap_", "GapFore_", "GapStep_", "GapEast_" }, 0.20f, 3);
+            GroundChildren(g, new[] { "GapRubble_", "GapEast_", "GapStoneW_" }, 0.20f, 3);
             Count("gapRubble", made);
             for (int k = 0; k < 10; k++) { Vector2 q = c + t * (k * 0.95f - 3.3f) - n * (1.0f + 2.0f * H(k, 4, 965)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.65f + 0.35f * H(k, 1, 965), H(k, 2, 965) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 26; k++) { Vector2 q = c + t * (k * 0.42f - 3.5f) - n * Mathf.Lerp(0.2f, 3.6f, H(k, 2, 966)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 966, k, 0.9f, 1.6f); }
@@ -792,23 +748,67 @@ namespace SleepingCalamity.EditorTools
 
         // The lane clutter's broken handcart stood 4.9 m in front of Eye_Orchard on the harvest cluster's bearing (a 1.1 m prop hides ground 5-16 m behind it from a 1.65 m eye).
         // It moves to the nook at the frame's right edge, still lying in the grass, half cut by the frame.
-        static void EyeClear(Transform ruined)
+        static void EyeClear(Transform ruined, Transform props, Transform flora)
         {
             Transform cart = FindByName(ruined, "Clutter_Clutter_Ru_Wreck1_Handcart");
             if (cart == null) { Count("cartMissing"); return; }
-            foreach (Vector2 to in new[] { new Vector2(33.3f, -48.7f), new Vector2(33.0f, -49.3f), new Vector2(33.8f, -48.2f), new Vector2(33.4f, -49.8f) })
+            // Pass A: the procedural handcart (blocky planks) goes. Scanned wood stands in its place off the lens axis at the frame's right edge: barrel, crates, sack, a log and a plank, with ferns and plants.
+            Object.DestroyImmediate(cart.gameObject);
+            Physics.SyncTransforms();
+            Transform g = Sub(props, "EyeCluster");
+            Vector2 anchor = new Vector2(33.5f, -49.2f);
+            foreach (Vector2 to in new[] { new Vector2(33.5f, -49.2f), new Vector2(33.3f, -49.8f), new Vector2(33.9f, -48.6f), new Vector2(33.7f, -50.4f) })
+                if (Ok(to, 0.2f, false, false)) { anchor = to; break; }
+            string[] codes = { "T20t", "T27l", "T20r", "T17b", "T06a" };
+            float[] sizes = { 0.95f, 0.6f, 1.5f, 0.55f, 0.9f };
+            for (int k = 0; k < codes.Length; k++)
             {
-                if (!Ok(to, 0.2f, false, false)) continue;
-                Bounds b = Render(cart.gameObject);
-                cart.position += new Vector3(to.x - b.center.x, 0f, to.y - b.center.z);
-                Physics.SyncTransforms();
-                b = Render(cart.gameObject);
-                cart.position += new Vector3(0f, Gy(to) - 0.05f - b.min.y, 0f);
-                Physics.SyncTransforms();
-                Count("cartMoved");
-                return;
+                Vector2 q = anchor + Dir(H(k, 1, 1401) * 360f) * Mathf.Lerp(0.35f, 1.5f, H(k, 2, 1401));
+                if (!Ok(q, 0.2f, false, false)) continue;
+                bool lying = codes[k] == "T20r";
+                Put(g, codes[k], "EyeCluster_" + k, q, Gy(q), sizes[k], H(k, 3, 1401) * 360f, lying ? (H(k, 4, 1401) - 0.5f) * 8f : (H(k, 4, 1401) - 0.5f) * 14f, (H(k, 5, 1401) - 0.5f) * 10f, sizes[k] * 0.1f, false);
             }
-            Count("cartNotMoved");
+            for (int k = 0; k < 6; k++)
+            {
+                Vector2 q = anchor + Dir(H(k, 6, 1401) * 360f) * Mathf.Lerp(0.5f, 1.9f, H(k, 7, 1401));
+                if (!Ok(q, 0.05f, false, false)) continue;
+                Put(g, k % 2 == 0 ? "T12b" : "T21m", "EyeClusterPlant_" + k, q, Gy(q), Mathf.Lerp(0.5f, 0.9f, H(k, 8, 1401)), H(k, 9, 1401) * 360f, 0f, 0f, 0.04f);
+            }
+            GroundChildren(g, new[] { "EyeCluster_" }, 0.18f, 3);
+            Count("cartReplaced");
+        }
+
+        // Pass A: the grass-to-path edge was a razor line (OnPath). A band either side of the ragged edge gets scanned small plants, stones and sprawling leaf plants so the transition reads as worn earth
+        // working into the lawn. Weeds first on the path side, plants and stones on the grass side; never on the cleared strip itself.
+        static void PathFeather(Transform props, Transform flora)
+        {
+            Transform g = Sub(props, "PathFeather");
+            string[] plants = { "T21e", "T21g", "T21i", "T19u", "T19w", "T21k", "T21m", "T12b" };
+            string[] stones = { "N03", "T20i", "T05c", "T11b" };
+            int made = 0;
+            for (int i = 1; i < PathLine.Length; i++)
+            {
+                Vector2 a = PathLine[i - 1], b = PathLine[i]; float len = Vector2.Distance(a, b); Vector2 dir = (b - a) / len, nr = Perp(dir);
+                for (float s = 0f; s < len; s += 0.4f)
+                {
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        int key = i * 1000 + (int)(s * 10f) * 2 + (side > 0 ? 1 : 0);
+                        if (H(key, 1, 1411) > 0.62f) continue;
+                        Vector2 pc = a + dir * s;
+                        float hw = Mathf.Lerp(0.5f, 0.95f, Mathf.PerlinNoise(pc.x * 1.9f + 3f, pc.y * 1.9f + 9f));
+                        float off = hw + Mathf.Lerp(-0.3f, 0.65f, H(key, 2, 1411));
+                        Vector2 q = pc + nr * (side * off) + dir * ((H(key, 3, 1411) - 0.5f) * 0.4f);
+                        if (!Ok(q, 0.05f, false, false)) continue;
+                        float r = H(key, 4, 1411);
+                        if (r < 0.2f) Put(g, stones[key % stones.Length], "PathFeather_S" + key, q, Gy(q), Mathf.Lerp(0.12f, 0.3f, H(key, 5, 1411)), H(key, 6, 1411) * 360f, (H(key, 7, 1411) - 0.5f) * 20f, (H(key, 8, 1411) - 0.5f) * 20f, 0.03f);
+                        else Put(g, plants[(int)(H(key, 9, 1411) * plants.Length) % plants.Length], "PathFeather_P" + key, q, Gy(q), Mathf.Lerp(0.22f, 0.5f, H(key, 10, 1411)), H(key, 11, 1411) * 360f, 0f, 0f, 0.02f);
+                        made++;
+                    }
+                }
+            }
+            GroundChildren(g, new[] { "PathFeather_S" }, 0.2f, 1);
+            Count("pathFeather", made);
         }
 
         // R2_22's chimney stack (the pillar of Eye_Allotment): the shell kit's mesh has gaps between its courses and the dressing's loose corbels float over the top, so sky shows

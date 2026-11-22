@@ -204,7 +204,7 @@ namespace SleepingCalamity.EditorTools
                 if (HollowmereAmbientLife.Butterflies)
                 {
                     int sp = seed % Wings.Length;   // T24: peacock, small tortoiseshell, cabbage white, brimstone: a real pinned-specimen photo per flock
-                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Hover = HollowmereAmbientLife.ButterflyHover, HideWithin = 0.5f, Seed = seed++ };
+                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Hover = HollowmereAmbientLife.ButterflyHover, HideWithin = 4.2f, Seed = seed++ };
                     f.Cards = Cards(life, f.Name, _wingMat[sp], pathSpot ? HollowmereAmbientLife.PathButterflies : meadow ? HollowmereAmbientLife.ButterfliesPerFlock + 2 : HollowmereAmbientLife.ButterfliesPerFlock, _wingMesh[sp]);
                     common.Add(f);
                 }
@@ -325,7 +325,7 @@ namespace SleepingCalamity.EditorTools
                 else { m.Clear(); m.vertices = fresh.vertices; m.uv = fresh.uv; m.triangles = fresh.triangles; m.RecalculateBounds(); m.RecalculateNormals(); EditorUtility.SetDirty(m); Object.DestroyImmediate(fresh); }
                 _wingMesh[i] = m;
                 Material mat = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_Wing_" + Wings[i] + ".mat", sh);
-                mat.SetTexture("_MainTex", tex); mat.SetColor("_Tint", Color.white); mat.SetFloat("_Cutoff", 0.5f); mat.SetFloat("_Translucency", Wings[i] == "cabbage" || Wings[i] == "brimstone" ? 1.1f : 0.8f);
+                mat.SetTexture("_MainTex", tex); mat.SetColor("_Tint", new Color(0.62f, 0.6f, 0.56f)); mat.SetFloat("_Cutoff", 0.5f); mat.SetFloat("_Translucency", Wings[i] == "cabbage" || Wings[i] == "brimstone" ? 0.45f : 0.35f);   // Pass A: tinted down so a cabbage white does not read as an unlit white card
                 mat.SetFloat("_FlapSpeed", 22f); mat.SetFloat("_FlapAmp", 0.55f); mat.SetFloat("_Fold", 0f); mat.SetFloat("_Dihedral", 0.18f); mat.SetFloat("_FadeNear", 0.3f); mat.SetFloat("_FadeFar", 0.8f);
                 mat.enableInstancing = false;
                 EditorUtility.SetDirty(mat);

@@ -66,16 +66,26 @@ namespace SleepingCalamity.EditorTools
                 // two or three courses of church-wall stone, stepping down along the old line, with a spill in front on both sides
                 for (int c = 0; c < 3; c++)
                 {
-                    Vector2 q2 = q + along * ((c - 1) * 0.95f);
+                    Vector2 q2 = q + along * ((c - 1) * 0.8f);
                     float h = (c == 1 ? 0.55f : c == 0 ? 0.8f : 0.4f) * Mathf.Lerp(0.8f, 1.2f, H(k, 40 + c, 2100));
-                    Put(g, c == 1 ? "T19k" : "T19l", "Broken_" + k + "_" + c, q2, Gy(q2), c == 1 ? 1.9f : 1.5f, YawAlong(along) + (H(k, 44 + c, 2100) - 0.5f) * 14f, 0f, (H(k, 48 + c, 2100) - 0.5f) * 6f, 0.1f, true);
+                    Put(g, c == 1 ? "T19k" : "T19l", "Broken_" + k + "_" + c, q2, Gy(q2), c == 1 ? 1.25f : 1.0f, YawAlong(along) + (H(k, 44 + c, 2100) - 0.5f) * 14f, 0f, 0f, 0.25f, true);   // Pass A: shorter, level and sunk (the 1.9 m slab cantilevered off the slope)
                 }
                 for (int j = 0; j < 5; j++) { Vector2 r = q + along * (j - 2) * 0.8f + Perp(along) * ((H(k, 60 + j, 2100) - 0.5f) * 2.2f); if (OkBank(r, 0.1f)) Put(g, FootRubble[(j + k) % FootRubble.Length], "BrokenSpill_" + k + "_" + j, r, Gy(r), Mathf.Lerp(0.3f, 0.8f, H(k, 66 + j, 2100)), H(k, 70 + j, 2100) * 360f, (H(k, 74 + j, 2100) - 0.5f) * 20f, (H(k, 78 + j, 2100) - 0.5f) * 20f, 0.06f); }
                 for (int j = 0; j < 4; j++) { Vector2 r = q + along * ((j - 1.5f) * 0.9f) + Perp(along) * (H(k, 82 + j, 2100) < 0.5f ? 0.7f : -0.7f); if (OkBank(r, 0.05f)) Weed(flora, r, 2110 + k, j, 0.8f, 1.4f); }
                 k++;
             }
             // ground-blend step: the foreground slabs (Eye_Orchard's left edge) stood one corner on the slope and floated on the other: five-point footprint on the terrain, sunk 20%, no tilt
-            GroundChildren(g, new[] { "Broken_" }, 0.20f, 3);
+            // Pass A: mossy scanned rocks half buried at the slab ends so the broken stones read as rubble in the grass
+            for (int bk = 0; bk < k; bk++)
+            {
+                Transform first = g.Find("Broken_" + bk + "_1"); if (first == null) continue;
+                for (int j = 0; j < 4; j++)
+                {
+                    Vector2 r = new Vector2(first.position.x, first.position.z) + Dir(H(bk, 90 + j, 2100) * 360f) * Mathf.Lerp(0.7f, 1.3f, H(bk, 94 + j, 2100));
+                    if (OkBank(r, 0.1f)) Put(g, j % 2 == 0 ? "T20c" : "T20b", "BrokenMoss_" + bk + "_" + j, r, Gy(r), Mathf.Lerp(0.35f, 0.75f, H(bk, 98 + j, 2100)), H(bk, 102 + j, 2100) * 360f, (H(bk, 106 + j, 2100) - 0.5f) * 20f, (H(bk, 110 + j, 2100) - 0.5f) * 20f, 0.1f);
+                }
+            }
+            GroundChildren(g, new[] { "Broken_", "BrokenMoss_" }, 0.20f, 3);
         }
 
         // OrchardGap: the foreground in front of the camera (41.9, -52, bearing 38 deg) was a dark mat of clumps. Take out the tall clumps nearest the lens, keep a ground patch of light, add a shadowless fill and readable rubble.
@@ -102,7 +112,7 @@ namespace SleepingCalamity.EditorTools
                 Vector2 q = cam + fwd * (1.8f + 0.45f * k) + Perp(fwd) * ((H(k, 1, 2210) - 0.5f) * (1.4f + 0.5f * k));
                 if (!Ok(q, 0.2f, false, false)) continue;
                 float size = Mathf.Lerp(0.5f, 1.1f, H(k, 2, 2210));
-                Put(g, k % 2 == 0 ? "T19k" : "T19g", "GapPatch_" + k, q, Gy(q), size, H(k, 3, 2210) * 360f, 0f, (H(k, 4, 2210) - 0.5f) * 10f, 0.05f);
+                Put(g, k % 3 == 0 ? "T20c" : k % 3 == 1 ? "N03" : "T05b", "GapPatch_" + k, q, Gy(q), size, H(k, 3, 2210) * 360f, 0f, (H(k, 4, 2210) - 0.5f) * 10f, 0.05f);
             }
             var lg = new GameObject("GapFill"); lg.transform.SetParent(g, false);
             Vector2 lp = cam + fwd * 3.2f;
