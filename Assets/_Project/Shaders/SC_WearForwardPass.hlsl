@@ -262,6 +262,14 @@ Varyings LitPassVertex(Attributes input)
 //   _DetailAlbedoMapScale = strength of the colour variation (0..1, default 1), _DetailNormalMapScale = strength of the second-scale normal (0..1.5),
 //   _SpecColor (set with SetVector, linear, the metallic workflow never reads it) = (stone width in m, moss amount 0..1, foot band height in m (0 = off), foot darkness 0..1).
 // All of it is world-space or second-scale, so the 2 m texture repeat stops being the pattern the eye finds.
+// Ground blend (ground-blend step, Neon's patch merged): the town's baked top-down ground (SleepingCalamity.Presentation.SCGroundBlendBinder sets these four globals; the data comes from
+// EditorTools.SCGroundBaker at the end of the Hollowmere build). Globals sit outside UnityPerMaterial, so the SRP batcher is untouched and no material property is added.
+// With no bake bound _SC_GroundBounds.z is 0 and the shader falls back to the object pivot for the foot band, as before.
+TEXTURE2D(_SC_GroundHeightTex);  SAMPLER(sampler_SC_GroundHeightTex);
+TEXTURE2D(_SC_GroundAlbedoTex);  SAMPLER(sampler_SC_GroundAlbedoTex);
+float4 _SC_GroundBounds;        // (minX, minZ, 1/sizeX, 1/sizeZ)
+float4 _SC_GroundHeightParams;  // (minY, maxY - minY, 1/width, 1/height)
+
 float SCHash(float2 p)
 {
     float3 p3 = frac(float3(p.xyx) * 0.1031);
@@ -310,6 +318,8 @@ void LitPassFragment(
 #endif
 
 #if defined(_SC_RUINSKIN)
+    half  scGroundBlend    = 0.0h;                       // how far this pixel has melted into the ground (drives the normal blend after InitializeInputData)
+    half3 scGroundNormalWS = half3(0.0h, 1.0h, 0.0h);
     {
         const half3 lumW = half3(0.2126h, 0.7152h, 0.0722h);
         float3 nW = normalize(input.normalWS);
@@ -325,21 +335,22 @@ void LitPassFragment(
         float col = floor(pl.x / stoneW + SCHash(float2(row, 7.1)) * 5.0);
         float stoneA = SCHash(float2(col, row)), stoneB = SCHash(float2(col + 31.7, row + 11.3));
         float macro = (SCNoise(pl * (1.0 / 4.5)) - 0.5) * 0.30 + (SCNoise(pl * (1.0 / 1.3)) - 0.5) * 0.16;
-        half3 tone = half3(1.0 + (stoneB - 0.5) * 0.20, 1.0, 1.0 - (stoneB - 0.5) * 0.24);
-        surfaceData.albedo *= tone * (1.0h + (half)((stoneA - 0.5) * 0.30 + macro) * amt);
+        half3 tone = half3(1.0 + (stoneB - 0.5) * 0.16, 1.0, 1.0 - (stoneB - 0.5) * 0.20);   // slightly calmer per-stone contrast (Neon: less high-frequency noise)
+        surfaceData.albedo *= tone * (1.0h + (half)((stoneA - 0.5) * 0.22 + macro) * amt);
 
         // a second, blotch-only layer of the same scan (a high mip: no joints, so no ghost joint lines at another angle) and a grain normal from noise, not from the block texture
         float2 uv2 = float2(input.uv.x * 0.91 - input.uv.y * 0.41, input.uv.x * 0.41 + input.uv.y * 0.91) * 0.37 + float2(0.31, 0.17);
         half meanL = max(0.03h, dot(SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_BaseMap, uv2, 11.0).rgb, lumW));
         half blotch = dot(SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_BaseMap, uv2, 4.5).rgb, lumW);
-        surfaceData.albedo *= lerp(1.0h, clamp(blotch / meanL, 0.7h, 1.35h), 0.7h * amt);
+        surfaceData.albedo *= lerp(1.0h, clamp(blotch / meanL, 0.75h, 1.30h), 0.7h * amt);
     #if defined(_NORMALMAP)
         {
             float2 gp = pl * 17.0; const float e = 0.35;
-            float g0 = SCNoise(gp) + 0.5 * SCNoise(gp * 2.3 + 5.0);
-            float gx = SCNoise(gp + float2(e, 0)) + 0.5 * SCNoise((gp + float2(e, 0)) * 2.3 + 5.0);
-            float gy = SCNoise(gp + float2(0, e)) + 0.5 * SCNoise((gp + float2(0, e)) * 2.3 + 5.0);
-            half2 gr = (half2)(float2(gx - g0, gy - g0) / e) * 0.22h * _DetailNormalMapScale;
+            // Grain dialled back (0.22 -> 0.08, second octave 0.5 -> 0.25): Neon measured 2-3x too much high-frequency energy here, which unclamped smoothness turned into specular aliasing
+            float g0 = SCNoise(gp) + 0.25 * SCNoise(gp * 2.3 + 5.0);
+            float gx = SCNoise(gp + float2(e, 0)) + 0.25 * SCNoise((gp + float2(e, 0)) * 2.3 + 5.0);
+            float gy = SCNoise(gp + float2(0, e)) + 0.25 * SCNoise((gp + float2(0, e)) * 2.3 + 5.0);
+            half2 gr = (half2)(float2(gx - g0, gy - g0) / e) * 0.08h * _DetailNormalMapScale;
             // pl.x runs along the surface's tangent only for walls facing +-z/x and ground: good enough for a grain that has no direction
             surfaceData.normalTS = normalize(half3(surfaceData.normalTS.xy - gr, surfaceData.normalTS.z));
         }
@@ -349,24 +360,65 @@ void LitPassFragment(
         half h = 0.5h;
     #if defined(_PARALLAXMAP)
         h = SAMPLE_TEXTURE2D(_ParallaxMap, sampler_ParallaxMap, input.uv).g;
-        surfaceData.albedo *= lerp(0.50h, 1.0h, smoothstep(0.03h, 0.30h, h));
-        surfaceData.albedo *= 1.0h + smoothstep(0.78h, 0.97h, h) * (0.10h + 0.22h * (half)SCNoise(pl * 9.0));
+        surfaceData.albedo *= lerp(0.55h, 1.0h, smoothstep(0.03h, 0.30h, h));
+        surfaceData.albedo *= 1.0h + smoothstep(0.80h, 0.97h, h) * (0.06h + 0.09h * (half)SCNoise(pl * 5.0));   // edge sparkle reduced (0.10 + 0.22 at 9/m -> 0.06 + 0.09 at 5/m)
     #endif
+
+        // Dry masonry and cobbles must not read glossy: clamp the scan's smoothness (the wet band at the waterline is a later step)
+        surfaceData.smoothness = min(surfaceData.smoothness, 0.28h);
+
+        // Real ground under this pixel: height from the bake, so the foot band follows slopes (the pivot measure was wrong there), plus the ground's colour and slope
+        float2 gUV = (pW.xz - _SC_GroundBounds.xy) * _SC_GroundBounds.zw;
+        bool hasGround = (_SC_GroundBounds.z > 0.0) && all(gUV >= 0.001) && all(gUV <= 0.999);
+        float aboveGround = footH > 0.0 ? pW.y - unity_ObjectToWorld._m13 : 99.0;   // no bake: the old pivot measure
+        half4 groundAlbedoSmooth = half4(surfaceData.albedo, surfaceData.smoothness);
+        if (hasGround)
+        {
+            float h01 = SAMPLE_TEXTURE2D_LOD(_SC_GroundHeightTex, sampler_SC_GroundHeightTex, gUV, 0.0).r;
+            aboveGround = pW.y - (_SC_GroundHeightParams.x + h01 * _SC_GroundHeightParams.y);
+            if (footH > 0.0 && aboveGround < footH * 1.4)
+            {
+                groundAlbedoSmooth = SAMPLE_TEXTURE2D_LOD(_SC_GroundAlbedoTex, sampler_SC_GroundAlbedoTex, gUV, 0.0);
+                float hR = SAMPLE_TEXTURE2D_LOD(_SC_GroundHeightTex, sampler_SC_GroundHeightTex, gUV + float2(_SC_GroundHeightParams.z, 0.0), 0.0).r;
+                float hU = SAMPLE_TEXTURE2D_LOD(_SC_GroundHeightTex, sampler_SC_GroundHeightTex, gUV + float2(0.0, _SC_GroundHeightParams.w), 0.0).r;
+                float stepX = _SC_GroundHeightParams.z / max(1e-5, _SC_GroundBounds.z);   // one texel in metres
+                float stepZ = _SC_GroundHeightParams.w / max(1e-5, _SC_GroundBounds.w);
+                float dhdx = ((hR - h01) * _SC_GroundHeightParams.y) / stepX;
+                float dhdz = ((hU - h01) * _SC_GroundHeightParams.y) / stepZ;
+                scGroundNormalWS = (half3)normalize(float3(-dhdx, 1.0, -dhdz));
+            }
+        }
+
         half cav = smoothstep(0.03h, 0.30h, h);
         half lum1 = saturate(dot(surfaceData.albedo, lumW) * 3.0h);
 
         // moss: world-up faces first (ledges, wall tops), pulled into the low joints by the height, broken by noise; more in the joints at the foot
-        float aboveGround = footH > 0.0 ? pW.y - unity_ObjectToWorld._m13 : 99.0;
         half foot = footH > 0.0 ? 1.0h - smoothstep(0.0h, (half)footH, (half)aboveGround) : 0.0h;
         float field = upF * 1.5 + (h - 0.5) * 0.9 + (SCNoise(pl * 3.1) - 0.5) * 0.8 - 0.55 + foot * (1.0 - cav) * 0.9;
         half moss2 = smoothstep(0.55h, 0.95h, (half)field) * mossAmt;
         half3 mossC = half3(0.060h, 0.095h, 0.026h) * (0.55h + 0.9h * lum1) * (0.75h + 0.5h * (half)SCNoise(pl * 6.0));
         surfaceData.albedo = lerp(surfaceData.albedo, mossC, moss2 * 0.88h);
-        surfaceData.smoothness = saturate(surfaceData.smoothness - moss2 * 0.25h);
+        surfaceData.smoothness = saturate(surfaceData.smoothness - moss2 * 0.20h);
 
-        // foot band: damp and dirty from the ground up, fading over footH
-        surfaceData.albedo *= 1.0h - foot * footDark * 0.55h;
-        surfaceData.smoothness = saturate(surfaceData.smoothness + foot * footDark * 0.06h);
+        if (hasGround && footH > 0.0)
+        {
+            // Ground seam blend: noisy height plus mortar-first creep, masked off the undersides; albedo and smoothness go to the baked ground, the normal after InitializeInputData
+            float seamNoise = (SCNoise(pW.xz * 2.2) - 0.5) * 0.35 + (h - 0.5) * 0.25;
+            float noisyH = aboveGround + seamNoise * footH;
+            half notUnderside = smoothstep(-0.35h, 0.15h, (half)nW.y);
+            scGroundBlend = (1.0h - smoothstep(0.0h, (half)(footH * 0.85), (half)noisyH)) * notUnderside;
+            surfaceData.albedo = lerp(surfaceData.albedo, groundAlbedoSmooth.rgb, scGroundBlend);
+            surfaceData.smoothness = lerp(surfaceData.smoothness, min(groundAlbedoSmooth.a, 0.25h), scGroundBlend);
+            // contact darkening at the very bottom (the old +0.06 foot gloss is gone)
+            surfaceData.albedo *= 1.0h - foot * footDark * 0.30h;
+            surfaceData.smoothness *= 1.0h - foot * 0.35h;
+        }
+        else
+        {
+            // foot band: damp and dirty from the ground up, fading over footH
+            surfaceData.albedo *= 1.0h - foot * footDark * 0.55h;
+            surfaceData.smoothness *= 1.0h - foot * 0.30h;
+        }
     }
 #endif
 
@@ -394,6 +446,11 @@ void LitPassFragment(
 
     InputData inputData;
     InitializeInputData(input, surfaceData.normalTS, inputData);
+#if defined(_SC_RUINSKIN)
+    // Blend the world normal toward the ground's, so the hard intersection crease between a ruin and the ground goes (before the baked GI read, which uses this normal)
+    if (scGroundBlend > 0.001h)
+        inputData.normalWS = normalize(lerp(inputData.normalWS, scGroundNormalWS, scGroundBlend));
+#endif
     SETUP_DEBUG_TEXTURE_DATA(inputData, UNDO_TRANSFORM_TEX(input.uv, _BaseMap));
 
 #if defined(_DBUFFER)
