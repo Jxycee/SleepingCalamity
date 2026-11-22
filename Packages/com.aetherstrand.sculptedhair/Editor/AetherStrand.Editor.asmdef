@@ -1,14 +1,18 @@
 {
-    "name": "AetherStrand.Editor",
-    "rootNamespace": "AetherStrand.Editor",
-    "references": ["AetherStrand.Runtime"],
-    "includePlatforms": ["Editor"],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": false
+  "name": "AetherStrand.Editor",
+  "rootNamespace": "AetherStrand.Editor",
+  "references": [
+    "AetherStrand.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }

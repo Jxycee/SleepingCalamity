@@ -1,13 +1,16 @@
-# AetherStrand — Sculpted Volumetric Hair Plugin for Unity (URP 17) & Blender 4.x
+# AetherStrand — Sculpted Hair Plugin for Unity 6 & Blender 4.x
 
-Preset Included: **PartedShag_Medium** (Layered chestnut shag with wispy tips)
-Target Render Pipeline: **Unity 6 / URP 17.x (Forward & Forward+)**
+Exported Preset: **Layered Swept Long** (`layered_swept_long` — Asymmetric swept fringe with layered crown volume)
+Exported Viewport Locks: **430**
+Target Render Pipeline: **Unity 6 URP 17.6 (Universal Render Pipeline, Forward & Forward+)**
 
 ## Contents
-- `AetherStrand_Unity/Shaders/AetherStrand_Hair.shader` — Volumetric Carved-Fiber Kajiya-Kay Dual-Lobe Shader (`AetherStrand/SculptedHair_URP`) with `ForwardLit` (Forward+ compatible), `ShadowCaster`, `DepthOnly`, `DepthNormals` (clipped, two-sided), tip-only feathered cutout, and optional radial head-center normal blending.
-- `AetherStrand_Unity/Runtime/AetherStrandPhysics.cs` — Substepped, framerate-independent XPBD/Verlet bone-chain solver with per-zone multipliers (`Bangs`, `Crown`, `Sides`, `Rear`), collider-projected rest poses, rest-curvature bending smoothness, zero-restitution sliding friction, deterministic `Simulate(dt, simTime)`, and `ComputeAudit()` PlayMode telemetry.
-- `AetherStrand_Unity/Runtime/AetherStrandCollider.cs` & `AetherStrandWindZone.cs` — Scale-aware analytical Sphere/Capsule colliders (with `SignedDistance`) and deterministic turbulent wind zone.
-- `AetherStrand_Unity/Editor/AetherStrandSetupWindow.cs` — Interactive setup window plus headless static batchmode API (`CreateMaterialAsset`, `AutoSetupPhysics`) that builds 6 head-height-scaled colliders (Cranium, Face/Jaw, Neck, Upper Chest, Left/Right Shoulders).
-- `AetherStrand_Unity/Presets/PartedShag_Medium.json` — Calibrated shader & physics preset.
+- `AetherStrand_Unity/package.json` — Embedded UPM package manifest (`com.aetherstrand.sculptedhair`, Unity `6000.0`).
+- `AetherStrand_Unity/Runtime/AetherStrand.Runtime.asmdef` & `Editor/AetherStrand.Editor.asmdef` — Assembly definitions for zero-config UPM compilation.
+- `AetherStrand_Unity/Shaders/AetherStrand_Hair.shader` — SRP-Batcher-safe Carved-Fiber Kajiya-Kay Dual-Lobe Hair Shader (`AetherStrand/SculptedHair_URP`) with `DepthOnly`, `DepthNormals`, Forward+ `LIGHT_LOOP_BEGIN`, `_HeadCenterBlend`, and `_DitherStrength`.
+- `AetherStrand_Unity/Runtime/AetherStrandPhysics.cs` — Substepped XPBD / Verlet bone-chain solver with framerate-independent damping, per-zone stiffness (`Bangs`, `Crown`, `Sides`, `Rear`), `Simulate(dt, simTime)`, `ResetToRestPose()`, and `ComputeAudit()`.
+- `AetherStrand_Unity/Runtime/AetherStrandCollider.cs` & `AetherStrandWindZone.cs` — Analytical Sphere/Capsule colliders with `SignedDistance()` and turbulent wind zone.
+- `AetherStrand_Unity/Editor/AetherStrandSetupWindow.cs` — Headless-safe static material updater (GUID-preserving) and deterministic 6-collider + `Hair_` bone auto-setup.
 - `AetherStrand_Unity/Textures/` — Seamless `GrooveAO`, `FlowIDShift`, `Normal`, and `AlphaCard` PNG maps.
-- `AetherStrand_Blender/aetherstrand_hair_cards.py` — Blender 4.x addon with 5-zone sculpted lock generator, optional `PresetGeometry.json` loader, scalp-mesh projection, deterministic k-means bone-chain clustering (~44 chains for 120 locks), curve conversion, and Linear Vertex Color Unity FBX exporter.
+- `AetherStrand_Blender/PresetGeometry.json` — Exact 1:1 exported viewport hair locks converted to Blender Z-up (`-Y` front).
+- `AetherStrand_Blender/aetherstrand_hair_cards.py` — Blender 4.x addon that auto-loads `PresetGeometry.json`, k-means clusters locks onto ~44 shared `Hair_<Zone>_<k>_<i>` bone chains (5 bones/chain, `use_deform = k > 0`), and exports Unity FBX with Linear vertex colors.

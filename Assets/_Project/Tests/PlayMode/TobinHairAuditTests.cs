@@ -38,8 +38,8 @@ namespace SleepingCalamity.Tests.PlayMode
             return phys;
         }
 
-        static string Fmt(AetherStrandAuditMetrics m) =>
-            $"chains {m.totalChains} penetrating {m.penetratingNodes} kink {m.maxKinkAngleDeg:F1} deg stretch {m.maxStretchErrorPct:F2} % tipSway {m.meanTipSwayCm:F2} cm";
+        static string Fmt(PhysicsAuditResult m) =>
+            $"chains {m.totalChains} colliders {m.colliderCount} penetrating {m.penetratingNodes} kink {m.maxKinkAngleDeg:F1} deg stretch {m.maxStretchErrorPct:F2} % tipSway {m.meanTipSwayCm:F2} cm";
 
         [Test]
         public void AetherStrand_Audit_90Frames()
@@ -49,7 +49,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var m = phys.ComputeAudit();
             Debug.Log("SC HAIR AUDIT aether idle: " + Fmt(m));
             Assert.That(m.totalChains, Is.GreaterThan(0));
-            Assert.That(phys.colliders.Count(c => c != null), Is.EqualTo(6), "colliders");
+            Assert.That(m.colliderCount, Is.EqualTo(6), "colliders");
             Assert.That(m.penetratingNodes, Is.EqualTo(0), Fmt(m));
             Assert.That(m.maxKinkAngleDeg, Is.LessThan(28f), Fmt(m));
             Assert.That(m.maxStretchErrorPct, Is.LessThan(3.5f), Fmt(m));

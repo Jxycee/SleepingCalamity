@@ -4,7 +4,6 @@ namespace AetherStrand
 {
     /// <summary>
     /// Global & turbulent wind zone for AetherStrandPhysics hair chains.
-    /// Deterministic when driven with explicit simTime.
     /// </summary>
     public class AetherStrandWindZone : MonoBehaviour
     {
@@ -16,25 +15,19 @@ namespace AetherStrand
 
         private void Update()
         {
-            StepGust(Time.deltaTime);
-        }
-
-        public void StepGust(float dt)
-        {
-            if (dt <= 0f) return;
-            _extraGust *= Mathf.Exp(-4.5f * dt);
+            _extraGust = Vector3.Lerp(_extraGust, Vector3.zero, 1f - Mathf.Exp(-4.5f * Time.deltaTime));
         }
 
         public void TriggerGust(Vector3 worldImpulse) => _extraGust += worldImpulse;
 
-        public Vector3 SampleWindAcceleration(Vector3 worldPos, float strandSeed, float simTime)
+        public Vector3 SampleWindAcceleration(Vector3 worldPos, float strandSeed, float time)
         {
             Vector3 dir = transform.forward;
-            float primaryWave = 0.65f + 0.35f * Mathf.Sin(simTime * gustFrequency + strandSeed);
-            float perlin = (Mathf.PerlinNoise(worldPos.x * 1.3f + simTime * 1.4f, worldPos.z * 1.3f + strandSeed) - 0.5f) * 2f;
+            float primaryWave = 0.65f + 0.35f * Mathf.Sin(time * gustFrequency + strandSeed);
+            float perlin = (Mathf.PerlinNoise(worldPos.x * 1.3f + time * 1.4f, worldPos.z * 1.3f + strandSeed) - 0.5f) * 2f;
 
             Vector3 lateral = transform.right * (perlin * turbulence * 1.6f);
-            Vector3 vertical = Vector3.up * (Mathf.Sin(simTime * 3.1f + strandSeed) * turbulence * 0.55f);
+            Vector3 vertical = Vector3.up * (Mathf.Sin(time * 3.1f + strandSeed) * turbulence * 0.55f);
             return dir * (windStrength * primaryWave) + lateral + vertical + _extraGust;
         }
     }

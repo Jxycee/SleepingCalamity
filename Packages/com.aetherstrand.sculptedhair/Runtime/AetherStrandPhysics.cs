@@ -13,9 +13,10 @@ namespace AetherStrand
     }
 
     [Serializable]
-    public struct AetherStrandAuditMetrics
+    public struct PhysicsAuditResult
     {
         public int totalChains;
+        public int colliderCount;
         public int penetratingNodes;
         public float maxKinkAngleDeg;
         public float meanTipSwayCm;
@@ -23,10 +24,9 @@ namespace AetherStrand
     }
 
     /// <summary>
-    /// Real-time XPBD / Verlet Hair Bone Chain Simulator for layered sculpted hair.
-    /// Features substepped framerate-independent integration, per-zone stiffness/drag,
-    /// rest-curvature bending smoothness, collider-projected rest poses,
-    /// zero-restitution sliding friction, rotation-only write-back, and PlayMode audit telemetry.
+    /// Real-time XPBD / Verlet Hair Bone Chain Simulator for sculpted volumetric hair.
+    /// Features substepped head-pose interpolation, framerate-independent exponential damping & root pinning,
+    /// XPBD rest-pose compliance tethers, per-zone stiffness multipliers, and deterministic verification audit hooks.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(120)]
@@ -36,69 +36,67 @@ namespace AetherStrand
         [Tooltip("Character Head bone transform used for inertia and rest-pose orientation.")]
         public Transform headTransform;
 
-        [Tooltip("Optional SkinnedMeshRenderer to receive _HeadCenterWS via MaterialPropertyBlock.")]
-        public Renderer hairRenderer;
-
-        [Tooltip("Local offset from headTransform to skull center for radial normal blending.")]
-        public Vector3 headCenterLocalOffset = new Vector3(0f, 0.11f, -0.01f);
-
         [Tooltip("Root bone of each hair lock chain (auto-traverses children).")]
         public List<Transform> hairRootBones = new List<Transform>();
 
-        [Tooltip("Head, jaw, neck, chest, and shoulder analytical colliders.")]
+        [Tooltip("Head, face/jaw, neck, chest, and shoulder analytical colliders.")]
         public List<AetherStrandCollider> colliders = new List<AetherStrandCollider>();
 
         [Tooltip("Optional global wind controller.")]
         public AetherStrandWindZone windZone;
 
-        [Header("Silhouette & Physics")]
+        [Tooltip("Optional hair renderer whose _HeadCenterWS shader property is synced each step.")]
+        public Renderer hairRenderer;
+
+        [Header("Silhouette & XPBD Physics")]
         [Range(0.05f, 0.95f)]
-        [Tooltip("Rest-pose shape retention. High (0.60-0.82) holds sculpted layered shapes; low (0.25-0.4) flows freely.")]
-        public float stiffness = 0.62f;
+        [Tooltip("Rest-pose shape retention. High (0.60-0.85) holds sculpted layered/spiky silhouettes; low (0.25-0.45) flows freely.")]
+        public float stiffness = 0.74f;
 
         [Tooltip("Downward gravity acceleration in m/s^2.")]
-        public float gravity = 4.40f;
+        public float gravity = 3.60f;
 
         [Range(0.01f, 0.35f)]
-        [Tooltip("Velocity damping coefficient (framerate-independent, calibrated at 60 Hz).")]
-        public float damping = 0.095f;
+        [Tooltip("Framerate-independent velocity damping calibrated at 60 Hz.")]
+        public float damping = 0.100f;
 
         [Range(0.0f, 1.5f)]
-        [Tooltip("Lag/drag from character head linear movement (scaled separately from head rotation).")]
-        public float headInertia = 0.88f;
+        [Tooltip("Lag/drag from character head movement.")]
+        public float headInertia = 0.84f;
 
         [Range(0.0f, 0.95f)]
         [Tooltip("Rest-curvature-preserving bending smoothness. Eliminates accordion kinks across colliding bangs.")]
-        public float bendingSmoothness = 0.52f;
+        public float bendingSmoothness = 0.64f;
 
-        [Range(0.002f, 0.030f)]
-        [Tooltip("Minimum surface clearance outside head/neck/shoulder colliders (meters).")]
-        public float collisionMargin = 0.011f;
+        [Range(0.002f, 0.025f)]
+        [Tooltip("Minimum surface clearance outside head/neck/chest/shoulder colliders (meters).")]
+        public float collisionMargin = 0.0090f;
 
         [Range(0.1f, 1.0f)]
         [Tooltip("Upper scalp parting anchor strength across root bones 1..3.")]
-        public float rootAnchor = 0.62f;
+        public float rootAnchor = 0.66f;
 
         [Range(1, 6)]
-        [Tooltip("Integration substeps per frame for fast head turns and dodges.")]
+        [Tooltip("Integration substeps per frame for fast head turns and smooth collider sliding.")]
         public int solverSubsteps = 3;
 
         [Range(1, 6)]
         public int solverIterations = 4;
 
-        [Tooltip("Virtual tip extension length beyond the final leaf bone.")]
+        [Tooltip("Virtual tip extension length beyond the final leaf bone (meters).")]
         public float leafExtensionLength = 0.06f;
 
-        [Header("Per-Zone Multipliers (Auto-Classified)")]
-        public float bangsStiffnessMul = 1.25f;
-        public float crownStiffnessMul = 1.35f;
-        public float sidesStiffnessMul = 0.95f;
-        public float rearStiffnessMul  = 0.80f;
+        [Header("Per-Zone Stiffness Multipliers")]
+        [Range(0.25f, 2.0f)] public float bangsStiffnessMultiplier = 1.15f;
+        [Range(0.25f, 2.0f)] public float crownStiffnessMultiplier = 1.20f;
+        [Range(0.25f, 2.0f)] public float sidesStiffnessMultiplier = 0.95f;
+        [Range(0.25f, 2.0f)] public float rearStiffnessMultiplier = 0.85f;
 
         [Header("Fallback Local Wind")]
-        public float fallbackWindStrength = 0.55f;
+        [Tooltip("Default 0 so hair stays still indoors/in caves when no AetherStrandWindZone is active.")]
+        public float fallbackWindStrength = 0f;
         public float fallbackTurbulence = 0.24f;
-        public float fallbackWindAzimuthDeg = 30.0f;
+        public float fallbackWindAzimuthDeg = 28.0f;
 
         [Header("Debug Visualization")]
         public bool drawGizmos = true;
@@ -109,9 +107,11 @@ namespace AetherStrand
             public Vector3 worldPos;
             public Vector3 prevWorldPos;
             public Vector3 restLocalPos;
+            public Vector3 restCurvatureLocal;
             public Quaternion restLocalRot;
             public float segmentLength;
             public float tipFraction;
+            public float stiffnessWeight;
             public bool isVirtualLeaf;
         }
 
@@ -124,12 +124,12 @@ namespace AetherStrand
 
         private readonly List<HairChain> _chains = new List<HairChain>();
         private Vector3 _prevHeadPos;
+        private Quaternion _prevHeadRot = Quaternion.identity;
         private Vector3 _impulseVelocity;
-        private bool _initialized;
         private MaterialPropertyBlock _mpb;
-        private static readonly int IdHeadCenterWS = Shader.PropertyToID("_HeadCenterWS");
+        private bool _initialized;
 
-        public int ChainCount => _chains.Count;
+        private static readonly int HeadCenterWsId = Shader.PropertyToID("_HeadCenterWS");
 
         private void Awake()
         {
@@ -137,19 +137,49 @@ namespace AetherStrand
             RebuildChains();
         }
 
+        private static HairZone DetectZone(Transform root, Vector3 restLocalPos, Vector3 tipLocalPos)
+        {
+            if (root != null)
+            {
+                string n = root.name;
+                if (n.IndexOf("Bangs", StringComparison.OrdinalIgnoreCase) >= 0) return HairZone.Bangs;
+                if (n.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0) return HairZone.Crown;
+                if (n.IndexOf("Sides", StringComparison.OrdinalIgnoreCase) >= 0) return HairZone.Sides;
+                if (n.IndexOf("Rear", StringComparison.OrdinalIgnoreCase) >= 0) return HairZone.Rear;
+            }
+
+            if (tipLocalPos.z > 0.08f && Mathf.Abs(tipLocalPos.x) < 0.20f) return HairZone.Bangs;
+            if (restLocalPos.y > 0.16f && tipLocalPos.z > -0.10f) return HairZone.Crown;
+            if (restLocalPos.z < -0.04f || tipLocalPos.z < -0.08f) return HairZone.Rear;
+            return HairZone.Sides;
+        }
+
+        private float GetZoneStiffnessMultiplier(HairZone zone)
+        {
+            switch (zone)
+            {
+                case HairZone.Bangs: return bangsStiffnessMultiplier;
+                case HairZone.Crown: return crownStiffnessMultiplier;
+                case HairZone.Sides: return sidesStiffnessMultiplier;
+                case HairZone.Rear:  return rearStiffnessMultiplier;
+                default:             return 1.0f;
+            }
+        }
+
         [ContextMenu("Rebuild Hair Chains")]
         public void RebuildChains()
         {
-            _chains.Clear();
             if (headTransform == null) headTransform = transform;
-
+            _chains.Clear();
             int chainIndex = 0;
+
             foreach (Transform root in hairRootBones)
             {
                 if (root == null) continue;
+                var chain = new HairChain { seedPhase = (chainIndex++ * 1.618033f) * 12.5f };
 
-                var linearBones = new List<Transform>();
                 Transform current = root;
+                var linearBones = new List<Transform>();
                 while (current != null)
                 {
                     linearBones.Add(current);
@@ -158,17 +188,12 @@ namespace AetherStrand
 
                 if (linearBones.Count < 1) continue;
 
-                var chain = new HairChain
-                {
-                    seedPhase = (chainIndex++ * 1.618033f) * 12.5f,
-                    zone = ClassifyZone(root)
-                };
-
                 int totalNodes = linearBones.Count + 1;
                 for (int i = 0; i < linearBones.Count; i++)
                 {
                     Transform b = linearBones[i];
                     float segLen = i == 0 ? 0f : Vector3.Distance(b.position, linearBones[i - 1].position);
+                    float tipFrac = (float)i / (totalNodes - 1);
                     chain.nodes.Add(new HairNode
                     {
                         bone = b,
@@ -177,21 +202,17 @@ namespace AetherStrand
                         restLocalPos = headTransform.InverseTransformPoint(b.position),
                         restLocalRot = b.localRotation,
                         segmentLength = segLen,
-                        tipFraction = (float)i / (totalNodes - 1),
+                        tipFraction = tipFrac,
+                        stiffnessWeight = Mathf.Clamp(0.18f + 0.82f * Mathf.Pow(1f - tipFrac, 1.35f), 0.12f, 1f),
                         isVirtualLeaf = false
                     });
                 }
 
                 Transform lastBone = linearBones[linearBones.Count - 1];
-                float tipLen = linearBones.Count >= 2
-                    ? Mathf.Min(leafExtensionLength, Vector3.Distance(lastBone.position, linearBones[linearBones.Count - 2].position))
-                    : leafExtensionLength;
-                tipLen = Mathf.Max(0.015f, tipLen);
-
                 Vector3 tipDir = linearBones.Count >= 2
                     ? (lastBone.position - linearBones[linearBones.Count - 2].position).normalized
                     : -lastBone.up;
-                Vector3 virtualTipWorld = lastBone.position + tipDir * tipLen;
+                Vector3 virtualTipWorld = lastBone.position + tipDir * leafExtensionLength;
 
                 chain.nodes.Add(new HairNode
                 {
@@ -200,36 +221,50 @@ namespace AetherStrand
                     prevWorldPos = virtualTipWorld,
                     restLocalPos = headTransform.InverseTransformPoint(virtualTipWorld),
                     restLocalRot = Quaternion.identity,
-                    segmentLength = tipLen,
+                    segmentLength = leafExtensionLength,
                     tipFraction = 1f,
+                    stiffnessWeight = 0.12f,
                     isVirtualLeaf = true
                 });
 
+                for (int i = 1; i < chain.nodes.Count - 1; i++)
+                {
+                    Vector3 midLocal = 0.5f * (chain.nodes[i - 1].restLocalPos + chain.nodes[i + 1].restLocalPos);
+                    chain.nodes[i].restCurvatureLocal = chain.nodes[i].restLocalPos - midLocal;
+                }
+
+                chain.zone = DetectZone(root, chain.nodes[0].restLocalPos, chain.nodes[chain.nodes.Count - 1].restLocalPos);
                 _chains.Add(chain);
             }
 
             _prevHeadPos = headTransform.position;
+            _prevHeadRot = headTransform.rotation;
             _initialized = true;
-            UpdateHeadCenterShaderProperty();
         }
 
+        [ContextMenu("Reset To Rest Pose")]
         public void ResetToRestPose()
         {
+            if (headTransform == null) headTransform = transform;
             if (!_initialized) RebuildChains();
+
+            _impulseVelocity = Vector3.zero;
+            _prevHeadPos = headTransform.position;
+            _prevHeadRot = headTransform.rotation;
+
             for (int c = 0; c < _chains.Count; c++)
             {
                 var nodes = _chains[c].nodes;
                 for (int i = 0; i < nodes.Count; i++)
                 {
-                    if (!nodes[i].isVirtualLeaf && nodes[i].bone != null)
-                        nodes[i].bone.localRotation = nodes[i].restLocalRot;
-                    Vector3 restW = headTransform.TransformPoint(nodes[i].restLocalPos);
-                    nodes[i].worldPos = restW;
-                    nodes[i].prevWorldPos = restW;
+                    HairNode n = nodes[i];
+                    if (!n.isVirtualLeaf && n.bone != null)
+                        n.bone.localRotation = n.restLocalRot;
+                    Vector3 restW = headTransform.TransformPoint(n.restLocalPos);
+                    n.worldPos = restW;
+                    n.prevWorldPos = restW;
                 }
             }
-            _prevHeadPos = headTransform.position;
-            _impulseVelocity = Vector3.zero;
         }
 
         public void AddImpulse(Vector3 worldImpulse) => _impulseVelocity += worldImpulse;
@@ -240,53 +275,217 @@ namespace AetherStrand
         }
 
         /// <summary>
-        /// Deterministic simulation step callable from LateUpdate or PlayMode tests.
+        /// Public deterministic simulation step callable from LateUpdate or automated verification suites.
         /// </summary>
-        public void Simulate(float deltaTime, float simTime)
+        public void Simulate(float dt, float simTime)
         {
             if (!_initialized || _chains.Count == 0 || headTransform == null) return;
 
-            float dt = Mathf.Min(deltaTime, 0.05f);
-            if (dt <= 0.00001f) return;
+            float clampedDt = Mathf.Min(dt, 0.033f);
+            if (clampedDt <= 0.00001f) return;
 
             int substeps = Mathf.Clamp(solverSubsteps, 1, 6);
-            float subDt = dt / substeps;
+            float subDt = clampedDt / substeps;
             float subDtSq = subDt * subDt;
 
-            // Framerate-independent exponential damping calibrated to 60 Hz reference
-            float dampRate = -Mathf.Log(1f - Mathf.Clamp(damping, 0.01f, 0.35f)) * 60f;
-            float dampMul = Mathf.Exp(-dampRate * subDt);
+            // Framerate-independent exponential damping rate calibrated at 60 Hz
+            float clampedDamp = Mathf.Clamp(damping, 0.01f, 0.35f);
+            float dampingRate = -Mathf.Log(1f - clampedDamp) * 60f;
+            float dampMul = Mathf.Exp(-dampingRate * subDt);
+            float impulseDecay = Mathf.Exp(-4.5f * subDt);
 
-            Vector3 totalHeadDelta = headTransform.position - _prevHeadPos;
-            Vector3 subHeadDelta = totalHeadDelta / substeps;
-            _prevHeadPos = headTransform.position;
+            Vector3 targetHeadPos = headTransform.position;
+            Quaternion targetHeadRot = headTransform.rotation;
 
             float azRad = fallbackWindAzimuthDeg * Mathf.Deg2Rad;
             Vector3 fallbackDir = new Vector3(Mathf.Cos(azRad), 0f, Mathf.Sin(azRad));
+            float bendAlpha = Mathf.Clamp01(bendingSmoothness) * 0.30f;
 
-            // Restore rest rotations once before sampling animated root positions
+            // Restore rest bone rotations once so bone.position yields exact rest-pose directions
             for (int c = 0; c < _chains.Count; c++)
             {
                 var nodes = _chains[c].nodes;
                 for (int i = 0; i < nodes.Count; i++)
-                {
                     if (!nodes[i].isVirtualLeaf && nodes[i].bone != null)
                         nodes[i].bone.localRotation = nodes[i].restLocalRot;
-                }
             }
 
-            for (int step = 0; step < substeps; step++)
+            Vector3 headScale = headTransform.lossyScale;
+
+            for (int sub = 0; sub < substeps; sub++)
             {
-                float stepTime = simTime - dt + (step + 1) * subDt;
-                _impulseVelocity *= Mathf.Exp(-5.0f * subDt);
+                float alpha0 = (float)sub / substeps;
+                float alpha1 = (float)(sub + 1) / substeps;
+                float subTime = simTime - clampedDt + subDt * (sub + 1);
+
+                Vector3 subPrevPos = Vector3.Lerp(_prevHeadPos, targetHeadPos, alpha0);
+                Vector3 subHeadPos = Vector3.Lerp(_prevHeadPos, targetHeadPos, alpha1);
+                Quaternion subPrevRot = Quaternion.Slerp(_prevHeadRot, targetHeadRot, alpha0);
+                Quaternion subHeadRot = Quaternion.Slerp(_prevHeadRot, targetHeadRot, alpha1);
+
+                Matrix4x4 subPrevMat = Matrix4x4.TRS(subPrevPos, subPrevRot, headScale);
+                Matrix4x4 subCurrMat = Matrix4x4.TRS(subHeadPos, subHeadRot, headScale);
+
+                _impulseVelocity *= impulseDecay;
 
                 for (int c = 0; c < _chains.Count; c++)
                 {
-                    StepChain(_chains[c], subDt, subDtSq, dampMul, subHeadDelta, fallbackDir, stepTime);
+                    HairChain chain = _chains[c];
+                    var nodes = chain.nodes;
+                    int count = nodes.Count;
+                    float zoneStiff = Mathf.Clamp(stiffness * GetZoneStiffnessMultiplier(chain.zone), 0.04f, 0.96f);
+
+                    // Root node pinned strictly to head scalp
+                    Vector3 rootWorld = subCurrMat.MultiplyPoint3x4(nodes[0].restLocalPos);
+                    nodes[0].worldPos = rootWorld;
+                    nodes[0].prevWorldPos = rootWorld;
+
+                    // 1. Substepped Verlet Integration with Rigid-Follow Inertia & Wind
+                    for (int i = 1; i < count; i++)
+                    {
+                        HairNode node = nodes[i];
+                        Vector3 prevTargetW = subPrevMat.MultiplyPoint3x4(node.restLocalPos);
+                        Vector3 currTargetW = subCurrMat.MultiplyPoint3x4(node.restLocalPos);
+                        Vector3 targetDelta = currTargetW - prevTargetW;
+
+                        Vector3 velocity = (node.worldPos - node.prevWorldPos) * dampMul;
+                        float followRigid = Mathf.Clamp(1f - headInertia * 0.56f * Mathf.Pow(node.tipFraction, 1.35f), 0.22f, 1f);
+                        Vector3 shiftedPos = node.worldPos + targetDelta * followRigid;
+                        node.prevWorldPos = shiftedPos;
+
+                        float tipSq = node.tipFraction * node.tipFraction;
+                        float tipCube = tipSq * node.tipFraction;
+                        velocity -= targetDelta * (0.20f * headInertia * tipSq);
+
+                        Vector3 windAccel;
+                        if (windZone != null)
+                        {
+                            windAccel = windZone.SampleWindAcceleration(shiftedPos, chain.seedPhase, subTime)
+                                        * (0.14f + 0.86f * tipSq);
+                        }
+                        else
+                        {
+                            float gust = 0.65f + 0.35f * Mathf.Sin(subTime * 2.3f + chain.seedPhase + i * 0.42f)
+                                       + fallbackTurbulence * 0.45f * Mathf.Sin(subTime * 5.4f + chain.seedPhase * 1.9f);
+                            windAccel = fallbackDir * (fallbackWindStrength * gust * (0.14f + 0.86f * tipSq));
+                        }
+
+                        Vector3 extAccel = windAccel * 0.62f
+                                           + Vector3.down * (gravity * 0.12f * tipCube)
+                                           + _impulseVelocity * (1.35f * (0.1f + 0.9f * tipSq));
+
+                        node.worldPos = shiftedPos + velocity + extAccel * subDtSq;
+
+                        // Framerate-independent exponential root anchor pinning
+                        if (i <= 3)
+                        {
+                            float kFade = i == 1 ? 0.42f : (i == 2 ? 0.22f : 0.09f);
+                            float rootPinRate = kFade * zoneStiff * (rootAnchor / 0.6f) * 60f;
+                            float rootPin = Mathf.Clamp(1f - Mathf.Exp(-rootPinRate * subDt), 0f, 0.78f);
+                            node.worldPos = Vector3.Lerp(node.worldPos, currTargetW, rootPin);
+                        }
+                    }
+
+                    // 2. XPBD Rest-Pose Compliance Tether + Rest-Curvature Anti-Kink + Distance & Collider Projection
+                    int iters = Mathf.Clamp(solverIterations, 1, 6);
+                    for (int iter = 0; iter < iters; iter++)
+                    {
+                        bool isFinalIter = iter == iters - 1;
+
+                        // Rest-curvature-preserving anti-kink smoothing
+                        if (bendAlpha > 0.005f || !isFinalIter)
+                        {
+                            for (int i = 1; i < count - 1; i++)
+                            {
+                                Vector3 a = nodes[i].worldPos - nodes[i - 1].worldPos;
+                                Vector3 b = nodes[i + 1].worldPos - nodes[i].worldPos;
+                                float lenA = a.magnitude;
+                                float lenB = b.magnitude;
+                                float alpha = !isFinalIter ? bendAlpha : 0f;
+                                float curvScale = 1f;
+                                if (lenA > 0.0001f && lenB > 0.0001f)
+                                {
+                                    float cosAng = Vector3.Dot(a, b) / (lenA * lenB);
+                                    if (cosAng < 0.935f)
+                                    {
+                                        float u = Mathf.Clamp01((0.935f - cosAng) / 0.17f);
+                                        float smoothU = u * u * (3f - 2f * u);
+                                        alpha = Mathf.Max(alpha, 0.76f * smoothU);
+                                        curvScale = 1f - smoothU;
+                                    }
+                                }
+                                if (alpha > 0.005f)
+                                {
+                                    Vector3 curvW = (subHeadRot * nodes[i].restCurvatureLocal) * curvScale;
+                                    Vector3 targetMid = 0.5f * (nodes[i - 1].worldPos + nodes[i + 1].worldPos) + curvW;
+                                    nodes[i].worldPos = Vector3.Lerp(nodes[i].worldPos, targetMid, alpha);
+                                }
+                            }
+                        }
+
+                        // XPBD compliant rest-pose tether + inextensible segment length + analytical collision
+                        for (int i = 1; i < count; i++)
+                        {
+                            HairNode prev = nodes[i - 1];
+                            HairNode curr = nodes[i];
+
+                            // XPBD compliance rest-pose tether (unconditionally stable for any subDt & stiffness)
+                            Vector3 restWorld = subCurrMat.MultiplyPoint3x4(curr.restLocalPos);
+                            for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
+                            {
+                                AetherStrandCollider col = colliders[colIdx];
+                                if (col != null && col.enabled)
+                                    col.ResolveCollision(ref restWorld, collisionMargin);
+                            }
+
+                            float shapedStiff = Mathf.Clamp01(zoneStiff * curr.stiffnessWeight);
+                            float compliance = Mathf.Lerp(0.085f, 0.00035f, shapedStiff * shapedStiff);
+                            float alphaTilde = (compliance / subDtSq) * iters;
+                            float xpbdLambda = 1f / (1f + alphaTilde);
+                            curr.worldPos += (restWorld - curr.worldPos) * xpbdLambda;
+
+                            // Distance constraint projection
+                            Vector3 diff = curr.worldPos - prev.worldPos;
+                            float dist = diff.magnitude;
+                            if (dist > 0.00001f)
+                            {
+                                float err = (dist - curr.segmentLength) / dist;
+                                if (i == 1)
+                                {
+                                    curr.worldPos -= diff * err;
+                                }
+                                else
+                                {
+                                    prev.worldPos += diff * (err * 0.20f);
+                                    curr.worldPos -= diff * (err * 0.80f);
+                                }
+                            }
+
+                            // Inelastic collider projection
+                            bool hitCollider = false;
+                            for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
+                            {
+                                AetherStrandCollider col = colliders[colIdx];
+                                if (col != null && col.enabled)
+                                {
+                                    Vector3 before = curr.worldPos;
+                                    col.ResolveCollision(ref curr.worldPos, collisionMargin);
+                                    if ((curr.worldPos - before).sqrMagnitude > 1e-8f) hitCollider = true;
+                                }
+                            }
+                            if (hitCollider && isFinalIter)
+                            {
+                                curr.prevWorldPos = Vector3.Lerp(curr.prevWorldPos, curr.worldPos, 0.86f);
+                            }
+                        }
+                    }
                 }
             }
 
-            // Rotation-only write-back (zero mesh stretch)
+            _prevHeadPos = targetHeadPos;
+            _prevHeadRot = targetHeadRot;
+
+            // 3. Aim Bone Transforms Along Simulated Chains
             for (int c = 0; c < _chains.Count; c++)
             {
                 var nodes = _chains[c].nodes;
@@ -309,213 +508,95 @@ namespace AetherStrand
                 }
             }
 
-            UpdateHeadCenterShaderProperty();
-        }
-
-        private void StepChain(
-            HairChain chain,
-            float subDt,
-            float subDtSq,
-            float dampMul,
-            Vector3 subHeadDelta,
-            Vector3 fallbackDir,
-            float stepTime)
-        {
-            var nodes = chain.nodes;
-            int count = nodes.Count;
-            float zoneMul = GetZoneStiffnessMultiplier(chain.zone);
-            float effStiffness = Mathf.Clamp(stiffness * zoneMul, 0.05f, 0.98f);
-
-            nodes[0].worldPos = nodes[0].bone.position;
-            nodes[0].prevWorldPos = nodes[0].worldPos;
-
-            for (int i = 1; i < count; i++)
+            // 4. Sync optional _HeadCenterWS property block for spherical normal smoothing
+            if (hairRenderer != null && headTransform != null)
             {
-                HairNode node = nodes[i];
-                Vector3 velocity = (node.worldPos - node.prevWorldPos) * dampMul;
-                velocity -= subHeadDelta * (0.35f * headInertia * node.tipFraction);
-                node.prevWorldPos = node.worldPos;
-
-                Vector3 windAccel;
-                if (windZone != null)
-                {
-                    windAccel = windZone.SampleWindAcceleration(node.worldPos, chain.seedPhase, stepTime)
-                                * (0.18f + 0.82f * node.tipFraction * node.tipFraction);
-                }
-                else
-                {
-                    float gust = 0.65f + 0.35f * Mathf.Sin(stepTime * 2.3f + chain.seedPhase + i * 0.42f)
-                               + fallbackTurbulence * 0.45f * Mathf.Sin(stepTime * 5.4f + chain.seedPhase * 1.9f);
-                    windAccel = fallbackDir * (fallbackWindStrength * gust * (0.18f + 0.82f * node.tipFraction * node.tipFraction));
-                }
-
-                Vector3 restWorld = headTransform.TransformPoint(node.restLocalPos);
-                for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
-                {
-                    AetherStrandCollider col = colliders[colIdx];
-                    if (col != null && col.enabled)
-                        col.ResolveCollision(ref restWorld, collisionMargin);
-                }
-
-                float tipFalloff = Mathf.Pow(1f - node.tipFraction, 1.45f);
-                float tipCube = node.tipFraction * node.tipFraction * node.tipFraction;
-                Vector3 extAccel = windAccel * 0.64f
-                                 + Vector3.down * (gravity * 0.14f * tipCube)
-                                 + _impulseVelocity * (1.35f * (0.1f + 0.9f * node.tipFraction * node.tipFraction));
-
-                node.worldPos += velocity + extAccel * subDtSq;
-
-                // XPBD compliance-style unconditionally stable rest-pose tether
-                float tetherCompliance = Mathf.Lerp(0.015f, 0.00025f, effStiffness) / Mathf.Max(0.12f, 0.18f + 0.82f * tipFalloff);
-                float alpha = tetherCompliance / Mathf.Max(1e-7f, subDtSq);
-                float tetherFactor = 1f / (1f + alpha);
-                node.worldPos = Vector3.Lerp(node.worldPos, restWorld, tetherFactor);
-
-                if (i <= 3)
-                {
-                    float kFade = i == 1 ? 0.42f : (i == 2 ? 0.22f : 0.09f);
-                    float pinRate = kFade * effStiffness * (rootAnchor / 0.6f) * 45f;
-                    float rootPin = Mathf.Clamp(1f - Mathf.Exp(-pinRate * subDt), 0f, 0.82f);
-                    node.worldPos = Vector3.Lerp(node.worldPos, restWorld, rootPin);
-                }
-            }
-
-            float bendAlpha = Mathf.Clamp01(bendingSmoothness) * 0.30f;
-            for (int iter = 0; iter < solverIterations; iter++)
-            {
-                if (bendAlpha > 0.005f && iter < solverIterations - 1)
-                {
-                    for (int i = 1; i < count - 1; i++)
-                    {
-                        Vector3 restMidLocal = 0.5f * (nodes[i - 1].restLocalPos + nodes[i + 1].restLocalPos);
-                        Vector3 restCurvWorld = headTransform.TransformVector(nodes[i].restLocalPos - restMidLocal);
-                        Vector3 targetMid = 0.5f * (nodes[i - 1].worldPos + nodes[i + 1].worldPos) + restCurvWorld;
-                        nodes[i].worldPos = Vector3.Lerp(nodes[i].worldPos, targetMid, bendAlpha);
-                    }
-                }
-
-                for (int i = 1; i < count; i++)
-                {
-                    HairNode prev = nodes[i - 1];
-                    HairNode curr = nodes[i];
-
-                    Vector3 diff = curr.worldPos - prev.worldPos;
-                    float dist = diff.magnitude;
-                    if (dist > 0.00001f)
-                    {
-                        float err = (dist - curr.segmentLength) / dist;
-                        if (i == 1)
-                        {
-                            curr.worldPos -= diff * err;
-                        }
-                        else
-                        {
-                            prev.worldPos += diff * (err * 0.20f);
-                            curr.worldPos -= diff * (err * 0.80f);
-                        }
-                    }
-
-                    bool hitCollider = false;
-                    for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
-                    {
-                        AetherStrandCollider col = colliders[colIdx];
-                        if (col != null && col.enabled && col.ResolveCollision(ref curr.worldPos, collisionMargin))
-                            hitCollider = true;
-                    }
-
-                    if (hitCollider && iter == solverIterations - 1)
-                    {
-                        // Zero-restitution sliding friction so hair drapes over shoulders without bouncing
-                        curr.prevWorldPos = Vector3.Lerp(curr.prevWorldPos, curr.worldPos, 0.70f);
-                    }
-                }
+                if (_mpb == null) _mpb = new MaterialPropertyBlock();
+                hairRenderer.GetPropertyBlock(_mpb);
+                Vector3 centerWS = headTransform.TransformPoint(new Vector3(0f, 0.12f, -0.01f));
+                _mpb.SetVector(HeadCenterWsId, new Vector4(centerWS.x, centerWS.y, centerWS.z, 0f));
+                hairRenderer.SetPropertyBlock(_mpb);
             }
         }
 
-        public AetherStrandAuditMetrics ComputeAudit()
+        /// <summary>
+        /// Evaluates real-time geometric quality telemetry across all active hair bone chains.
+        /// </summary>
+        public PhysicsAuditResult ComputeAudit()
         {
-            var m = new AetherStrandAuditMetrics { totalChains = _chains.Count };
-            if (!_initialized || _chains.Count == 0 || headTransform == null) return m;
+            int activeColliders = 0;
+            if (colliders != null)
+            {
+                for (int i = 0; i < colliders.Count; i++)
+                {
+                    if (colliders[i] != null && colliders[i].enabled) activeColliders++;
+                }
+            }
 
-            float tipSwaySumM = 0f;
+            var result = new PhysicsAuditResult
+            {
+                totalChains = _chains.Count,
+                colliderCount = activeColliders
+            };
+            if (!_initialized || _chains.Count == 0 || headTransform == null) return result;
+
+            int penetrating = 0;
+            float maxKink = 0f;
+            float tipSwaySumCm = 0f;
+            float maxStretchPct = 0f;
+
             for (int c = 0; c < _chains.Count; c++)
             {
                 var nodes = _chains[c].nodes;
                 int count = nodes.Count;
+                if (count < 2) continue;
 
                 for (int i = 1; i < count; i++)
                 {
-                    Vector3 p = nodes[i].worldPos;
-                    for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
-                    {
-                        var col = colliders[colIdx];
-                        if (col != null && col.enabled && col.SignedDistance(p, collisionMargin * 0.5f) < -0.002f)
-                        {
-                            m.penetratingNodes++;
-                            break;
-                        }
-                    }
+                    HairNode curr = nodes[i];
+                    HairNode prev = nodes[i - 1];
 
-                    float segLen = nodes[i].segmentLength;
-                    if (segLen > 0.001f)
+                    if (curr.segmentLength > 0.0001f)
                     {
-                        float d = Vector3.Distance(p, nodes[i - 1].worldPos);
-                        float pct = Mathf.Abs(d - segLen) / segLen * 100f;
-                        if (pct > m.maxStretchErrorPct) m.maxStretchErrorPct = pct;
+                        float dist = Vector3.Distance(curr.worldPos, prev.worldPos);
+                        float stretchPct = Mathf.Abs(dist - curr.segmentLength) / curr.segmentLength * 100f;
+                        if (stretchPct > maxStretchPct) maxStretchPct = stretchPct;
                     }
 
                     if (i < count - 1)
                     {
-                        Vector3 d0 = (p - nodes[i - 1].worldPos).normalized;
-                        Vector3 d1 = (nodes[i + 1].worldPos - p).normalized;
-                        float kink = Vector3.Angle(d0, d1);
-                        if (kink > m.maxKinkAngleDeg) m.maxKinkAngleDeg = kink;
+                        Vector3 a = curr.worldPos - prev.worldPos;
+                        Vector3 b = nodes[i + 1].worldPos - curr.worldPos;
+                        if (a.sqrMagnitude > 1e-8f && b.sqrMagnitude > 1e-8f)
+                        {
+                            float ang = Vector3.Angle(a, b);
+                            if (ang > maxKink) maxKink = ang;
+                        }
                     }
+
+                    bool isPenetrating = false;
+                    for (int colIdx = 0; colIdx < colliders.Count; colIdx++)
+                    {
+                        AetherStrandCollider col = colliders[colIdx];
+                        if (col != null && col.enabled && col.SignedDistance(curr.worldPos) < -0.001f)
+                        {
+                            isPenetrating = true;
+                            break;
+                        }
+                    }
+                    if (isPenetrating) penetrating++;
                 }
 
                 HairNode tip = nodes[count - 1];
-                Vector3 tipRestW = headTransform.TransformPoint(tip.restLocalPos);
-                tipSwaySumM += Vector3.Distance(tip.worldPos, tipRestW);
+                Vector3 restTipWS = headTransform.TransformPoint(tip.restLocalPos);
+                tipSwaySumCm += Vector3.Distance(tip.worldPos, restTipWS) * 100f;
             }
 
-            m.meanTipSwayCm = (tipSwaySumM / _chains.Count) * 100f;
-            return m;
-        }
-
-        private HairZone ClassifyZone(Transform root)
-        {
-            string n = root.name.ToLowerInvariant();
-            if (n.Contains("bang") || n.Contains("front")) return HairZone.Bangs;
-            if (n.Contains("crown") || n.Contains("top")) return HairZone.Crown;
-            if (n.Contains("side") || n.Contains("temple")) return HairZone.Sides;
-            if (n.Contains("rear") || n.Contains("back") || n.Contains("nape")) return HairZone.Rear;
-
-            Vector3 local = headTransform.InverseTransformPoint(root.position);
-            if (local.z > 0.03f) return HairZone.Bangs;
-            if (local.y > 0.14f && Mathf.Abs(local.x) < 0.055f) return HairZone.Crown;
-            if (local.z < -0.03f) return HairZone.Rear;
-            return HairZone.Sides;
-        }
-
-        private float GetZoneStiffnessMultiplier(HairZone zone)
-        {
-            switch (zone)
-            {
-                case HairZone.Bangs: return bangsStiffnessMul;
-                case HairZone.Crown: return crownStiffnessMul;
-                case HairZone.Sides: return sidesStiffnessMul;
-                default:             return rearStiffnessMul;
-            }
-        }
-
-        private void UpdateHeadCenterShaderProperty()
-        {
-            if (hairRenderer == null || headTransform == null) return;
-            if (_mpb == null) _mpb = new MaterialPropertyBlock();
-            Vector3 centerWS = headTransform.TransformPoint(headCenterLocalOffset);
-            hairRenderer.GetPropertyBlock(_mpb);
-            _mpb.SetVector(IdHeadCenterWS, new Vector4(centerWS.x, centerWS.y, centerWS.z, 1f));
-            hairRenderer.SetPropertyBlock(_mpb);
+            result.penetratingNodes = penetrating;
+            result.maxKinkAngleDeg = maxKink;
+            result.meanTipSwayCm = _chains.Count > 0 ? tipSwaySumCm / _chains.Count : 0f;
+            result.maxStretchErrorPct = maxStretchPct;
+            return result;
         }
 
         private void OnDrawGizmosSelected()
@@ -527,7 +608,7 @@ namespace AetherStrand
                 for (int i = 0; i < chain.nodes.Count - 1; i++)
                 {
                     Gizmos.DrawLine(chain.nodes[i].worldPos, chain.nodes[i + 1].worldPos);
-                    Gizmos.DrawSphere(chain.nodes[i + 1].worldPos, 0.006f);
+                    Gizmos.DrawSphere(chain.nodes[i + 1].worldPos, 0.007f);
                 }
             }
         }

@@ -17,7 +17,8 @@
 # island instead of Neon's round(v, 2) row grouping, so the lock count always equals the card count.
 import bpy, bmesh, sys, os, json, math, random, importlib.util
 import numpy as np
-from mathutils import Vector
+from mathutils import Vector, Matrix
+from mathutils.bvhtree import BVHTree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..', '..', '..'))
@@ -30,7 +31,8 @@ def opt(name, default):
     return argv[argv.index(name) + 1] if name in argv else default
 FBX_OUT = opt('--fbx', DEF_FBX)
 CHAINS = int(opt('--chains', 44)); BONES = int(opt('--bones', 5)); THICK = float(opt('--thick', 0.38)); WIDTH_SCALE = float(opt('--width', 0.85))
-ROOT_FIX = '--no-root-fix' not in argv
+ROOT_FIX = '--root-fix' in argv          # v3 generator pins the root ring to Head itself; kept only for old generator versions
+MODE = opt('--preset', 'shipped')         # shipped = AI Studio's vendor/PresetGeometry.json fitted to Tobin's scalp; hairdeck = HairDeck card spines
 os.makedirs(OUT, exist_ok=True)
 BINS = 12
 
@@ -102,6 +104,33 @@ print('LOCKS', len(locks), 'zones', zc, 'card width mm median', round(1000 * flo
 preset = {'locks': [dict(zone=l['zone'], points=[list(p) for p in l['pts']], width=l['width'],
                          thickness=float(min(0.018, max(0.006, l['width'] * THICK))), seed=l['seed'],
                          layerAO=0.72 if l['core'] else 0.94) for l in locks]}
+fit_info = {}
+if MODE == 'shipped':
+    # AI Studio's shipped lock layout is in its viewport units (Blender Z-up, -Y front, head pivot at the origin).
+    # Fit to Tobin: turn 180 deg about Z (our face points +Y), uniform scale from the root clouds (width and depth), align the root-cloud
+    # centre (x, y) and its top (z) with the HairDeck card roots, then snap each lock's root onto the scalp shell (2 mm tuck).
+    src = json.load(open(os.path.join(HERE, 'vendor', 'PresetGeometry.json')))
+    sl = src['locks']
+    turn = 1.0 if FRONT < 0 else -1.0          # -Y front in the source; flip x and y when our face is +Y
+    Rs = np.array([[turn * l['points'][0][0], turn * l['points'][0][1], l['points'][0][2]] for l in sl])
+    Rd = np.array([list(l['pts'][0]) for l in locks])
+    ext_s, ext_d = Rs.max(0) - Rs.min(0), Rd.max(0) - Rd.min(0)
+    ratios = ext_d / ext_s; SCV = np.array([ratios[0], ratios[1], 0.5 * (ratios[0] + ratios[1])]); SC = float(np.prod(SCV) ** (1 / 3))   # per-axis: skull width/depth from the root clouds, height = their mean (HairDeck nape rows skew the z extent)
+    cs = np.array([(Rs[:, 0].max() + Rs[:, 0].min()) / 2, (Rs[:, 1].max() + Rs[:, 1].min()) / 2, Rs[:, 2].max()])
+    cd = np.array([(Rd[:, 0].max() + Rd[:, 0].min()) / 2, (Rd[:, 1].max() + Rd[:, 1].min()) / 2, Rd[:, 2].max()])
+    sb = bmesh.new(); sb.from_mesh(shell.data); sb.transform(shell.matrix_world); TREE = BVHTree.FromBMesh(sb)
+    out = []; snaps = []
+    for l in sl:
+        P = np.array([[turn * q[0], turn * q[1], q[2]] for q in l['points']])
+        P = (P - cs) * SCV + cd
+        rootW = HEAD + Vector(P[0]); hit, nrm, _i, _d = TREE.find_nearest(rootW)
+        if hit is not None:
+            d = np.array((hit - nrm * 0.002) - rootW); P = P + d; snaps.append(float(np.linalg.norm(d)))
+        e = dict(l); e['points'] = P.tolist(); e['width'] = l['width'] * SC; e['thickness'] = l['thickness'] * SC
+        out.append(e)
+    preset = dict(src); preset['locks'] = out
+    fit_info = dict(scale=SC, scale_xyz=SCV.round(3).tolist(), axis_ratios=ratios.round(3).tolist(), snap_mm_median=1000 * float(np.median(snaps)), snap_mm_p90=1000 * float(np.percentile(snaps, 90)))
+    print('FIT', fit_info, 'shipped locks', len(out), 'base shell', sum(1 for l in out if l.get('isBaseShell')))
 PRESET = os.path.join(OUT, 'TobinPresetGeometry.json')
 json.dump(preset, open(PRESET, 'w'))
 
@@ -110,7 +139,9 @@ spec = importlib.util.spec_from_file_location('aetherstrand_hair_cards', os.path
 AS = importlib.util.module_from_spec(spec); spec.loader.exec_module(AS); AS.register()
 for o in bpy.context.selected_objects: o.select_set(False)
 bpy.context.view_layer.objects.active = None   # no active mesh: roots already sit on the scalp (no BVH projection)
-res = bpy.ops.aetherstrand.generate_sculpted_hair(preset_geometry_json=PRESET, target_chain_count=CHAINS, bones_per_chain=BONES)
+gen = bpy.ops.aetherstrand.generate_sculpted_hair
+props = gen.get_rna_type().properties.keys()
+res = gen(geometry_json_path=PRESET, target_chains=CHAINS, bones_per_chain=BONES) if 'geometry_json_path' in props else gen(preset_geometry_json=PRESET, target_chain_count=CHAINS, bones_per_chain=BONES)
 print('GENERATE', res)
 arm = bpy.data.objects['AetherStrand_HairRig']; hair = bpy.data.objects['AetherStrand_SculptedHairMesh']
 hair.name = 'Tobin_AetherHair'; hair.data.name = 'Tobin_AetherHair'
@@ -169,6 +200,6 @@ bpy.ops.export_scene.fbx(filepath=FBX_OUT, use_selection=True, object_types={'AR
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'tobin_aetherstrand.blend'))
 tris = sum(len(p.vertices) - 2 for p in hair.data.polygons)
 roots = sorted({b.name.rsplit('_', 1)[0] for b in arm.data.bones if b.name.startswith('Hair_')})
-json.dump(dict(locks=len(locks), zones=zc, chains=len(roots), bones=len(arm.data.bones), hair_tris=tris, root_fix=ROOT_FIX, head=list(HEAD), front=FRONT),
+json.dump(dict(locks=len(preset['locks']), hairdeck_cards=len(locks), zones=zc, chains=len(roots), bones=len(arm.data.bones), hair_tris=tris, root_fix=ROOT_FIX, head=list(HEAD), front=FRONT, mode=MODE, fit=fit_info),
           open(os.path.join(OUT, 'summary.json'), 'w'), indent=1)
 print('EXPORT_DONE', FBX_OUT, 'chains', len(roots), 'bones', len(arm.data.bones), 'hair tris', tris)

@@ -2,7 +2,8 @@
 //   HairAB/Tobin_HairDeck.prefab      TobinBase + the installed HairDeck cards (TobinHairMaterialBuilder) + TobinHairSpringChains (hair_<k>_<i> bones)
 //   HairAB/Tobin_AetherStrand.prefab  TobinBase + AetherStrand locks (AetherHair/TobinAetherHair.fbx) + AetherStrandPhysics with 6 colliders (Hair_* bones)
 // Both keep the same scalp shell and cap material. The AetherStrand side uses the plugin's headless API
-// (AetherStrandSetupWindow.CreateMaterialAsset + AutoSetupPhysics) with the preset AetherHair/Tobin_AetherStrand.json.
+// (AetherStrandSetupWindow.CreateMaterialAsset + AutoSetupPhysics, plugin v3.0.0) with AetherHair/Tobin_AetherStrand.json (the shipped look, Tobin's colours).
+// Delete the HairAB prefabs after regenerating a hair FBX: an existing prefab keeps its structure (hair instance) and only gets settings re-applied.
 // Rebuilds are idempotent: an existing prefab is edited in place (structure kept, settings re-applied), so two builds write the same bytes.
 //   unity.ps1 exec -Method SleepingCalamity.EditorTools.TobinHairABBuilder.Run
 // Trial only: not wired into ProjectBuilder.RunAll (the user picks a hair route from the A/B first).
@@ -103,30 +104,15 @@ namespace SleepingCalamity.EditorTools
             if (realHead.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("hair_", System.StringComparison.Ordinal)))
                 throw new System.InvalidOperationException("AetherStrand variant holds HairDeck hair_ bones (two solvers)");
 
-            // Workaround (logged for the plugin): AutoSetupPhysics uses `GetComponent<T>() ?? AddComponent<T>()`, and in the editor a missing
-            // component comes back as Unity's fake null, so `??` never adds. Pre-create the physics and the 6 collider objects it looks up by name.
-            if (root.GetComponent<AetherStrandPhysics>() == null) root.AddComponent<AetherStrandPhysics>();
-            Transform B(HumanBodyBones b) => animator.GetBoneTransform(b);
-            Transform chest = B(HumanBodyBones.UpperChest) != null ? B(HumanBodyBones.UpperChest) : B(HumanBodyBones.Chest);
-            Transform shL = B(HumanBodyBones.LeftShoulder) != null ? B(HumanBodyBones.LeftShoulder) : B(HumanBodyBones.LeftUpperArm);
-            Transform shR = B(HumanBodyBones.RightShoulder) != null ? B(HumanBodyBones.RightShoulder) : B(HumanBodyBones.RightUpperArm);
-            foreach (var (bone, nm) in new[] { (realHead, "AS_Col_Cranium"), (realHead, "AS_Col_FaceJaw"), (B(HumanBodyBones.Neck), "AS_Col_Neck"), (chest, "AS_Col_UpperChest"), (shL, "AS_Col_ShoulderL"), (shR, "AS_Col_ShoulderR") })
-            {
-                if (bone == null) continue;
-                var c = bone.Find(nm);
-                if (c == null) { var go = new GameObject(nm); go.transform.SetParent(bone, false); c = go.transform; }
-                if (c.GetComponent<AetherStrandCollider>() == null) c.gameObject.AddComponent<AetherStrandCollider>();
-            }
-
-            // Head height H scales the 6 colliders. The plugin's neck-to-head heuristic clamps to 0.28 m on MetaPerson (cranium r 0.118 m, which swallows
-            // the scalp-hugging lock nodes: stretch 242 %, kink 150 deg in the audit), so pass the plugin's documented MetaPerson value.
+            // Head height H scales the 6 colliders. Passed explicitly: SkinnedMeshRenderer bounds of the head (the plugin's headMeshWorldBounds path) are
+            // inflated in the editor (0.28 m wide), and v2.1's neck heuristic gave a cranium that swallowed the scalp.
             var phys = AetherStrandSetupWindow.AutoSetupPhysics(root, AetherBonePrefix, AetherPresetPath, HeadHeight, hairSmr);
             if (phys == null) throw new System.InvalidOperationException("AutoSetupPhysics returned null");
             int expected = realHead.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal) && !t.parent.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal));
             if (phys.hairRootBones.Any(t => !t.name.StartsWith(AetherBonePrefix, System.StringComparison.Ordinal))) throw new System.InvalidOperationException("AetherStrand bound a bone outside Hair_");
             if (phys.hairRootBones.Count != expected) throw new System.InvalidOperationException("roots " + phys.hairRootBones.Count + " != chains " + expected);
             if (phys.headTransform != realHead) throw new System.InvalidOperationException("AetherStrand head is " + (phys.headTransform ? phys.headTransform.name : "null"));
-            if (phys.colliders.Count != 6) throw new System.InvalidOperationException("AetherStrand colliders " + phys.colliders.Count + " != 6");
+            if (phys.ComputeAudit().colliderCount != 6 || phys.colliders.Count != 6) throw new System.InvalidOperationException("AetherStrand colliders " + phys.colliders.Count + " != 6");
             phys.drawGizmos = false;
             EditorUtility.SetDirty(phys);
             var headBounds = tobinT.GetComponentsInChildren<SkinnedMeshRenderer>(true).Where(r => r.name.Contains("Head")).Select(r => r.bounds).FirstOrDefault();

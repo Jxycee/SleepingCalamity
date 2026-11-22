@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "2.0",
+  "presetId": "layered_swept_long",
+  "presetName": "Layered Swept Long",
+  "pipeline": "urp",
+  "shader": {
+    "rootColor": "#090a0c",
+    "baseColor": "#25272b",
+    "tipColor": "#4c5057",
+    "primarySpecColor": "#c8ccd2",
+    "secondarySpecColor": "#5c6068",
+    "primaryShift": 0.05,
+    "primaryPower": 64,
+    "primaryIntensity": 0.36,
+    "secondaryShift": -0.14,
+    "secondaryPower": 24,
+    "secondaryIntensity": 0.22,
+    "rimIntensity": 0.48,
+    "rimPower": 2.7,
+    "rootAO": 0.74,
+    "grooveDepth": 0.78,
+    "strandVariation": 0.28
+  },
+  "physics": {
+    "stiffness": 0.74,
+    "gravity": 3.6,
+    "windStrength": 0,
+    "windTurbulence": 0.24,
+    "windAzimuth": 28,
+    "damping": 0.1,
+    "inertia": 0.84,
+    "bendingSmoothness": 0.64,
+    "collisionMarginMm": 9,
+    "rootAnchor": 0.66,
+    "solverSubsteps": 3,
+    "strandWidthScale": 1,
+    "collisionEnabled": true
+  }
+}
