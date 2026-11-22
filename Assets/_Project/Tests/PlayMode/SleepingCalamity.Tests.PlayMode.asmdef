@@ -17,7 +17,8 @@
         "Unity.Netcode.Runtime",
         "Unity.Multiplayer.Tools.NetworkSimulator.Runtime",
         "Unity.Collections",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "AetherStrand.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -1,5 +1,11 @@
 {
   "dependencies": {
+    "com.aetherstrand.sculptedhair": {
+      "version": "file:com.aetherstrand.sculptedhair",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.cqf.urpvolumetricfog": {
       "version": "https://github.com/CristianQiu/Unity-URP-Volumetric-Light.git#0.5.91",
       "depth": 0,

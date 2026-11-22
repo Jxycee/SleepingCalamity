@@ -1,0 +1,19 @@
+{
+  "name": "com.aetherstrand.sculptedhair",
+  "version": "2.1.0",
+  "displayName": "AetherStrand Sculpted Volumetric Hair (URP)",
+  "description": "Volumetric sculpted hair shader (URP 17.x) with carved fiber grooves, dual-lobe Kajiya-Kay specular, substepped bone-chain physics, analytical colliders, and PlayMode audit telemetry.",
+  "unity": "6000.0",
+  "keywords": [
+    "hair",
+    "sculpted-hair",
+    "shader",
+    "kajiya-kay",
+    "physics",
+    "xpbd",
+    "urp"
+  ],
+  "author": {
+    "name": "AetherStrand Studio"
+  }
+}

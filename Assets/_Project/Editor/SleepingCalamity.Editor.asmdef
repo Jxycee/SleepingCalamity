@@ -18,7 +18,9 @@
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
         "UnityEngine.UI",
-        "uLipSync.Runtime"
+        "uLipSync.Runtime",
+        "AetherStrand.Runtime",
+        "AetherStrand.Editor"
     ],
     "includePlatforms": [
         "Editor"
