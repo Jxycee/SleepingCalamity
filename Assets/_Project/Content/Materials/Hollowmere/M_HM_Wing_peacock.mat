@@ -36,8 +36,8 @@ Material:
     - _FlapAmp: 0.55
     - _FlapSpeed: 22
     - _Fold: 0
-    - _Translucency: 0.8
+    - _Translucency: 0.6
     m_Colors:
-    - _Tint: {r: 1, g: 1, b: 1, a: 1}
+    - _Tint: {r: 0.86, g: 0.84, b: 0.78, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
