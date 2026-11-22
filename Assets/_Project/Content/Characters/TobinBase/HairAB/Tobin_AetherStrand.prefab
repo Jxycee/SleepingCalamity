@@ -241,9 +241,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 1
-  centerOffset: {x: 0, y: 0.0784, z: 0.042000003}
-  radius: 0.08400001
-  capsuleHeight: 0.10080001
+  centerOffset: {x: 0, y: 0.0644, z: 0.034500003}
+  radius: 0.069000006
+  capsuleHeight: 0.08280001
   capsuleAxis: {x: 0, y: 0.98893636, z: -0.14834046}
 --- !u!1 &84311700722964123
 GameObject:
@@ -842,9 +842,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 1
-  centerOffset: {x: 0, y: 0.042000003, z: -0.014}
-  radius: 0.117599994
-  capsuleHeight: 0.252
+  centerOffset: {x: 0, y: 0.034500003, z: -0.0115}
+  radius: 0.096599996
+  capsuleHeight: 0.207
   capsuleAxis: {x: 1, y: 0, z: 0}
 --- !u!1 &476073201868845939
 GameObject:
@@ -3613,9 +3613,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 1
-  centerOffset: {x: 0, y: 0.050400004, z: 0}
-  radius: 0.072799996
-  capsuleHeight: 0.154
+  centerOffset: {x: 0, y: 0.041400004, z: 0}
+  radius: 0.0598
+  capsuleHeight: 0.12650001
   capsuleAxis: {x: 0, y: 1, z: 0}
 --- !u!1 &2686793797086231187
 GameObject:
@@ -3665,7 +3665,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandPhysics
   headTransform: {fileID: 9098268153590647256}
   hairRenderer: {fileID: 1578700740203810666}
-  headCenterLocalOffset: {x: 0, y: 0.14, z: -0.0084}
+  headCenterLocalOffset: {x: 0, y: 0.115, z: -0.0069}
   hairRootBones:
   - {fileID: 3275912201235501224}
   - {fileID: 7387193645760844823}
@@ -9271,9 +9271,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 1
-  centerOffset: {x: 0, y: 0.058799997, z: 0.0028}
-  radius: 0.0672
-  capsuleHeight: 0.117599994
+  centerOffset: {x: 0, y: 0.048299998, z: 0.0023}
+  radius: 0.0552
+  capsuleHeight: 0.096599996
   capsuleAxis: {x: 0, y: 1, z: 0}
 --- !u!1 &6408583468719096627
 GameObject:
@@ -11130,9 +11130,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 1
-  centerOffset: {x: 0, y: 0.050400004, z: 0}
-  radius: 0.072799996
-  capsuleHeight: 0.154
+  centerOffset: {x: 0, y: 0.041400004, z: 0}
+  radius: 0.0598
+  capsuleHeight: 0.12650001
   capsuleAxis: {x: 0, y: 1, z: 0}
 --- !u!1 &8225683199770603981
 GameObject:
@@ -11274,8 +11274,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AetherStrand.Runtime::AetherStrand.AetherStrandCollider
   shape: 0
-  centerOffset: {x: 0, y: 0.14559999, z: -0.0112}
-  radius: 0.117599994
+  centerOffset: {x: 0, y: 0.1196, z: -0.0092}
+  radius: 0.096599996
   capsuleHeight: 0
   capsuleAxis: {x: 0, y: 1, z: 0}
 --- !u!1 &8369569688984905262

@@ -31,7 +31,7 @@
     "damping": 0.095,
     "inertia": 0.88,
     "bendingSmoothness": 0.52,
-    "collisionMarginMm": 11.0,
+    "collisionMarginMm": 3.0,
     "rootAnchor": 0.62,
     "solverSubsteps": 3,
     "solverIterations": 4
