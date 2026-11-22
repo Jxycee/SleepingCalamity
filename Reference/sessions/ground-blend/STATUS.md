@@ -1,4 +1,4 @@
-State: DONE (check result below)
+State: DONE
 Branch: claude/ground-blend-4d3fa9 (worktree .claude/worktrees/fable-coordinator-playbook-eec554), cut from 98728afa. Not pushed, not merged.
 
 | Commit | What |
@@ -21,5 +21,9 @@ Neon's code problems: NEON-NOTES.md. Open: parapet caps / lifted block / "L" are
 | Meadow | .1539 / .1482 | 32 vs 31 | after (marginal) |
 
 Notes: effect on HF is small (OrchardGap near .2028 -> .1783 the largest). Reviewers did not find docs/art/scene-judging.md in the worktree for some runs and scored from general criteria; Meadow reviewer saw labelled crops. Shore stones not covered by these cameras: dry-look of the 0.28 clamp unchecked (needs LakeShore/Jetty). Parapet caps, lifted block, "L" need Blender wall-kit regen (not done).
+
+Check on tip 1ee4a6e9 (SC MARKER = 1ee4a6e9): build PASS, EditMode 1869/1869, PlayMode 310 passed / 0 failed / 36 skipped (346). First run failed one test, CombatArenaTests.Solo_SixRatsOnOneHero_InsideARoom_StayInRoomAndApart (hover overlap 0.953 vs 0.98), passed on rerun with no code change: flaky, unrelated to this branch.
+
+Verdict: renders near-identical (mean luma diff 2-6, HF share -1..4% relative); A/B margins small. Not a fix for the cohesion gap on its own. Grounding of rubble/slabs is the visible gain.
 
 Archive: ready
