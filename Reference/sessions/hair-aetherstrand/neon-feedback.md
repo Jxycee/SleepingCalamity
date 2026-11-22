@@ -8,6 +8,13 @@ The plugin is used as shipped. Where we had to work around something, it is said
 
 ## Audit numbers with the shipped defaults (Tobin, MetaPerson head, 44 chains)
 - With AutoSetupPhysics' own head-height estimate (H clamped to 0.28 m, so the cranium sphere has r 0.118 m): `chains 44 penetrating 0 kink 150.3 deg stretch 242.05 % tipSway 10.40 cm` after 90 frames. Head-turn snap: `kink 140.4 stretch 242.32 % tipSway 15.96 cm`. The oversized colliders push the scalp-hugging nodes out, and the root node is not projected, so segment 1 stretches. That is the heuristic in item 8.
+- With H set to 0.23 m (cranium r 0.097 m), margin 11 mm: `kink 150.5 deg stretch 76.76 % tipSway 3.95 cm`. Snap: `kink 96.4 stretch 76.68 % tipSway 9.71 cm`.
+- Same, margin 3 mm (our Tobin preset): `penetrating 0 kink 150.5 deg stretch 52.46 % tipSway 3.42 cm`. Snap: `kink 96.4 stretch 52.15 % tipSway 9.47 cm`. Settled: `kink 151.7 stretch 52.76 %`.
+- **The kink limit fails at rest, before any simulation.** We measured the exported rig in Blender: Hair_Rear_19 already bends 155.5 deg between bones, and 35 of 44 chains bend more than 28 deg. Two causes:
+  (a) `maxKinkAngleDeg` is the absolute angle between segments. A curved or spiky groom always has large rest angles, so measure the change from the rest angle instead.
+  (b) The generator averages the member locks' spines per cluster (item 19). Locks that leave nearby roots in different directions (the crown, the back whorl) average into a folded chain. Cluster on root plus tip direction, or give each lock its own chain.
+- The stretch error stays high (52-77 %) while the bone lengths themselves never change (rotation-only write-back, 0.00 % measured on bones). So the error is in the sim nodes. It is most likely the folded chains and the unprojected root node fighting the collider push in segment 1.
+- For comparison, the same bone measure on our current HairDeck spring chains (wind 0): tip sway 0.30 cm idle, 0.93 cm at the end of a 60 deg / 0.1 s head turn, stretch 2.6 % idle. The AetherStrand chains with wind 0: tip sway 2.96 cm idle (max 12 cm), 7.2 cm after the turn. They do not hold the rest shape: gravity 4.4 against stiffness 0.62 lets the long rear chains sag.
 
 ## Packaging
 1. No `.asmdef` files. We added `AetherStrand.Runtime` and an editor-only `AetherStrand.Editor`. Please ship them.

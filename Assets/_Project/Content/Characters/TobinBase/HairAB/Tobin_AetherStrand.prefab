@@ -3724,7 +3724,7 @@ MonoBehaviour:
   damping: 0.095
   headInertia: 0.88
   bendingSmoothness: 0.52
-  collisionMargin: 0.011000001
+  collisionMargin: 0.003
   rootAnchor: 0.62
   solverSubsteps: 3
   solverIterations: 4
