@@ -188,3 +188,5 @@ Assets/_Project/Content/Generated/**/*.asset  lfs
 
 # T24c: the split manifest is compared as text by a scoped save: LF in every checkout
 Assets/_Project/Scenes/Hollowmere_SplitManifest.txt  text eol=lf
+# Ground-blend step: the baked ground height/albedo of the town (SCGroundBaker), raw bytes
+Hollowmere_GroundBake_*.bytes filter=lfs diff=lfs merge=lfs -text

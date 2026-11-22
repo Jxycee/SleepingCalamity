@@ -248,6 +248,8 @@ namespace SleepingCalamity.EditorTools
             HollowmereGround.Build(set, ruined, rebuilt, t);   // T13a: lone street props grouped by use or removed, stall goods, contact rings, plants and chips (after every collider)
             Lap("square-to-ground");
             BuildPathDebug(root, t);
+            HollowmereGroundBake.Run(root, set);   // ground-blend step: CPU top-down bake of the ground (terrain + paving slab), the binder on the root (after every collider; before combine/externalize/split)
+            Lap("ground-bake");
 
             Transform lighting = Child(root, "Lighting");
             Light sun = LookTestBuilder.AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.identity, Color.white, 3f, 10f, LightShadows.Soft);
