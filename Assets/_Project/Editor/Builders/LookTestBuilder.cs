@@ -45,7 +45,7 @@ namespace SleepingCalamity.EditorTools
 
         // The same Forward+ / SSAO / 4-cascade stack at other asset paths: each is copied from its source asset when missing, then brought to the numbers below.
         // BeautyCornerBuilder passes its own copy of the look-test assets with a stronger SSAO, so tuning the corner never moves the LookTest scenes.
-        public static void EnsureRendering(string rendererPath, string rpAssetPath, string sourceRenderer, string sourceRp, float ssaoIntensity, float ssaoDirect)
+        public static void EnsureRendering(string rendererPath, string rpAssetPath, string sourceRenderer, string sourceRp, float ssaoIntensity, float ssaoDirect, float ssaoRadius = 0.35f, int ssaoSamples = 1)   // samples: 0 High (12), 1 Medium (8), 2 Low (4)
         {
             BuilderUtil.EnsureFolder(RenderingFolder);
             if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(rendererPath) == null)
@@ -70,7 +70,8 @@ namespace SleepingCalamity.EditorTools
             using (var so = new SerializedObject(ssao))
             {
                 SetInt(so, "m_Settings.Source", 1);                  // DepthNormals
-                SetFloat(so, "m_Settings.Radius", 0.35f);
+                SetFloat(so, "m_Settings.Radius", ssaoRadius);
+                SetInt(so, "m_Settings.Samples", ssaoSamples);
                 SetFloat(so, "m_Settings.Intensity", ssaoIntensity);
                 SetFloat(so, "m_Settings.DirectLightingStrength", ssaoDirect);
                 if (so.ApplyModifiedPropertiesWithoutUndo()) changed = true;

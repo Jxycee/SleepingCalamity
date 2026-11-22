@@ -55,7 +55,7 @@ namespace SleepingCalamity.EditorTools
         static void EnsureLookAssets()
         {
             LookTestBuilder.EnsureRendering();   // the look-test stack is the copy source of the corner's own assets (and is put back to its own numbers)
-            LookTestBuilder.EnsureRendering(RendererPath, RpAssetPath, LookTestBuilder.RendererPath, LookTestBuilder.RpAssetPath, 1.8f, 0.3f);
+            LookTestBuilder.EnsureRendering(RendererPath, RpAssetPath, LookTestBuilder.RendererPath, LookTestBuilder.RpAssetPath, 1.8f, 0.3f, 0.45f, 0);   // ground-blend step: radius 0.35 -> 0.45, samples Medium -> High (the corner and the Hollowmere eye cameras only)
             LookTestBuilder.BuildMaterials();
             BuildProfile();
             BuildSupportMaterials();
