@@ -26,8 +26,10 @@ Export FBX -Z forward, Y up, FBX_SCALE_UNITS, bake_space_transform, FACE smoothi
   --showcase renders the ruined and kit shots, --with-walls puts wall stubs beside the gates, --quick renders one view per gate state.
 Tris: straight modules 3.4-3.8k, Breach 6.0k, Crumbled 3.7k, Buttress 0.8k, End 2.4k, Stair 1.6k; gate Frame 31.3k / 26.0k,
 Shell 18.5k / 20.8k, Part_Door 1.2k. Exports go to Assets/_Project/Content/Art/Town/Wall (see SOURCES.md there).
-Status (2026-10-31, cloud): self-review 28.5-30/40 per family (rubric in SOURCES.md). Next visible gains: lichen colour (needs an
-orange channel in the wear shader), moss and ivy at the wall foot (B9 foliage), a more broken top on Wall_Crumbled, ivy on the gates.
+Status (2026-11-22, Pass A wall-kit rewrite): eliminated floating parapet blocks/merlons and stray breach overhang artifacts,
+replaced disconnected ruined merlon teeth with fused stepped/eroded masonry top courses, replaced giant faceted breach cubes with
+low sunken mortared talus (leaving hero rubble to Megascans), and upgraded SC_WEAR linear vertex colours (R grime in foot/recesses,
+G moss on up-facing tops/ledges, B polish on walk-height worn edges; no-wear encoded as (0,0,0,1) and R+G+B clamped <= 2.50 < 2.99).
 """
 import sys, os, math, random, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -218,24 +220,25 @@ ICO_F = [(0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11), (1, 5, 9), (
          (7, 1, 8), (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9), (4, 9, 5), (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1)]
 
 def rock(pc, key, c, size, R, block=False):
-    """A low-poly rubble stone (20 tris) or a fallen ashlar block (12 tris) centred at c, half sizes `size`."""
+    """A low-poly rubble stone (20 tris) or chamfered fallen block centred at c, half sizes `size`."""
     sx, sy, sz = size
-    rot = Matrix.Rotation(R.uniform(0, 6.283), 4, 'Z') @ Matrix.Rotation(R.uniform(-0.5, 0.5), 4, 'X') @ \
-        Matrix.Rotation(R.uniform(-0.5, 0.5), 4, 'Y')
+    rot = Matrix.Rotation(R.uniform(0, 6.283), 4, 'Z') @ Matrix.Rotation(R.uniform(-0.45, 0.45), 4, 'X') @ \
+        Matrix.Rotation(R.uniform(-0.45, 0.45), 4, 'Y')
     c = Vector(c)
     if block:
-        pts = [Vector((a * sx, b * sy, e * sz)) for a in (-1, 1) for b in (-1, 1) for e in (-1, 1)]
-        faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
-    else:
-        pts = [Vector(v).normalized() for v in ICO_V]
-        pts = [Vector((p.x * sx, p.y * sy, p.z * sz)) for p in pts]
-        faces = ICO_F
-    pts = [rot @ (p * R.uniform(0.82, 1.12)) + c for p in pts]
-    for f in faces:
+        # Chamfered irregular stone block via FK.add_box (no razor-sharp 12-tri cubes)
+        box(pc, key, (sx * 2.0, sy * 2.0, sz * 2.0), T(c.x, c.y, c.z) @ rot,
+            cham=min(sx, sy, sz) * 0.28, wob=min(sx, sy, sz) * 0.14, seed=R.random() * 80.0)
+        return
+    pts = [Vector(v).normalized() for v in ICO_V]
+    pts = [Vector((p.x * sx, p.y * sy, p.z * sz)) for p in pts]
+    pts = [rot @ (p * R.uniform(0.84, 1.10)) + c for p in pts]
+    for f in ICO_F:
         add_face(pc, key, [pts[i] for i in f], ref=c, off=(R.random(), R.random()))
 
-def heap(pc, R, cx, cy, rx, ry, hmax, n, zbase=0.0, keys=(('rubble', 0.45), ('ochre', 0.3), ('coping', 0.1), ('foot', 0.15)),
-         smin=0.1, smax=0.36, clip=None, blocks=0.25, yaw=0.0):
+def heap(pc, R, cx, cy, rx, ry, hmax, n, zbase=0.0, keys=(('rubble', 0.45), ('ochre', 0.25), ('rubble_d', 0.15), ('foot', 0.15)),
+         smin=0.08, smax=0.22, clip=None, blocks=0.0, yaw=0.0):
+    """Low sunken mortared talus skirt (leaves hero boulder/rubble piles to Megascans assemblies)."""
     ca, sa = math.cos(yaw), math.sin(yaw)
     for _ in range(n):
         r = math.sqrt(R.random()); a = R.uniform(0, 6.283)
@@ -243,15 +246,16 @@ def heap(pc, R, cx, cy, rx, ry, hmax, n, zbase=0.0, keys=(('rubble', 0.45), ('oc
         x, y = cx + lx * ca - ly * sa, cy + lx * sa + ly * ca
         if clip and not clip(x, y):
             continue
-        h = hmax * (1 - r ** 1.6)
-        s = R.uniform(smin, smax) * (1.0 + 0.5 * (1 - r))
-        z = zbase + h * R.uniform(0.35, 1.0) + s * 0.25
-        t = R.random(); acc = 0; k = keys[0][0]
+        h = hmax * (1.0 - r ** 1.7)
+        s = R.uniform(smin, smax) * (0.85 + 0.35 * (1.0 - r))
+        # Seat stones down into the talus/ground so nothing ever hovers
+        z = zbase + h * R.uniform(0.15, 0.72) - s * 0.15
+        t = R.random(); acc = 0.0; k = keys[0][0]
         for kk, w in keys:
             acc += w
             if t <= acc:
                 k = kk; break
-        rock(pc, k, (x, y, z), (s * R.uniform(0.8, 1.3), s * R.uniform(0.8, 1.3), s * R.uniform(0.55, 0.9)), R,
+        rock(pc, k, (x, y, z), (s * R.uniform(0.85, 1.25), s * R.uniform(0.85, 1.25), s * R.uniform(0.50, 0.80)), R,
              block=R.random() < blocks)
 
 # ----------------------------------------------------------------------------- loft (extruded section with a varying profile)
@@ -342,11 +346,13 @@ class WallSpec:
         self.__dict__.update(kw)
 
 def core_loft(S):
-    n = max(2, int(round((S.x1 - S.x0) / 0.25)))
+    # Finer 0.16 m sampling keeps stepped breach/crumbled profiles tight with zero overhanging skin slabs
+    n = max(4, int(round((S.x1 - S.x0) / 0.16)))
     xs = [S.x0 + (S.x1 - S.x0) * i / n for i in range(n + 1)]
     secs = []
     def poly(x, inset=0.0, drop=0.0):
-        tb = min(BODY_TOP, S.tb(x)) - drop; tp = max(tb, S.tp(x) - drop)
+        tb = min(BODY_TOP, S.tb(x)) - drop
+        tp = max(tb, S.tp(x) - drop)
         zb = -0.55
         return [(yo(zb) + inset, zb), (TH, zb), (TH, tb), (PAR_IN, tb), (PAR_IN, tp), (yo(tp) + inset, tp)]
     if S.ext[0]:
@@ -356,6 +362,50 @@ def core_loft(S):
     if S.ext[1]:
         secs.append((S.x1 + 0.2, poly(S.x1, 0.045, 0.03)))
     return loft_bm(secs, lambda s, a, b: Vector((s, a, b)))
+
+def _eroded_parapet_courses(pc, S, R):
+    """Fused, stepped/eroded masonry top courses along ruined/crumbled wall tops (replaces disconnected boxy merlon teeth).
+    Every course block is seated 0.08 m down into the parapet core so nothing can ever float."""
+    step_w = 0.44
+    x = S.x0 + 0.02
+    idx = 0
+    while x < S.x1 - 0.08:
+        ln = min(S.x1 - x - 0.02, R.uniform(0.36, 0.62))
+        if S.x1 - (x + ln) < 0.26:
+            ln = S.x1 - x - 0.02
+        xm = x + ln * 0.5
+        base_z = min(S.tp(x + 0.04), S.tp(xm), S.tp(x + ln - 0.04))
+        if base_z >= 0.42:
+            # Stepped course height: higher on full-height ruined parapet, lower near breach shoulders
+            full_parapet = base_z >= PAR_TOP - 0.15
+            nz = noise.noise(Vector((xm * 1.45, S.seed * 0.73, idx * 0.19)))
+            extra_h = (0.14 + 0.34 * max(0.0, nz + 0.35)) if full_parapet else (0.08 + 0.16 * max(0.0, nz + 0.4))
+            # Embed 0.08 m down into the wall core so every stone is fused to the course below
+            embed = 0.08
+            tot_h = extra_h + embed
+            y_out = yo(base_z)
+            y_in = PAR_IN if (S.tp(xm) > S.tb(xm) + 0.15) else TH
+            depth = max(0.36, min(0.68, (y_in - y_out) * 0.92))
+            yc = y_out + depth * 0.5 + 0.02
+            k_roll = R.random()
+            key = 'rubble_d' if k_roll < 0.22 else 'rubble_w' if k_roll < 0.44 else 'ochre' if k_roll < 0.62 else 'rubble'
+            yaw = RZ(R.uniform(-0.022, 0.022))
+            pitch = Matrix.Rotation(R.uniform(-0.03, 0.03), 4, 'Y')
+            box(pc, key, (ln - 0.015, depth, tot_h),
+                T(xm, yc, base_z - embed + tot_h * 0.5) @ yaw @ pitch,
+                cham=0.035, wob=0.014, seed=R.random() * 60.0)
+            # Occasional fused second-course stone on intact ruined parapet stretches (never overhanging)
+            if full_parapet and extra_h > 0.28 and ln > 0.42 and R.random() < 0.45:
+                sub_w = ln * R.uniform(0.55, 0.78)
+                sub_h = R.uniform(0.12, 0.22)
+                sub_embed = 0.05
+                sub_x = xm + R.uniform(-0.05, 0.05)
+                box(pc, 'rubble_l' if R.random() < 0.35 else 'rubble',
+                    (sub_w, depth * 0.86, sub_h + sub_embed),
+                    T(sub_x, yc, base_z + extra_h - sub_embed + (sub_h + sub_embed) * 0.5) @ yaw,
+                    cham=0.03, wob=0.014, seed=R.random() * 60.0)
+        x += ln
+        idx += 1
 
 def wall_pc(S):
     R = R_(S.name + str(S.seed))
@@ -367,7 +417,6 @@ def wall_pc(S):
         h = FOOT_TOP - FOOT_BOT
         mid = (xa + xb) / 2
         box(pc, 'foot', (xb - xa, 1.7, h), T(mid, 0.0, FOOT_BOT + h / 2), cham=0.05, wob=0.01, seed=R.random() * 50)
-    ex = 0.0
     # --- outer face (normal -Y): U=+X, V=+Z
     O_out = Vector((0, 0, 0)); Uo = Vector((1, 0, 0)); Vz = Vector((0, 0, 1)); No = Vector((0, -1, 0))
     def in_patch(face, u, v, ua=0, ub=0, va=0, vb=0):
@@ -375,19 +424,24 @@ def wall_pc(S):
             if f == face and pa - 0.05 < u < pb + 0.05 and qa - 0.05 < v < qb + 0.05:
                 return True
         return False
-    vm_out = lambda u: S.tp(u) - (COPE1 - COPE0 if S.coping and S.tp(u) >= PAR_TOP - 1e-3 else 0.0)
+    # Clamp outer masonry strictly below the local parapet top (using min across stone width to prevent breach-edge overhangs)
+    vm_out = lambda u: min(S.tp(max(S.x0, u - 0.14)), S.tp(u), S.tp(min(S.x1, u + 0.14))) - (
+        COPE1 - COPE0 if S.coping and S.tp(u) >= PAR_TOP - 1e-3 else 0.0)
     masonry(pc, O_out, Uo, Vz, No, S.x0, S.x1, -0.5, 3.0, R, vmax=vm_out, bat=bat_out,
             skip=lambda u, v, *a: in_patch('out', u, v), ochre=0.28)
     # --- inner face (normal +Y): U=-X, V=+Z, up to the corbel under the deck
     Ui = Vector((-1, 0, 0)); Ni = Vector((0, 1, 0))
-    top_in = lambda u: (S.tb(-u) - (0.14 if S.corbel and S.tb(-u) >= BODY_TOP - 1e-3 else 0.0))
+    top_in = lambda u: min(S.tb(max(S.x0, -u - 0.14)), S.tb(-u), S.tb(min(S.x1, -u + 0.14))) - (
+        0.14 if S.corbel and S.tb(-u) >= BODY_TOP - 1e-3 else 0.0)
     masonry(pc, Vector((0, 0, 0)), Ui, Vz, Ni, -S.x1, -S.x0, -0.5, 2.2, R, vmax=top_in, bat=lambda v: TH,
             skip=lambda u, v, *a: in_patch('in', u, v), ochre=0.3)
     # --- parapet inner face (normal +Y at y = PAR_IN)
     Op = Vector((0, PAR_IN, 0))
-    masonry(pc, Op, Ui, Vz, Ni, -S.x1, -S.x0, BODY_TOP, 3.0, R, vmax=lambda u: S.tp(-u) - (COPE1 - COPE0 if S.coping and S.tp(-u) >= PAR_TOP - 1e-3 else 0.0),
+    vm_pin = lambda u: min(S.tp(max(S.x0, -u - 0.14)), S.tp(-u), S.tp(min(S.x1, -u + 0.14))) - (
+        COPE1 - COPE0 if S.coping and S.tp(-u) >= PAR_TOP - 1e-3 else 0.0)
+    masonry(pc, Op, Ui, Vz, Ni, -S.x1, -S.x0, BODY_TOP, 3.0, R, vmax=vm_pin,
             bat=lambda v: 0.0, ochre=0.3, course=(0.22, 0.34),
-            skip=lambda u, v, *a: S.tp(-u) <= S.tb(-u) + 0.12 or v > S.tp(-u) - 0.1 and False)
+            skip=lambda u, v, *a: S.tp(-u) <= S.tb(-u) + 0.18)
     # patches: tidy newer courses, a little proud
     for (face, pa, pb, qa, qb) in S.patches:
         if face == 'out':
@@ -396,21 +450,21 @@ def wall_pc(S):
         else:
             masonry(pc, Vector((0, 0, 0)), Ui, Vz, Ni, -pb, -pa, qa, qb, R, key='patch', bat=lambda v: TH, course=(0.25, 0.28),
                     length=(0.36, 0.55), dmax=0.075, joint=0.03, ochre=0.0, shape=0.0, flush=False, warp=0.0, split=0.0, pin=0.0)
-    # --- string course (outer, pale) and corbel course (inner, pale)
+    # --- string course (outer, pale) and corbel course (inner, pale): pulled back 0.15 m from any breach drop
     if S.string:
         zc = 2.15
-        xs = _split(S.x0, S.x1, R, 0.8, 1.4)
-        for (a, b) in xs:
-            if min(S.tb(a), S.tb(0.5 * (a + b)), S.tb(b)) < BODY_TOP - 0.01:
+        for (a, b) in _split(S.x0, S.x1, R, 0.8, 1.4):
+            if min(S.tb(max(S.x0, a - 0.12)), S.tb(a), S.tb(0.5 * (a + b)), S.tb(b), S.tb(min(S.x1, b + 0.12))) < BODY_TOP - 0.01:
                 continue
             box(pc, 'coping', (b - a - 0.03, 0.2, 0.15), T((a + b) / 2, yo(zc) - 0.02, zc), cham=0.02, wob=0.004, seed=R.random() * 40)
     if S.corbel:
         zc = 2.04
         for (a, b) in _split(S.x0, S.x1, R, 0.7, 1.3):
-            if min(S.tb(a), S.tb(0.5 * (a + b)), S.tb(b)) < BODY_TOP - 0.01:
+            if min(S.tb(max(S.x0, a - 0.12)), S.tb(a), S.tb(0.5 * (a + b)), S.tb(b), S.tb(min(S.x1, b + 0.12))) < BODY_TOP - 0.01:
                 continue
             box(pc, 'coping', (b - a - 0.03, 0.22, 0.14), T((a + b) / 2, TH + 0.06, zc), cham=0.02, wob=0.004, seed=R.random() * 40)
-    # --- coping band and merlons on the outer parapet
+    # --- coping band on the outer parapet (track exact covered spans so merlons can never float over missing coping)
+    coped_spans = []
     if S.coping:
         slabs = _split(S.x0, S.x1, R, 0.95, 1.05, even=True)
         for i, (a, b) in enumerate(slabs):
@@ -418,71 +472,90 @@ def wall_pc(S):
             if not _on(S.coping, i, xm) or min(S.tp(a), S.tp(xm), S.tp(b)) < PAR_TOP - 1e-3:
                 continue
             key = 'patch' if i in S.patched_coping else 'coping'
-            # overlap trick: both ends overshoot 6 cm into the neighbour; the right-end slab sits 4 mm lower so it never z-fights
             lo = a + 0.006 if (i > 0 or not S.ext[0]) else a - 0.06
             hi = b - 0.006 if (i < len(slabs) - 1 or not S.ext[1]) else b + 0.06
             dz = 0.02 if i in S.patched_coping else 0.0
-            box(pc, key, (hi - lo, 0.62, COPE1 - COPE0 + dz), T((lo + hi) / 2, -0.38, (COPE0 + COPE1 + dz) / 2 - (0.004 if i == len(slabs) - 1 else 0.0)),
+            # Seat coping 0.03 m into parapet top so no seam gap can open
+            cope_h = (COPE1 - COPE0) + dz + 0.03
+            box(pc, key, (hi - lo, 0.62, cope_h),
+                T((lo + hi) / 2, -0.38, COPE0 - 0.03 + cope_h * 0.5 - (0.004 if i == len(slabs) - 1 else 0.0)),
                 cham=0.025, wob=0.004, seed=R.random() * 30)
-    if S.spout is not None and S.tp(S.spout) >= PAR_TOP - 1e-3:
-        # a stone water spout under the coping on the outer face (rain from the walkway), with a dark mouth
+            coped_spans.append((lo, hi))
+    if S.spout is not None and min(S.tp(S.spout - 0.15), S.tp(S.spout), S.tp(S.spout + 0.15)) >= PAR_TOP - 1e-3:
         box(pc, 'coping', (0.2, 0.55, 0.2), T(S.spout, -0.9, 2.52) @ Matrix.Rotation(-0.12, 4, 'X'), cham=0.025, wob=0.003, seed=5.5)
         box(pc, 'foot', (0.1, 0.1, 0.1), T(S.spout, -1.19, 2.47), cham=0.0)
-    if S.merlons:
-        # polish 2: no two merlons alike (width, height, a hair of offset and yaw); a few chipped, a few gone (Ruined)
+    # --- parapet top: fused eroded courses on ruined/broken pieces, or grounded merlons on intact/rebuilt pieces
+    if getattr(S, 'eroded_top', False):
+        _eroded_parapet_courses(pc, S, R)
+    elif S.merlons:
         Rm = R_(S.name + 'merlons' + str(S.seed))
+        def is_coped(xa_m, xb_m):
+            return any(lo <= xa_m + 0.02 and hi >= xb_m - 0.02 for (lo, hi) in coped_spans)
         for i in range(4):
             xm = -1.5 + i
-            if not (_on(S.merlons, i, xm) and S.tp(xm) >= PAR_TOP - 1e-3):
+            w = 0.62 + Rm.uniform(-0.07, 0.05)
+            dx = Rm.uniform(-0.04, 0.04)
+            cx = xm + dx
+            # Hard invariant: never build a merlon unless full parapet AND coping slab exist underneath its whole footprint
+            if not (_on(S.merlons, i, xm)
+                    and min(S.tp(cx - w * 0.5), S.tp(cx), S.tp(cx + w * 0.5)) >= PAR_TOP - 1e-3
+                    and (not S.coping or is_coped(cx - w * 0.45, cx + w * 0.45))):
                 continue
             key = 'patch' if (i in S.patched_coping) else 'rubble'
             ck = 'patch' if (i in S.patched_coping) else 'coping'
-            w = 0.62 + Rm.uniform(-0.07, 0.05); top = MER1 + Rm.uniform(-0.06, 0.03)
-            dx = Rm.uniform(-0.04, 0.04); yaw = RZ(Rm.uniform(-0.025, 0.025))
+            top = MER1 + Rm.uniform(-0.06, 0.03)
+            yaw = RZ(Rm.uniform(-0.025, 0.025))
             roll = Rm.random(); repaired = i in S.patched_coping
+            seat = 0.04  # Embed 4 cm into coping band so merlons are fused to the course below
             if not repaired and roll < S.miss:
-                hs = Rm.uniform(0.08, 0.2)   # stub of the merlon, ragged top
-                box(pc, key, (w, 0.42, hs), T(xm + dx, -0.36, MER0 + hs / 2) @ yaw, cham=0.03, wob=0.02, seed=Rm.random() * 30)
-                if S.deck:
-                    rock(pc, 'coping', (xm + Rm.uniform(-0.3, 0.3), 0.3 + Rm.uniform(-0.15, 0.15), 2.27), (0.2, 0.14, 0.05), Rm, block=True)
+                hs = Rm.uniform(0.08, 0.18) + seat
+                box(pc, key, (w, 0.44, hs), T(cx, -0.36, MER0 - seat + hs * 0.5) @ yaw, cham=0.03, wob=0.016, seed=Rm.random() * 30)
                 continue
             if not repaired and roll < S.miss + S.chip:
-                side = 1 if Rm.random() < 0.5 else -1; drop = Rm.uniform(0.12, 0.26); hh = top - MER0
-                def chip(p, side=side, drop=drop, w=w, hh=hh):   # the top falls away toward one side: a broken, sloped top
+                side = 1 if Rm.random() < 0.5 else -1; drop = Rm.uniform(0.12, 0.24); hh = (top - MER0) + seat
+                def chip(p, side=side, drop=drop, w=w, hh=hh):
                     t = max(0.0, min(1.0, 0.5 + side * p.x / w)) ** 1.3
                     return Vector((0, 0, -drop * t * max(0.0, (p.z + hh / 2) / hh)))
-                box(pc, key, (w, 0.42, hh), T(xm + dx, -0.36, (MER0 + top) / 2) @ yaw, cham=0.03, wob=0.012, seed=Rm.random() * 30,
+                box(pc, key, (w, 0.44, hh), T(cx, -0.36, MER0 - seat + hh * 0.5) @ yaw, cham=0.03, wob=0.012, seed=Rm.random() * 30,
                     cuts=(2, 0, 1), bend=chip)
                 continue
-            box(pc, key, (w, 0.42, top - MER0), T(xm + dx, -0.36, (MER0 + top) / 2) @ yaw, cham=0.03, segs=1, wob=0.006, seed=Rm.random() * 30)
-            box(pc, ck, (w + 0.14 + Rm.uniform(-0.02, 0.02), 0.58, CAP1 - MER1), T(xm + dx, -0.37, top + (CAP1 - MER1) / 2) @ yaw
-                @ Matrix.Rotation(Rm.uniform(-0.02, 0.02), 4, 'Y'), cham=0.025, wob=0.004, seed=Rm.random() * 30)
+            mer_h = (top - MER0) + seat
+            box(pc, key, (w, 0.44, mer_h), T(cx, -0.36, MER0 - seat + mer_h * 0.5) @ yaw, cham=0.03, segs=1, wob=0.006, seed=Rm.random() * 30)
+            cap_seat = 0.03
+            cap_h = (CAP1 - MER1) + cap_seat
+            box(pc, ck, (w + 0.12 + Rm.uniform(-0.02, 0.02), 0.56, cap_h),
+                T(cx, -0.37, top - cap_seat + cap_h * 0.5) @ yaw @ Matrix.Rotation(Rm.uniform(-0.018, 0.018), 4, 'Y'),
+                cham=0.025, wob=0.004, seed=Rm.random() * 30)
             if S.loops and i % 2 == 1:
-                box(pc, 'glass', (0.07, 0.03, 0.36), T(xm + dx, -0.575, 3.13 + (top - MER1) / 2), cham=0.0)
-    # --- walkway
+                box(pc, 'glass', (0.07, 0.03, 0.36), T(cx, -0.575, 3.13 + (top - MER1) / 2), cham=0.0)
+    # --- walkway (strictly pulled back from breach drops so no plank or bearer overhangs empty air)
     if S.deck == 'plank':
         npl = 22; pitch = (HALF * 2) / npl
         for i in range(npl):
             xm = -HALF + pitch * (i + 0.5)
             if S.gap and S.gap(xm):
                 continue
-            if S.tb(xm) < BODY_TOP - 0.01 or not (S.x0 < xm < S.x1):
+            if not (S.x0 + 0.04 < xm < S.x1 - 0.04):
+                continue
+            if min(S.tb(xm - 0.12), S.tb(xm), S.tb(xm + 0.12)) < BODY_TOP - 0.01:
                 continue
             w = pitch - 0.022
             box(pc, 'walk', (w, 0.87, 0.1), T(xm, 0.285 + R.uniform(-0.004, 0.004), 2.15 + R.uniform(-0.006, 0.008)) @ RZ(R.uniform(-0.012, 0.012)),
                 cham=0.0, long_axis=1, uv_world=False, seed=R.random() * 20)
-        # bearers: heavy beam ends under the boards poking out of the inner face
         for xm in (-1.5, -0.5, 0.5, 1.5):
-            if S.x0 < xm < S.x1 - 0.2 and S.tb(xm) >= BODY_TOP - 0.01 and not (S.gap and S.gap(xm)):
+            if (S.x0 + 0.2 < xm < S.x1 - 0.2
+                    and min(S.tb(xm - 0.18), S.tb(xm), S.tb(xm + 0.18)) >= BODY_TOP - 0.01
+                    and not (S.gap and S.gap(xm))):
                 box(pc, 'walk', (0.2, 0.3, 0.14), T(xm + R.uniform(-0.02, 0.02), TH + 0.1, 2.0), cham=0.02, uv_world=False, long_axis=1, seed=R.random() * 20)
     elif S.deck == 'slab':
         for (a, b) in _split(S.x0, S.x1, R, 1.2, 1.4, even=True):
-            if S.tb(0.5 * (a + b)) < BODY_TOP - 0.01 or (S.gap and S.gap(0.5 * (a + b))):
+            xm = 0.5 * (a + b)
+            if min(S.tb(a), S.tb(xm), S.tb(b)) < BODY_TOP - 0.01 or (S.gap and S.gap(xm)):
                 continue
-            box(pc, 'coping', (b - a - 0.04, 0.87, 0.1), T((a + b) / 2, 0.285, 2.15), cham=0.02, wob=0.003, seed=R.random() * 20)
-    # --- rubble and spill
+            box(pc, 'coping', (b - a - 0.04, 0.87, 0.1), T(xm, 0.285, 2.15), cham=0.02, wob=0.003, seed=R.random() * 20)
+    # --- sunken mortared talus skirt (low, grounded; Megascans handles hero rubble piles)
     for (cx, cy, rx, ry, hm, nn, zb) in S.heaps:
-        heap(pc, R, cx, cy, rx, ry, hm, nn, zbase=zb, clip=lambda x, y: True, smin=0.13, smax=0.46)
+        heap(pc, R, cx, cy, rx, ry, hm, nn, zbase=zb, clip=lambda x, y: True, smin=0.08, smax=0.22, blocks=0.0)
     return pc
 
 def _on(spec, i, x):
@@ -503,6 +576,11 @@ def _split(a, b, R, lo, hi, even=False):
 
 # ----------------------------------------------------------------------------- wear (linear attribute: R grime, G moss, B polish)
 def wear(ob, seed=0, grime=1.0, moss=1.0):
+    """Linear SC_WEAR vertex colours ('wear' FLOAT_COLOR CORNER):
+      R = grime (foot band + mortar recesses + rain streaks)
+      G = moss  (up-facing tops, ledges, and damp lower joints)
+      B = polish (worn stone edges/quoins at walk height 0.65..1.55 m, walkway planks, stair treads)
+    Zero wear is encoded as (0, 0, 0, 1); R+G+B is clamped <= 2.50 so it never trips WearLit's >= 2.99 white fallback."""
     me = ob.data
     attr = me.color_attributes.new('wear', 'FLOAT_COLOR', 'CORNER')
     off = Vector((seed * 1.7, seed * 2.3, 0.0))
@@ -516,25 +594,44 @@ def wear(ob, seed=0, grime=1.0, moss=1.0):
             p = p0 + off; z = p0.z
             nz = noise.noise(p * 1.9)
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, z * 0.6)))
-            r = max(0.0, 1 - (z + 0.3) / (1.3 + 0.3 * nz + 0.2 * streak)) * 0.85
+            # R: grime toward the foot and in recessed mortar/footing cores
+            r = max(0.0, 1.0 - (z + 0.25) / (1.35 + 0.30 * nz + 0.20 * streak)) * 0.88
+            if mn in ('TW_Joint', 'TW_Footing'):
+                r = max(r, 0.55 + 0.20 * max(0.0, nz))
             if abs(n.z) < 0.6 and 1.0 < z < 3.2:
-                r = max(r, 0.3 * max(0.0, streak + 0.25) * min(1.0, (z - 1.0) / 0.8))
-            r = max(r, 0.4 * max(0.0, noise.noise(p * 0.6 + Vector((3.0, 1.0, 2.0)))) + 0.1 * max(0.0, nz))
-            if mn in ('TW_Rubble', 'TW_RubbleOchre', 'TW_Footing'):
-                r = max(r, 0.4 * tv * tv)
+                r = max(r, 0.30 * max(0.0, streak + 0.25) * min(1.0, (z - 1.0) / 0.8))
+            r = max(r, 0.38 * max(0.0, noise.noise(p * 0.6 + Vector((3.0, 1.0, 2.0)))) + 0.10 * max(0.0, nz))
+            if mn in ('TW_Rubble', 'TW_RubbleOchre', 'TW_RubbleDark', 'TW_Footing'):
+                r = max(r, 0.36 * tv * tv)
+            # G: moss on up-facing tops, ledges, and lower damp joints
             g = 0.0
-            if n.z > 0.5:
-                g = min(1.0, 0.55 * max(0.0, 0.3 + nz) + max(0.0, 0.6 - z) * 0.5)
-            elif z < 0.8:
-                g = 0.3 * max(0.0, nz + 0.1) * (1 - z / 0.8)
+            if n.z > 0.45:
+                top_boost = 0.22 if z > 2.2 else 0.0
+                g = min(1.0, (0.58 + top_boost) * max(0.0, 0.35 + nz) + max(0.0, 0.7 - z) * 0.45)
+            elif z < 0.9:
+                g = 0.34 * max(0.0, nz + 0.15) * (1.0 - z / 0.9)
+            # B: polish on worn edges at walk height (0.65..1.55 m), walkway planks, and stair treads
             b = 0.0
+            if 0.65 <= z <= 1.55 and abs(n.z) < 0.7:
+                # Corner/edge exposure: near module corners, jambs, or proud stone faces
+                edge_prox = max(0.0, 1.0 - abs(abs(p0.y) - 0.68) * 6.0)
+                if mn in ('TW_Coping', 'TW_Rubble', 'TW_RubblePale', 'TW_RubbleWarm'):
+                    b = max(b, 0.32 * edge_prox * max(0.0, 0.45 + 0.55 * nz))
             if mn == 'TW_Walkway' and n.z > 0.5:
-                b = 0.45 + 0.2 * max(0.0, streak)
+                b = max(b, 0.45 + 0.20 * max(0.0, streak))
             if mn == 'TW_Coping' and n.z > 0.8 and ob.name == 'Wall_Stair':
-                b = 0.5
+                b = max(b, 0.50)
             if mn == 'TW_Patch':
-                r *= 0.35; g *= 0.3
-            attr.data[li].color = (min(1.0, r * grime), min(1.0, g * moss), min(1.0, b), 1.0)
+                r *= 0.35; g *= 0.30
+            rc = min(1.0, max(0.0, r * grime))
+            gc = min(1.0, max(0.0, g * moss))
+            bc = min(1.0, max(0.0, b))
+            # Enforce sum <= 2.50 (< 2.99 WearLit sentinel)
+            tot = rc + gc + bc
+            if tot > 2.50:
+                sc = 2.50 / tot
+                rc *= sc; gc *= sc; bc *= sc
+            attr.data[li].color = (rc, gc, bc, 1.0)
 
 def make_obj(pc, name=None, seed=0, grime=1.25, moss=1.0, decal=False):
     name = name or pc.name
@@ -559,11 +656,22 @@ def straight_a():
 def straight_b():
     return WallSpec(name='Wall_Straight_B', seed=2, deck='slab', loops=True, spout=-0.7)
 
-def straight_a_ruined():   # polish 2: the Ruined preset's A/B modules lose and chip more merlons
-    return WallSpec(name='Wall_Straight_A_Ruined', seed=21, deck='plank', spout=0.9, chip=0.3, miss=0.3)
+def straight_a_ruined():
+    # Pass A: fused stepped/eroded top courses instead of disconnected merlon teeth
+    s = 21
+    def tp(x):
+        step = math.floor((x + 2.0) * 2.2) / 2.2
+        return PAR_TOP - 0.10 - 0.24 * max(0.0, noise.noise(Vector((step * 2.1, s, 0.7))) + 0.25)
+    return WallSpec(name='Wall_Straight_A_Ruined', seed=s, deck='plank', spout=0.9,
+                    tp=tp, merlons=False, coping=False, eroded_top=True, chip=0.0, miss=0.0)
 
 def straight_b_ruined():
-    return WallSpec(name='Wall_Straight_B_Ruined', seed=22, deck='slab', loops=True, spout=-0.7, chip=0.3, miss=0.3)
+    s = 22
+    def tp(x):
+        step = math.floor((x + 2.0) * 2.2) / 2.2
+        return PAR_TOP - 0.08 - 0.26 * max(0.0, noise.noise(Vector((step * 2.3, s, 1.1))) + 0.25)
+    return WallSpec(name='Wall_Straight_B_Ruined', seed=s, deck='slab', loops=False, spout=-0.7,
+                    tp=tp, merlons=False, coping=False, eroded_top=True, chip=0.0, miss=0.0)
 
 def patched():
     return WallSpec(name='Wall_Patched', seed=3, deck='plank',
@@ -571,29 +679,46 @@ def patched():
                     patched_coping=[2], spout=-1.15)
 
 def breach():
+    # Pass A: asymmetric stepped masonry breach (no clean diagonal cut, no floating merlons, no giant faceted cubes)
     s = 11
     def tb(x):
-        ax = abs(x)
-        if ax >= 1.2:
+        # Asymmetric gap centre at x = +0.08; stepped in 0.26 m stone courses
+        dx = abs(x - 0.08)
+        if dx >= 1.48:
             return BODY_TOP
-        return max(0.32, 0.32 + (ax - 0.55) * 2.0) + 0.16 * n1(x, s) + (0.12 if x < 0 else 0.0)
+        raw = 0.28 + max(0.0, (dx - 0.42)) * 1.75 + 0.24 * n1(x, s) + (0.14 if x < 0.0 else 0.0)
+        stepped = math.floor(raw / 0.26) * 0.26 + 0.04 * n1(x * 2.1, s + 3)
+        return max(0.28, min(BODY_TOP, stepped))
     def tp(x):
-        return PAR_TOP if abs(x) >= 1.2 else tb(x)
-    return WallSpec(name='Wall_Breach', seed=s, deck='plank', tb=tb, tp=tp, merlons=lambda i, x: abs(x) > 1.2,
-                    coping=lambda i, x: abs(x) > 1.2,
-                    heaps=[(0.1, -1.5, 2.3, 1.5, 1.15, 95, -0.05), (-0.1, 1.5, 2.2, 1.4, 1.0, 80, -0.05),
-                           (0.0, 0.0, 1.3, 0.7, 0.8, 45, 0.1)])
+        dx = abs(x - 0.08)
+        if dx >= 1.55:
+            step = math.floor((x + 2.0) * 2.4) / 2.4
+            return PAR_TOP - 0.14 - 0.18 * max(0.0, noise.noise(Vector((step * 2.5, s, 0.4))) + 0.2)
+        if dx >= 1.18:
+            raw = tb(x) + 0.42 * ((dx - 1.18) / 0.37)
+            return math.floor(raw / 0.26) * 0.26
+        return tb(x)
+    # Low sunken mortared talus only (small irregular stones, zero giant cubes); hero rubble comes from Megascans
+    return WallSpec(name='Wall_Breach', seed=s, deck='plank', tb=tb, tp=tp,
+                    merlons=False, coping=False, eroded_top=True,
+                    heaps=[(0.05, -0.95, 1.55, 0.85, 0.42, 32, -0.10),
+                           (-0.05, 0.95, 1.45, 0.80, 0.38, 28, -0.10),
+                           (0.05, 0.0, 0.95, 0.55, 0.32, 18, 0.02)])
 
 def crumbled():
     s = 12
     def tb(x):
-        return BODY_TOP - 0.3 * max(0.0, n1(x, s) + 0.1)
+        raw = BODY_TOP - 0.34 * max(0.0, n1(x, s) + 0.15)
+        return math.floor(raw / 0.24) * 0.24 + 0.03 * n1(x * 2.0, s + 5)
     def tp(x):
-        step = math.floor((x + 2.0) * 3.0) / 3.0
-        return max(tb(x), 2.15 + 0.55 * (0.5 + 0.9 * noise.noise(Vector((step * 2.3, s, 1.0)))))
-    return WallSpec(name='Wall_Crumbled', seed=s, deck='plank', tb=tb, tp=tp, merlons=False, coping=lambda i, x: False,
+        step = math.floor((x + 2.0) * 2.6) / 2.6
+        raw = 2.05 + 0.62 * max(0.0, 0.45 + 0.85 * noise.noise(Vector((step * 2.3, s, 1.0))))
+        return max(tb(x), math.floor(raw / 0.26) * 0.26)
+    return WallSpec(name='Wall_Crumbled', seed=s, deck='plank', tb=tb, tp=tp,
+                    merlons=False, coping=False, eroded_top=True,
                     gap=lambda x: (-1.25 < x < -0.5) or (0.95 < x < 1.3), loops=False,
-                    heaps=[(0.0, -1.3, 2.0, 0.9, 0.7, 44, -0.05), (0.2, 1.3, 1.9, 0.85, 0.6, 34, -0.05)])
+                    heaps=[(0.0, -0.95, 1.45, 0.65, 0.32, 22, -0.10),
+                           (0.15, 0.95, 1.35, 0.60, 0.28, 18, -0.10)])
 
 def end_piece():
     return WallSpec(name='Wall_End', seed=4, deck='plank', x0=-2.0, x1=0.0, ext=(True, False),
@@ -603,11 +728,9 @@ def build_wall(S):
     pc = wall_pc(S)
     R = R_(S.name + 'extra')
     if S.name == 'Wall_Crumbled':
-        # planks slumped into the hole, fallen coping blocks on the walkway
-        for (xm, rz) in ((-0.45, 0.28), (0.9, -0.35)):
-            box(pc, 'walk', (0.17, 0.87, 0.1), T(xm, 0.3, 1.75) @ Matrix.Rotation(rz, 4, 'X') @ RZ(0.1), uv_world=False, long_axis=1, seed=R.random())
-        for xm in (-1.0, 1.1):
-            rock(pc, 'coping', (xm, 0.2 + R.uniform(-0.1, 0.1), 2.3), (0.3, 0.2, 0.1), R, block=True)
+        # Grounded slumped planks resting inside the walkway recess (no floating loose coping cubes)
+        for (xm, rz) in ((-0.45, 0.24), (0.9, -0.28)):
+            box(pc, 'walk', (0.17, 0.87, 0.1), T(xm, 0.3, 1.92) @ Matrix.Rotation(rz, 4, 'X') @ RZ(0.08), uv_world=False, long_axis=1, seed=R.random())
     if S.dressed_end:
         end_dressing(pc, S, R)
     return pc
@@ -1205,7 +1328,7 @@ def battlements(pc, G, R, ZT, broken=None):
             # polish 2: width / height vary per merlon; on the ruined Shell about a third of the survivors are chipped, capless
             ww = 0.78 + Rb.uniform(-0.08, 0.05); hh = 0.45 + Rb.uniform(-0.06, 0.04)
             wx, wy = (ww, 0.5) if ax == 0 else (0.5, ww)
-            z0 = zpar + 0.8 + 0.05
+            z0 = zpar + 0.76  # Seated 4 cm into parapet coping so gate merlons never hover
             if broken and Rb.random() < 0.35:
                 side = 1 if Rb.random() < 0.5 else -1; drop = Rb.uniform(0.12, 0.25)
                 def chip(p, side=side, drop=drop, ww=ww, hh=hh, ax=ax):
@@ -1216,7 +1339,7 @@ def battlements(pc, G, R, ZT, broken=None):
                     cuts=(2, 2, 1), bend=chip)
                 continue
             box(pc, 'rubble', (wx, wy, hh), T(x, y, z0 + hh / 2), cham=0.03, wob=0.006, seed=Rb.random() * 20)
-            box(pc, 'coping', (wx + 0.12, wy + 0.12, 0.1), T(x, y, z0 + hh + 0.05) @ Matrix.Rotation(Rb.uniform(-0.02, 0.02), 4, 'X'),
+            box(pc, 'coping', (wx + 0.12, wy + 0.12, 0.13), T(x, y, z0 + hh + 0.035) @ Matrix.Rotation(Rb.uniform(-0.02, 0.02), 4, 'X'),
                 cham=0.025, wob=0.004, seed=Rb.random() * 20)
 
 def east_turret(pc, G, R, broken):
