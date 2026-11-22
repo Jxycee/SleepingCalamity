@@ -757,13 +757,13 @@ namespace SleepingCalamity.EditorTools
             Physics.SyncTransforms();
             Transform g = Sub(props, "EyeCluster");
             Vector2 anchor = new Vector2(33.5f, -49.2f);
-            foreach (Vector2 to in new[] { new Vector2(33.5f, -49.2f), new Vector2(33.3f, -49.8f), new Vector2(33.9f, -48.6f), new Vector2(33.7f, -50.4f) })
+            foreach (Vector2 to in new[] { new Vector2(34.2f, -51.6f), new Vector2(34.0f, -51.0f), new Vector2(33.5f, -49.2f), new Vector2(33.3f, -49.8f) })
                 if (Ok(to, 0.2f, false, false)) { anchor = to; break; }
             // Pass A round 2: props sit against something. A long stone trough anchors the cluster; barrel, crates, sack and a tipped wheelbarrow (the old handcart's stand-in) hug it, a wall block and a log lie at its ends.
             Put(g, "T27e", "EyeCluster_0", anchor, Gy(anchor), 1.7f, 20f, 0f, 0f, 0.1f, false);
             string[] codes = { "T20t", "T27l", "T20w", "T17b", "T16c", "T19k", "T20r" };
             float[] sizes = { 0.95f, 0.6f, 0.65f, 0.55f, 1.4f, 0.9f, 1.4f };
-            float[] ang = { 110f, 200f, 250f, 290f, 335f, 70f, 160f };
+            float[] ang = { 290f, 200f, 250f, 330f, 20f, 70f, 160f };
             float[] rad = { 0.95f, 0.85f, 0.8f, 1.0f, 1.45f, 1.1f, 1.6f };
             for (int k = 0; k < codes.Length; k++)
             {

@@ -62,7 +62,7 @@ namespace SleepingCalamity.EditorTools
                 float route = Mathf.Abs(u - 0.3f) < 0.7f ? 0.45f : 1f;   // the climbable ramp is lower
                 return H0 * f * side * route;
             }
-            string[] big = { "T19k", "T19l", "T20c", "N02", "T19k", "T20b", "T19l" };   // the jp_ rock set (T20d-h) renders glossy: left out
+            string[] big = { "T19k", "T19l", "T05b", "T19k", "T19l", "T20c" };   // the jp_ rock set (T20d-h) renders glossy: left out
             string[] mid = { "T19l", "T05b", "T19k", "T20c", "T05b", "T19l" };
             string[] small = { "T05b", "T05c", "T05b", "N03", "T05c" };
             int made = 0, placedHeap = 0;
@@ -71,14 +71,14 @@ namespace SleepingCalamity.EditorTools
                 float u = (k % 2 == 0 ? -1f : 1f) * Mathf.Lerp(2.3f, 3.3f, H(k, 1, 1301)); float d = Mathf.Lerp(0.3f, 1.4f, H(k, 2, 1301));
                 Vector2 q = bc + tt * u + o * d; if (!Ok(q, 0.2f, false, false)) continue;
                 float size = Mathf.Lerp(1.3f, 1.8f, H(k, 3, 1301));
-                PutM(g, big[k % big.Length], "GapHeapTop_B" + k, q, Gy(q) + Prof(u, d) * 0.6f, size, H(k, 4, 1301) * 360f, (H(k, 5, 1301) - 0.5f) * 20f, (H(k, 6, 1301) - 0.5f) * 20f, size * 0.25f);
+                PutM(g, big[k % big.Length], "GapHeapTop_B" + k, q, Gy(q) + Prof(u, d) * 0.3f, size * 0.75f, H(k, 4, 1301) * 360f, (H(k, 5, 1301) - 0.5f) * 20f, (H(k, 6, 1301) - 0.5f) * 20f, size * 0.25f);
                 made++;
             }
             for (int k = 0; k < 120; k++)   // the heap: stacked mixed pieces, big at the wall line and smaller going out, nothing large on the ramp
             {
                 float u = (H(k, 11, 1302) - 0.5f) * 6.2f; float d = Mathf.Pow(H(k, 12, 1302), 1.15f) * Dmax;
                 float h = Prof(u, d); if (h < 0.05f) continue;
-                if (placedHeap >= 34) break;
+                if (placedHeap >= 46) break;
                 Vector2 q = bc + tt * u + o * d; if (!Ok(q, 0.2f, false, false)) continue;
                 float size = Mathf.Lerp(2.0f, 0.55f, Mathf.Clamp01(d / Dmax + 0.25f * (H(k, 13, 1302) - 0.5f))) * Mathf.Lerp(0.75f, 1.25f, H(k, 14, 1302));
                 bool ramp = Mathf.Abs(u - 0.3f) < 0.7f; if (ramp) size = Mathf.Min(size, 0.7f);
