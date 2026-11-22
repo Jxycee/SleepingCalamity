@@ -379,7 +379,7 @@ def _eroded_parapet_courses(pc, S, R):
             # Stepped course height: higher on full-height ruined parapet, lower near breach shoulders
             full_parapet = base_z >= PAR_TOP - 0.15
             nz = noise.noise(Vector((xm * 1.45, S.seed * 0.73, idx * 0.19)))
-            extra_h = (0.14 + 0.34 * max(0.0, nz + 0.35)) if full_parapet else (0.08 + 0.16 * max(0.0, nz + 0.4))
+            extra_h = (0.22 + 0.42 * max(0.0, nz + 0.35)) if full_parapet else (0.06 + 0.12 * max(0.0, nz + 0.4))
             # Embed 0.08 m down into the wall core so every stone is fused to the course below
             embed = 0.08
             tot_h = extra_h + embed
@@ -393,9 +393,9 @@ def _eroded_parapet_courses(pc, S, R):
             pitch = Matrix.Rotation(R.uniform(-0.03, 0.03), 4, 'Y')
             box(pc, key, (ln - 0.015, depth, tot_h),
                 T(xm, yc, base_z - embed + tot_h * 0.5) @ yaw @ pitch,
-                cham=0.035, wob=0.014, seed=R.random() * 60.0)
+                cham=0.05, wob=0.02, seed=R.random() * 60.0)
             # Occasional fused second-course stone on intact ruined parapet stretches (never overhanging)
-            if full_parapet and extra_h > 0.28 and ln > 0.42 and R.random() < 0.45:
+            if full_parapet and extra_h > 0.28 and ln > 0.40 and R.random() < 0.6:
                 sub_w = ln * R.uniform(0.55, 0.78)
                 sub_h = R.uniform(0.12, 0.22)
                 sub_embed = 0.05
@@ -554,8 +554,11 @@ def wall_pc(S):
                 continue
             box(pc, 'coping', (b - a - 0.04, 0.87, 0.1), T(xm, 0.285, 2.15), cham=0.02, wob=0.003, seed=R.random() * 20)
     # --- sunken mortared talus skirt (low, grounded; Megascans handles hero rubble piles)
-    for (cx, cy, rx, ry, hm, nn, zb) in S.heaps:
-        heap(pc, R, cx, cy, rx, ry, hm, nn, zbase=zb, clip=lambda x, y: True, smin=0.08, smax=0.22, blocks=0.0)
+    for hp in S.heaps:
+        (cx, cy, rx, ry, hm, nn, zb) = hp[:7]
+        blk = hp[7] if len(hp) > 7 else 0.0
+        heap(pc, R, cx, cy, rx, ry, hm, nn, zbase=zb, clip=lambda x, y: True,
+             smin=0.10 if blk else 0.08, smax=0.30 if blk else 0.22, blocks=blk)
     return pc
 
 def _on(spec, i, x):
@@ -656,21 +659,30 @@ def straight_a():
 def straight_b():
     return WallSpec(name='Wall_Straight_B', seed=2, deck='slab', loops=True, spout=-0.7)
 
+def jag_top(s, lo=0.04, gap_lo=0.34, gap_hi=0.72, w=2.5):
+    """Alternating stumps and gaps of varied height on a 0.4 m grid (Pass A round 2: readable broken silhouette)."""
+    def tp(x):
+        step = math.floor((x + 2.0) * w) / w
+        h = noise.noise(Vector((step * 2.7, s, 0.9)))
+        k = (noise.noise(Vector((step * 5.3, s + 7, 0.3))) + 1.0) * 0.5
+        if h > -0.05:
+            return PAR_TOP - lo - 0.14 * k            # stump
+        return PAR_TOP - gap_lo - (gap_hi - gap_lo) * k   # gap/notch
+    return tp
+
 def straight_a_ruined():
     # Pass A: fused stepped/eroded top courses instead of disconnected merlon teeth
     s = 21
-    def tp(x):
-        step = math.floor((x + 2.0) * 2.2) / 2.2
-        return PAR_TOP - 0.10 - 0.24 * max(0.0, noise.noise(Vector((step * 2.1, s, 0.7))) + 0.25)
+    tp = jag_top(s)
     return WallSpec(name='Wall_Straight_A_Ruined', seed=s, deck='plank', spout=0.9,
+                    heaps=[(0.0, -0.95, 1.7, 0.55, 0.30, 12, -0.12, 0.55), (0.3, 0.95, 1.5, 0.5, 0.26, 8, -0.12, 0.5)],
                     tp=tp, merlons=False, coping=False, eroded_top=True, chip=0.0, miss=0.0)
 
 def straight_b_ruined():
     s = 22
-    def tp(x):
-        step = math.floor((x + 2.0) * 2.2) / 2.2
-        return PAR_TOP - 0.08 - 0.26 * max(0.0, noise.noise(Vector((step * 2.3, s, 1.1))) + 0.25)
+    tp = jag_top(s, lo=0.02, gap_lo=0.30, gap_hi=0.62)
     return WallSpec(name='Wall_Straight_B_Ruined', seed=s, deck='slab', loops=False, spout=-0.7,
+                    heaps=[(-0.2, -0.95, 1.7, 0.55, 0.30, 12, -0.12, 0.55), (0.2, 0.95, 1.5, 0.5, 0.26, 8, -0.12, 0.5)],
                     tp=tp, merlons=False, coping=False, eroded_top=True, chip=0.0, miss=0.0)
 
 def patched():
@@ -692,8 +704,7 @@ def breach():
     def tp(x):
         dx = abs(x - 0.08)
         if dx >= 1.55:
-            step = math.floor((x + 2.0) * 2.4) / 2.4
-            return PAR_TOP - 0.14 - 0.18 * max(0.0, noise.noise(Vector((step * 2.5, s, 0.4))) + 0.2)
+            return jag_top(s, lo=0.06, gap_lo=0.30, gap_hi=0.60)(x)
         if dx >= 1.18:
             raw = tb(x) + 0.42 * ((dx - 1.18) / 0.37)
             return math.floor(raw / 0.26) * 0.26
@@ -701,9 +712,9 @@ def breach():
     # Low sunken mortared talus only (small irregular stones, zero giant cubes); hero rubble comes from Megascans
     return WallSpec(name='Wall_Breach', seed=s, deck='plank', tb=tb, tp=tp,
                     merlons=False, coping=False, eroded_top=True,
-                    heaps=[(0.05, -0.95, 1.55, 0.85, 0.42, 32, -0.10),
-                           (-0.05, 0.95, 1.45, 0.80, 0.38, 28, -0.10),
-                           (0.05, 0.0, 0.95, 0.55, 0.32, 18, 0.02)])
+                    heaps=[(0.05, -0.95, 1.55, 0.85, 0.50, 24, -0.12, 0.6),
+                           (-0.05, 0.95, 1.45, 0.80, 0.44, 20, -0.12, 0.6),
+                           (0.05, 0.0, 0.95, 0.55, 0.36, 12, 0.0, 0.6)])
 
 def crumbled():
     s = 12
@@ -711,14 +722,12 @@ def crumbled():
         raw = BODY_TOP - 0.34 * max(0.0, n1(x, s) + 0.15)
         return math.floor(raw / 0.24) * 0.24 + 0.03 * n1(x * 2.0, s + 5)
     def tp(x):
-        step = math.floor((x + 2.0) * 2.6) / 2.6
-        raw = 2.05 + 0.62 * max(0.0, 0.45 + 0.85 * noise.noise(Vector((step * 2.3, s, 1.0))))
-        return max(tb(x), math.floor(raw / 0.26) * 0.26)
+        return max(tb(x), math.floor(jag_top(s, lo=0.0, gap_lo=0.55, gap_hi=0.95)(x) / 0.26) * 0.26)
     return WallSpec(name='Wall_Crumbled', seed=s, deck='plank', tb=tb, tp=tp,
                     merlons=False, coping=False, eroded_top=True,
                     gap=lambda x: (-1.25 < x < -0.5) or (0.95 < x < 1.3), loops=False,
-                    heaps=[(0.0, -0.95, 1.45, 0.65, 0.32, 22, -0.10),
-                           (0.15, 0.95, 1.35, 0.60, 0.28, 18, -0.10)])
+                    heaps=[(0.0, -0.95, 1.45, 0.65, 0.40, 18, -0.12, 0.55),
+                           (0.15, 0.95, 1.35, 0.60, 0.34, 14, -0.12, 0.55)])
 
 def end_piece():
     return WallSpec(name='Wall_End', seed=4, deck='plank', x0=-2.0, x1=0.0, ext=(True, False),

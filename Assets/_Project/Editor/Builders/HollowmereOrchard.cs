@@ -733,7 +733,7 @@ namespace SleepingCalamity.EditorTools
             Count("gapRubble", made);
             for (int k = 0; k < 10; k++) { Vector2 q = c + t * (k * 0.95f - 3.3f) - n * (1.0f + 2.0f * H(k, 4, 965)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.65f + 0.35f * H(k, 1, 965), H(k, 2, 965) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 26; k++) { Vector2 q = c + t * (k * 0.42f - 3.5f) - n * Mathf.Lerp(0.2f, 3.6f, H(k, 2, 966)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 966, k, 0.9f, 1.6f); }
-            for (int k = 0; k < 4; k++) { Vector2 q = c + t * (k * 2.1f - 2.8f) - n * (1.0f + 1.4f * H(k, 5, 967)); if (Ok(q, 0.2f, false, false)) Put(g, "T12c", "GapIvy_" + k, q, Gy(q), 1.1f, H(k, 6, 967) * 360f, 0f, 3f, 0f); }
+            for (int k = 0; k < 4; k++) { Vector2 q = c + t * (k * 2.1f - 2.8f) - n * (1.0f + 1.4f * H(k, 5, 967)); if (Ok(q, 0.2f, false, false)) Recolor(Put(g, "T12c", "GapIvy_" + k, q, Gy(q), 1.5f, H(k, 6, 967) * 360f, 0f, 3f, 0f), "IvyLit", new Color(2.1f, 2.4f, 1.3f)); }
             Decal(dec, "Damp", c - n * 1.0f, 4.0f, 3.0f, YawAlong(t), "GapDamp"); Decal(dec, "Moss", c - n * 1.8f + t * 2f, 2.6f, 2.6f, 40f, "GapMoss"); Decal(dec, "Moss", c - n * 1.2f - t * 2.2f, 2.4f, 2.4f, 130f, "GapMoss2");
             Decal(dec, "LeavesA", c - n * 3.0f, 3.0f, 3.0f, 70f, "GapLitterA"); Decal(dec, "LeavesB", c - n * 2.6f + t * 3f, 3.0f, 3.0f, 10f, "GapLitterB"); Decal(dec, "LeavesA", c - n * 3.4f - t * 2f, 2.6f, 2.6f, 200f, "GapLitterC");
             for (int k = 0; k < 4; k++) { Vector2 q = c - n * (2.2f + 0.6f * k) + t * (k * 1.5f - 2f); if (Ok(q, 0.1f, false, false)) Apple(g, q, 17, k, k == 2); }
@@ -759,14 +759,18 @@ namespace SleepingCalamity.EditorTools
             Vector2 anchor = new Vector2(33.5f, -49.2f);
             foreach (Vector2 to in new[] { new Vector2(33.5f, -49.2f), new Vector2(33.3f, -49.8f), new Vector2(33.9f, -48.6f), new Vector2(33.7f, -50.4f) })
                 if (Ok(to, 0.2f, false, false)) { anchor = to; break; }
-            string[] codes = { "T20t", "T27l", "T20r", "T17b", "T06a" };
-            float[] sizes = { 0.95f, 0.6f, 1.5f, 0.55f, 0.9f };
+            // Pass A round 2: props sit against something. A long stone trough anchors the cluster; barrel, crates, sack and a tipped wheelbarrow (the old handcart's stand-in) hug it, a wall block and a log lie at its ends.
+            Put(g, "T27e", "EyeCluster_0", anchor, Gy(anchor), 1.7f, 20f, 0f, 0f, 0.1f, false);
+            string[] codes = { "T20t", "T27l", "T20w", "T17b", "T16c", "T19k", "T20r" };
+            float[] sizes = { 0.95f, 0.6f, 0.65f, 0.55f, 1.4f, 0.9f, 1.4f };
+            float[] ang = { 110f, 200f, 250f, 290f, 335f, 70f, 160f };
+            float[] rad = { 0.95f, 0.85f, 0.8f, 1.0f, 1.45f, 1.1f, 1.6f };
             for (int k = 0; k < codes.Length; k++)
             {
-                Vector2 q = anchor + Dir(H(k, 1, 1401) * 360f) * Mathf.Lerp(0.35f, 1.5f, H(k, 2, 1401));
+                Vector2 q = anchor + Dir(ang[k]) * rad[k];
                 if (!Ok(q, 0.2f, false, false)) continue;
-                bool lying = codes[k] == "T20r";
-                Put(g, codes[k], "EyeCluster_" + k, q, Gy(q), sizes[k], H(k, 3, 1401) * 360f, lying ? (H(k, 4, 1401) - 0.5f) * 8f : (H(k, 4, 1401) - 0.5f) * 14f, (H(k, 5, 1401) - 0.5f) * 10f, sizes[k] * 0.1f, false);
+                bool lying = codes[k] == "T20r"; bool tipped = codes[k] == "T16c";
+                Put(g, codes[k], "EyeCluster_" + (k + 1), q, Gy(q), sizes[k], ang[k] + 90f + (H(k, 3, 1401) - 0.5f) * 30f, tipped ? 0f : lying ? (H(k, 4, 1401) - 0.5f) * 8f : (H(k, 4, 1401) - 0.5f) * 14f, tipped ? 28f : (H(k, 5, 1401) - 0.5f) * 10f, sizes[k] * 0.1f, false);
             }
             for (int k = 0; k < 6; k++)
             {

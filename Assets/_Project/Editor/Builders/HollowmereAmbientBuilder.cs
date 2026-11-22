@@ -325,7 +325,7 @@ namespace SleepingCalamity.EditorTools
                 else { m.Clear(); m.vertices = fresh.vertices; m.uv = fresh.uv; m.triangles = fresh.triangles; m.RecalculateBounds(); m.RecalculateNormals(); EditorUtility.SetDirty(m); Object.DestroyImmediate(fresh); }
                 _wingMesh[i] = m;
                 Material mat = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_Wing_" + Wings[i] + ".mat", sh);
-                mat.SetTexture("_MainTex", tex); mat.SetColor("_Tint", new Color(0.62f, 0.6f, 0.56f)); mat.SetFloat("_Cutoff", 0.5f); mat.SetFloat("_Translucency", Wings[i] == "cabbage" || Wings[i] == "brimstone" ? 0.45f : 0.35f);   // Pass A: tinted down so a cabbage white does not read as an unlit white card
+                mat.SetTexture("_MainTex", tex); mat.SetColor("_Tint", new Color(0.86f, 0.84f, 0.78f)); mat.SetFloat("_Cutoff", 0.5f); mat.SetFloat("_Translucency", Wings[i] == "cabbage" || Wings[i] == "brimstone" ? 0.7f : 0.6f);   // Pass A: tinted down so a cabbage white does not read as an unlit white card
                 mat.SetFloat("_FlapSpeed", 22f); mat.SetFloat("_FlapAmp", 0.55f); mat.SetFloat("_Fold", 0f); mat.SetFloat("_Dihedral", 0.18f); mat.SetFloat("_FadeNear", 0.3f); mat.SetFloat("_FadeFar", 0.8f);
                 mat.enableInstancing = false;
                 EditorUtility.SetDirty(mat);
