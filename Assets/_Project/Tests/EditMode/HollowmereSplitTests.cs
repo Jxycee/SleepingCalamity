@@ -118,6 +118,9 @@ namespace SleepingCalamity.Tests.EditMode
             var open = SceneNames.HollowmereArt.ToDictionary(n => n, n => EditorSceneManager.OpenScene("Assets/_Project/Scenes/" + n + ".unity", OpenSceneMode.Additive));
             Scene mainScene = EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Additive);
             GameObject mainRoot = mainScene.GetRootGameObjects().FirstOrDefault(g => g.name == "Hollowmere");
+            // one pass instead of a Count per path (quadratic: hit the 180 s test timeout once the manifest grew)
+            var plainCount = new System.Collections.Generic.Dictionary<string, int>();
+            foreach (string l in lines) { string pl = HollowmereSplit.PlainPath(l); plainCount[pl] = plainCount.TryGetValue(pl, out int c0) ? c0 + 1 : 1; }
             try
             {
                 int i = 0, total = 0;
@@ -136,7 +139,7 @@ namespace SleepingCalamity.Tests.EditMode
                         previous = path;
                         string plain = HollowmereSplit.PlainPath(path).Substring("Hollowmere/".Length);
                         Assert.That(root.transform.Find(plain), Is.Not.Null, name + " does not hold " + path);
-                        if (mainRoot != null && lines.Count(l => HollowmereSplit.PlainPath(l) == HollowmereSplit.PlainPath(path)) == 1)
+                        if (mainRoot != null && plainCount[HollowmereSplit.PlainPath(path)] == 1)
                             Assert.That(mainRoot.transform.Find(plain), Is.Null, path + " is in " + name + " and still in Hollowmere.unity (art twice)");
                         total++;
                     }
