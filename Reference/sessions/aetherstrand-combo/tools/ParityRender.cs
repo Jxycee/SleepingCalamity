@@ -184,6 +184,7 @@ public static class ParityRender
                 Debug.Log("PARITY diag " + mr.name + " -> " + dm.shader.name);
             }
         }
+        if (Env("SC_PARITY_NOBUST", "0") == "1") foreach (var mr in root.GetComponentsInChildren<MeshRenderer>()) mr.enabled = false;
         var names = new[] { "FRONT", "BACK", "LEFT", "RIGHT" };
         var poss = new[] { new Vector3(0, .82f, 1.84f), new Vector3(0, .82f, -1.84f), new Vector3(1.86f, .82f, 0), new Vector3(-1.86f, .82f, 0) };
         var tgts = new[] { new Vector3(0, .77f, 0), new Vector3(0, .77f, -.02f), new Vector3(0, .77f, -.05f), new Vector3(0, .77f, -.05f) };
