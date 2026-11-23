@@ -1,4 +1,4 @@
-State: DONE. A/B delivered (AetherStrand v3.0.0 shipped preset vs HairDeck). Verdict: HairDeck wins. Waiting on the user's pick, and on whether to run a round-2 physics retune.
+State: WAITING (user: next AetherStrand version from Neon). The v3.0.0 A/B is delivered (HairDeck won). No round 2 until the new zip arrives; the next coordinator will message the path.
 
 Branch claude/hair-aetherstrand-b297e1, cut from claude/hair-sweep-tool-abafe3, with origin/main merged in (dab358df). origin/main is still on Unity 6000.6.5f1 (6.8 has not landed there), so the branch stays on 6.5.
 
@@ -27,4 +27,3 @@ Branch claude/hair-aetherstrand-b297e1, cut from claude/hair-sweep-tool-abafe3, 
 - When v2.2 lands: re-vendor it, regenerate, build, capture the full set (stills and motion), make the sheets, send them to the user, then run check and build-twice.
 
 
-Archive: ready
