@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ALL_ARCHETYPES, generateRandomHairstyle } from 'C:/Dev/scratch/AetherStrand/src/engine/hairBuilder';
 import { exportGeometry } from './web_geometry';
+import { HAIR_PRESETS, DEFAULT_BUILDER_BY_PRESET } from 'C:/Dev/scratch/AetherStrand/src/types/hair';
 
 const out = process.argv[2] ?? 'C:/Dev/scratch/batch';
 fs.mkdirSync(out, { recursive: true });
@@ -29,3 +30,22 @@ ALL_ARCHETYPES.forEach((arch: string, i: number) => {
   console.log(arch, r.name, locks.length);
 });
 fs.writeFileSync(path.join(out, 'index.json'), JSON.stringify(index));
+
+// The web app's named presets (Leon, SOLDIER, Silver, Noctis, Crimson) with their default builder configs.
+for (const id of Object.keys(HAIR_PRESETS)) {
+  const def: any = (HAIR_PRESETS as any)[id];
+  const recipe = {
+    schemaVersion: '2.0',
+    presetId: id,
+    customName: def.name,
+    builder: (DEFAULT_BUILDER_BY_PRESET as any)[id],
+    shader: def.shader,
+    physics: { ...def.physics, solverSubsteps: 1, collisionEnabled: true },
+  };
+  const dir = path.join(out, 'preset-' + id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'recipe.json'), JSON.stringify(recipe));
+  const geo = exportGeometry(recipe);
+  fs.writeFileSync(path.join(dir, 'PresetGeometry.json'), JSON.stringify(geo));
+  console.log('preset-' + id, def.name, geo.lockCount);
+}

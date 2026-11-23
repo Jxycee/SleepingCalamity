@@ -24,6 +24,9 @@ namespace AetherStrand.Editor
         public bool autoFitToHeadMesh = true;
         /// <summary>Set by GenerateAndAttach when AetherStrandHeadFit succeeded (per-axis scale + offset from web head space to this head).</summary>
         public bool useHeadFit;
+        /// <summary>After the fit, move lock points out of the character's real head surface (convex hull of the head mesh).</summary>
+        public bool pushOutOfHead = true;
+        public float headMargin = 0.0015f;
         public Vector3 fitScale = Vector3.one;
         public Vector3 fitOffset = Vector3.zero;
         /// <summary>Legacy: rescale by 0.23/maxZ when the JSON is in web-bust units. False = use overallScale only (parity mode).</summary>
@@ -116,6 +119,14 @@ namespace AetherStrand.Editor
                 return null;
             }
 
+
+            if (p.useHeadFit && p.pushOutOfHead)
+            {
+                var sets = new List<Vector3[]>(locks.Count);
+                foreach (var l in locks) sets.Add(l.points);
+                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin);
+                Debug.Log("[AetherStrand] Pushed " + moved + " lock points out of the head (margin " + (p.headMargin * 1000f).ToString("F1") + " mm).");
+            }
 
             // 1. Clean previous generated rig & mesh object under Head / characterRoot
             RemovePreviousGeneratedHair(characterRoot, headBone);

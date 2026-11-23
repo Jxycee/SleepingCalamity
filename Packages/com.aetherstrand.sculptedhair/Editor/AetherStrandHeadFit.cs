@@ -78,6 +78,68 @@ namespace AetherStrand.Editor
             return true;
         }
 
+        /// <summary>Head-bone-weighted head surface points in head-bone space (rest pose); empty if the character has no head mesh.</summary>
+        public static List<Vector3> HeadPoints(GameObject characterRoot, Transform headBone)
+        {
+            var pts = new List<Vector3>(8192);
+            if (characterRoot == null || headBone == null) return pts;
+            var smrs = characterRoot.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            for (int pass = 0; pass < 2 && pts.Count < 200; pass++)
+            {
+                pts.Clear();
+                foreach (var smr in smrs)
+                {
+                    if (smr == null || smr.sharedMesh == null) continue;
+                    string n = smr.name.ToLowerInvariant();
+                    if (n.Contains("hair") || n.Contains("lash") || n.Contains("teeth") || n.Contains("eye")) continue;
+                    if (pass == 0 && !n.Contains("head")) continue;
+                    CollectHeadWeighted(smr, headBone, pts);
+                }
+            }
+            return pts;
+        }
+
+        /// <summary>
+        /// Pushes points (head-bone space) out of the character's head (convex hull of the head mesh) to at least <paramref name="margin"/> metres.
+        /// Returns the number of points moved. Used after the fit so hair never intersects the real head surface.
+        /// </summary>
+        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin)
+        {
+            var hp = HeadPoints(characterRoot, headBone);
+            if (hp.Count < 200) return 0;
+            var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(hp);
+            int nt = (hp.Count / 3) * 3; var tri = new int[nt]; for (int i = 0; i < nt; i++) tri[i] = i;
+            mesh.SetTriangles(tri, 0);
+            var go = new GameObject("__hairPushOutHead"); go.transform.SetParent(headBone, false);
+            var mc = go.AddComponent<MeshCollider>(); mc.sharedMesh = mesh; mc.convex = true;
+            Vector3 centre = Vector3.zero; foreach (var q in hp) centre += q; centre /= hp.Count;
+            Vector3 centreW = headBone.TransformPoint(centre);
+            int moved = 0;
+            foreach (var set in pointSets)
+            {
+                for (int i = 0; i < set.Length; i++)
+                {
+                    Vector3 w = headBone.TransformPoint(set[i]);
+                    Vector3 cp = mc.ClosestPoint(w); float d = Vector3.Distance(cp, w);
+                    Vector3 target = w; bool move = false;
+                    if (d > 1e-6f)
+                    {
+                        if (d < margin) { target = w + (w - cp).normalized * (margin - d); move = true; }
+                    }
+                    else
+                    {
+                        Vector3 dir = (w - centreW).normalized;
+                        var ray = new Ray(w + dir * 0.6f, -dir);
+                        if (dir.sqrMagnitude > 1e-8f && mc.Raycast(ray, out RaycastHit hit, 1.2f)) { target = hit.point + dir * margin; move = true; }
+                    }
+                    if (move) { set[i] = headBone.InverseTransformPoint(target); moved++; }
+                }
+            }
+            Object.DestroyImmediate(go); Object.DestroyImmediate(mesh);
+            return moved;
+        }
+
         private static void CollectHeadWeighted(SkinnedMeshRenderer smr, Transform headBone, List<Vector3> outPts)
         {
             var mesh = smr.sharedMesh;

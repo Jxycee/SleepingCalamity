@@ -25,3 +25,6 @@ Harness: tools/ParityRender.cs (scratch project outside repo), tools/web_export.
 
 ## Pushed upstream (2026-11-23)
 Jxycee/AetherStrand: branch parity-fixes and main fast-forwarded to 6dd8b74 (unity-plugin/, tools/unity-parity/, docs/unity-parity/, web exporter fields, capture cfg/nobust). Web generator still emits the old plugin zip.
+
+## Other hairstyles on Tobin (2026-11-23)
+12 archetypes + 5 web presets (Leon, SOLDIER, Silver, Noctis, Crimson) fitted on Tobin with push-out of the real head surface: vertices inside head 0.03-0.06% (2-6 mm), roots inside 0% (HairEval). Renders: renders/tobin_named_presets.png, renders/tobin_12_archetypes.png. AI authoring loop and baseline: NEON_TASK.md (Neon not yet run; sessions give evidence only).
