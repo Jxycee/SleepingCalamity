@@ -200,6 +200,7 @@ public static class ParityRender
         foreach (var mr in root.GetComponentsInChildren<MeshRenderer>()) Debug.Log("PARITY bustR " + mr.name + " vis=" + mr.isVisible + " b=" + mr.bounds.center + mr.bounds.size + " sh=" + mr.sharedMaterial.shader.name + " key=" + mr.sharedMaterial.GetVector("_KeyColW"));
         RenderTexture.active = null;
         File.WriteAllBytes(Path.Combine(outDir, tag + "_4view.png"), sheet.EncodeToPNG());
+        EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene(), "Assets/Parity/ParityScene.unity");
         Debug.Log("PARITY wrote " + Path.Combine(outDir, tag + "_4view.png"));
     }
 }
