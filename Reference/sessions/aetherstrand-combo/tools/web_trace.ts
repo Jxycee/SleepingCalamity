@@ -152,11 +152,17 @@ fs.writeFileSync(
 const exported: any[] = hair.exportLockGeometry(physics.strandWidthScale);
 exported.forEach((e: any, i: number) => {
   const lk = locks[i];
+  // Full float64 precision (exportLockGeometry rounds to 5 decimals = 0.01 mm, which flips contact branches over 300 frames).
+  e.points = lk.particles.map((p: any) => [p.restLocal.x, -p.restLocal.z, p.restLocal.y]);
+  e.rootNormal = [lk.rootNormalLocal.x, -lk.rootNormalLocal.z, lk.rootNormalLocal.y];
+  e.width = lk.baseWidth * physics.strandWidthScale;
+  e.thickness = lk.baseThickness * (0.65 + 0.35 * physics.strandWidthScale);
+  e.seed = lk.seed;
   e.layerOrder = lk.layerOrder;
   e.mass = lk.mass;
-  e.restMidR = Math.round(lk.restMidR * 1e6) / 1e6;
-  e.rootRawY = Math.round(lk.particles[0].rawRestLocal.y * 1e6) / 1e6;
-  e.stiffnessWeight = lk.particles.map((p: any) => Math.round(p.stiffnessWeight * 1e6) / 1e6);
+  e.restMidR = lk.restMidR;
+  e.rootRawY = lk.particles[0].rawRestLocal.y;
+  e.stiffnessWeight = lk.particles.map((p: any) => p.stiffnessWeight);
 });
 fs.writeFileSync(
   path.join(outDir, 'PresetGeometry.json'),
