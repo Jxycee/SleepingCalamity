@@ -306,6 +306,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     int si = (int)(s * 10f);
                     if (H(lk, si, 81) > 0.3f) continue;
+                    if (lane.Id == "LowerLane" && s > len - 10f) continue;   // Pass A round 3: the mud blob on the cobbles in front of the Lower Gate arch had no caster (the old rubble heap hid it)
                     HollowmereLayout.PointAlong(lane.Points, s, out TownPoint p, out TownPoint dir);
                     HollowmereLayout.PointAlong(lane.Points, Mathf.Min(len - 0.1f, s + 1.5f), out TownPoint p2, out _);
                     HollowmereLayout.PointAlong(lane.Points, Mathf.Max(0f, s - 1.5f), out TownPoint p0, out _);

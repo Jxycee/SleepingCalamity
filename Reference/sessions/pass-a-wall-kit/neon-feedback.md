@@ -12,3 +12,6 @@ Blind A/B on the scene card: new frames lost on all six cameras. Changes to `Art
 - FBX bytes: two runs differ in about 300 bytes (header/footer timestamp and ids), same length; the old generator behaves the same. Geometry deterministic as far as seen; byte-identical is not achievable with Blender's FBX writer.
 - Neon's smooth-dip ruined tops and removed foot rubble made the ruined walls read intact and bare-footed; the A/B penalised this (see changes above). Neon never saw the frames (LFS pointers); next time send frames.
 - `docs/art/scene-judging.md` is not tracked in git (only in the main checkout), so Neon cannot read it from the branch either.
+
+## Round 3 (WIP, unmeasured)
+Wear means measured on the current exports (old in brackets): straights grime 0.22-0.36 (0.17-0.20), moss 0.026-0.073 (0.017-0.032); Breach 0.558/0.121 (0.262/0.045); Crumbled 0.409/0.080 (0.275/0.048); gates 0.11/0.049 (0.08/0.021). Scaling grime/moss back in sc_town_wall.py was not started.
