@@ -63,6 +63,11 @@ namespace SleepingCalamity.EditorTools
             return mat;
         }
 
+        // Fit of the shipped PresetGeometry onto Tobin's scalp with the generator's own knobs. The defaults (scale 1, no offset) seat the root cloud
+        // 3-8 cm high and short of the front hairline (bald forehead in the round-2 capture). Measured from the root clouds in head-bone space
+        // (preset vs the HairDeck card roots): width ratio 1.09, depth ratio 1.49 -> uniform 1.2; offset aligns the root-cloud top and centre.
+        public static HairSculptParams FitParams() => new HairSculptParams { overallScale = 1.2f, headLocalOffset = new Vector3(-0.005f, -0.064f, -0.002f) };
+
         static void BuildVariant(GameObject root, bool aether, StringBuilder log)
         {
             string tag = aether ? "aether" : "hairdeck";
@@ -82,7 +87,7 @@ namespace SleepingCalamity.EditorTools
                 {   // plugin's in-Unity generator (v2.5+): mesh + Hair_ chains straight under TobinBase's Head bone from the shipped PresetGeometry.json.
                     // Runs only on the first build (it creates new objects), so rebuilds stay byte-identical; delete the prefab to regenerate.
                     var mat0 = AssetDatabase.LoadAssetAtPath<Material>(AetherMatPath);
-                    var smr0 = AetherStrandMeshGenerator.GenerateAndAttach(root, new HairSculptParams(), GeometryPath, AetherMeshPath, mat0);
+                    var smr0 = AetherStrandMeshGenerator.GenerateAndAttach(root, FitParams(), GeometryPath, AetherMeshPath, mat0);
                     if (smr0 == null) throw new System.InvalidOperationException("AetherStrandMeshGenerator.GenerateAndAttach returned null");
                     hair = new GameObject("Hair"); hair.transform.SetParent(root.transform, false);
                     smr0.transform.SetParent(hair.transform, true);

@@ -1,0 +1,24 @@
+aether day stills tips 44 disp 1.26/16.28 cm
+aether torch stills tips 44 disp 1.26/16.28 cm
+aether torchoff stills tips 44 disp 1.26/16.28 cm
+aether headturn t+0.00s tipdisp mean 1.26 max 16.27 cm
+aether headturn t+0.10s tipdisp mean 3.62 max 15.94 cm
+aether headturn t+0.20s tipdisp mean 3.57 max 15.38 cm
+aether headturn t+0.33s tipdisp mean 3.15 max 13.57 cm
+aether headturn t+0.50s tipdisp mean 2.44 max 10.88 cm
+aether headturn t+0.80s tipdisp mean 1.44 max 5.85 cm
+aether headturn t+1.20s tipdisp mean 1.07 max 4.71 cm
+aether runstop t+0.00s tipdisp mean 10.29 max 17.40 cm
+aether runstop t+0.10s tipdisp mean 10.23 max 18.64 cm
+aether runstop t+0.20s tipdisp mean 8.98 max 18.65 cm
+aether runstop t+0.33s tipdisp mean 7.17 max 17.40 cm
+aether runstop t+0.50s tipdisp mean 5.02 max 14.05 cm
+aether runstop t+0.80s tipdisp mean 2.42 max 9.90 cm
+aether runstop t+1.20s tipdisp mean 1.35 max 9.53 cm
+aether idle t+0.00s tipdisp mean 1.77 max 16.03 cm
+aether idle t+0.10s tipdisp mean 1.77 max 15.36 cm
+aether idle t+0.20s tipdisp mean 1.74 max 13.77 cm
+aether idle t+0.33s tipdisp mean 1.68 max 11.48 cm
+aether idle t+0.50s tipdisp mean 1.60 max 8.64 cm
+aether idle t+0.80s tipdisp mean 1.49 max 4.53 cm
+aether idle t+1.20s tipdisp mean 1.48 max 3.90 cm

@@ -65,3 +65,20 @@ Still open:
 - Audit (H 0.23 m, shipped physics): `colliders 6 penetrating 0 kink 68.8 deg stretch 58.82 % tipSway 1.53 cm`. Head-turn snap (60 deg in 0.1 s): `tipSway 18.33 cm`, settled +0.9 s `12.21 cm`. Sim-node stretch stays at 56-59 % while bone lengths never change, so the solver's nodes drift from the bones.
 - Motion: in a 60 deg / 0.1 s head turn and a 5 m/s run stopped in 0.15 s, the locks fly 18-28 cm off the head and are still 6 cm out after 1.2 s. The response is far too loose for a hero: head inertia 0.84 against the tether, and stretch never recovers. Our spring chains on the same head move 0.9 cm and settle in 0.5 s.
 - Look: with the shipped preset fitted to Tobin, the locks read as flat ribbons, and the fringe covers the eyes. The shading takes point lights well.
+
+## v2.5 intake (Neon's rebuild, round 2 of the trial, 2026-11-22 evening)
+- `package.json` says 2.5.0, lower than the installed 3.0.0, so UPM treats it as a downgrade. We set it to `3.1.0-neon`. Please version newer builds upward.
+- The `.meta` files for .cs, .shader, .asmdef and .json are missing (the texture metas are present). Unity generates them; we keep the v3 metas where the file names match.
+- The ids disagree: `PresetGeometry.json` and `ExportedLook.json` say presetId `parted_shag_medium` with presetName "Layered Swept Long", and the README/playbook say `layered_swept_long`. The geometry is the same 430-lock layout as v3's (same lock count and zones); only the header changed.
+- The playbook writes the material to `Assets/AetherStrand_layered_swept_long_Mat.mat` at the project root, and `CreateMaterialAsset` defaults to `Assets/AetherStrand_Hair_Mat.mat`. Default to a folder the caller passes. We write ours under Content/Characters/TobinBase/AetherHair.
+- New `AetherStrandMeshGenerator.GenerateAndAttach`: we use it, since it builds the mesh and the Hair_ chains under the Head bone with no Blender round trip.
+  - It maps the preset into head-bone local space with a uniform auto-normalise (crown at 0.23 m). So it assumes the head bone's axes are Y-up, Z-forward and its origin sits at the preset pivot, and it can't fit a wider or narrower skull (Tobin's root cloud is about 0.73x the preset's x/y ratio).
+  - It creates new GameObjects on every call. A builder that re-runs it makes new fileIDs each time, which is not byte-stable; we call it only when the prefab is first built.
+- `ExportedLook.json` colours are now dark brown (#1e1815 / #3a2f28 / #54463c). We keep Tobin's chestnut for colour parity with round 1.
+
+## v2.5 results on Tobin (round 2)
+- In-Unity generator, defaults (scale 1, no offset): 430 locks, 54,180 tris, 220 Hair_ bones. The hair sits 3-8 cm high and back: the forehead and front scalp are bald (ab_v25/stills_unfitted.jpg).
+- Fitted with the generator's own knobs (overallScale 1.2, headLocalOffset (-0.005, -0.064, -0.002), from the root clouds): the back and sides cover, but the forehead stays bald. The fringe roots land inside the skull, and nothing projects roots onto the scalp. **Ask:** add a scalp projection to `GenerateAndAttach` (raycast or closest point onto the head mesh, like the v2.1 Blender BVH step), or a non-uniform fit (separate width/depth/height scales).
+- Audit (fitted): `colliders 6 penetrating 0 kink 38.7 deg stretch 7.60 % tipSway 1.52 cm`. Head-turn snap: `tipSway 5.20 cm`, settled `1.67 cm`. That is much better than v3 (kink 69, stretch 59 %, snap 18 cm). Kink and stretch are still above the 28 deg / 3.5 % limits.
+- Motion is now good. Our bone measure with wind 0: tip sway 1.14 cm idle, 3.45 cm at the end of a 60 deg / 0.1 s turn, back to 1.14 cm at +0.9 s. The run-to-stop recovers in about 1 s. The locks move as coherent clumps and don't explode. Our HairDeck chains move only 0.93 cm on the same turn. So for motion, AetherStrand v2.5 is the livelier one.
+- The torch reaches the hair (hair value 3.8 off, 52.3 on).

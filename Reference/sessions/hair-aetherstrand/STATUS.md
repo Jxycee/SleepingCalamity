@@ -1,4 +1,4 @@
-State: WAITING (user: next AetherStrand version from Neon). The v3.0.0 A/B is delivered (HairDeck won). No round 2 until the new zip arrives; the next coordinator will message the path.
+State: DONE (round 2). AetherStrand v2.5 A/B delivered (ab_v25/). Motion: v2.5 now wins (coherent, settles in about 1 s). Look: HairDeck wins (v2.5 leaves Tobin's forehead bald, with flat ribbons). No overall measured win, so no round 3 without a plugin fix (scalp projection) or a user decision.
 
 Branch claude/hair-aetherstrand-b297e1, cut from claude/hair-sweep-tool-abafe3, with origin/main merged in (dab358df). origin/main is still on Unity 6000.6.5f1 (6.8 has not landed there), so the branch stays on 6.5.
 
@@ -17,6 +17,9 @@ Branch claude/hair-aetherstrand-b297e1, cut from claude/hair-sweep-tool-abafe3, 
 
 - Check on 88856370 FAILED. build PASS, EditMode 1867/1867, PlayMode 308 passed / 3 failed / 36 skipped. Failures: the 2 AetherStrand audit tests (plugin kink/stretch, as expected) and StairHandoverTests.Stairs_F1ToF3_ThenHome(Rtt300Loss5) (network timing, not this branch's code; possibly flaky). No PASS marker.
 - Churn for the coordinator: the build rewrote 6 Hollowmere materials (M_GD_*, M_StoneCottage_B_SC_Rubble), CellarFloorSync.prefab and CellarFloorTest.unity. Not this branch's files; reverted. A first check attempt failed on Win32 IO 1224 (scene file in use).
+
+- a0a64447 v2.5 (Neon's rebuild) installed, versioned 3.1.0-neon. The builder uses the plugin's in-Unity generator (AetherStrandMeshGenerator.GenerateAndAttach) instead of our Blender fit.
+- Fitted generator (overallScale 1.2, headLocalOffset from the root clouds), deterministic rebuild. Audit: kink 38.7 deg, stretch 7.6 %, snap tip sway 5.2 cm, penetrating 0 (the 2 audit tests still fail their thresholds). Bone measure (wind 0): 1.14 / 3.45 / 1.14 cm, against HairDeck's 0.30 / 0.93 / 0.30. Torch reaches the hair (diff 48.5).
 
 ## How the AetherStrand hair is made
 - Blender: `Art/Blender/tools/experimental/tobin_hair/aetherstrand/tobin_aetherstrand.py`. It imports the installed HairDeck FBX and turns each card island into a lock spine (uv.v bins, so 554 cards give 554 locks). Lock settings follow Neon's neon_07 recipe: width ×0.85, thickness clamp(w×0.38, 6-18 mm), core/outer layerAO 0.72/0.94, seed from uv1.x. It writes the PresetGeometry.json, runs the vendored, unmodified generator (44 chains × 5 bones), moves the rig onto the Head bone, re-weights the root rings to Head, keeps the same scalp shell, and exports with STRIP, linear colours and rig_export axes. Zones: Rear 358, Bangs 85, Crown 76, Sides 35. 29.9k hair tris, against 24.2k for HairDeck.

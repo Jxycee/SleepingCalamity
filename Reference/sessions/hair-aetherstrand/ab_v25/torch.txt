@@ -1,0 +1,2 @@
+hairdeck: hair px 128533, mean value torch on 99.7 off 23.3 (diff 76.4)
+aether: hair px 69385, mean value torch on 52.3 off 3.8 (diff 48.5)

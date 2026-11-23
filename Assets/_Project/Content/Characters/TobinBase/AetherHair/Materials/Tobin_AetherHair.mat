@@ -45,7 +45,7 @@ Material:
     - _AlphaClip: 0.34
     - _DitherStrength: 0
     - _GrooveDepth: 0.78
-    - _HeadCenterBlend: 0.15
+    - _HeadCenterBlend: 0.3
     - _PrimaryIntensity: 0.36
     - _PrimaryPower: 64
     - _PrimaryShift: 0.05
