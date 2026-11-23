@@ -65,13 +65,13 @@ namespace AetherStrand
                         uv[vi] = new Vector2(PU[r], t);
                         uv2[vi] = new Vector2((float)d.scalpRoot, 0f);
                         float under = PY[r] < -0.1 ? 0.85f : 1.0f;
-                        col[vi] = new Color(t, (float)d.layerAO * under, (float)d.seed, mask);
+                        { float sd = Mathf.Clamp01((float)d.seed) * 255f, sh = Mathf.Floor(sd); col[vi] = new Color(sd - sh, (float)d.layerAO * under, sh / 255f, mask); }
                         vi++;
                     }
                 }
                 int tip = vi;
                 uv[tip] = new Vector2(0.5f, 1f); uv2[tip] = new Vector2((float)d.scalpRoot, 0f);
-                col[tip] = new Color(1f, (float)d.layerAO, (float)d.seed, mask);
+                { float sd = Mathf.Clamp01((float)d.seed) * 255f, sh = Mathf.Floor(sd); col[tip] = new Color(sd - sh, (float)d.layerAO, sh / 255f, mask); }
                 for (int k = 0; k < Rings - 1; k++)
                 {
                     int r0 = bv + k * RingVerts, r1 = bv + (k + 1) * RingVerts;

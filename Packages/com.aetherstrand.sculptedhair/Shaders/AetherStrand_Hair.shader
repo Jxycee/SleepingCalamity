@@ -108,7 +108,8 @@ Shader "AetherStrand/SculptedHair_URP"
             // Solid cohesive root->mid body; outer lock tips (vertColor.a > 0.5 && t > 0.70) fray into fine wisps
             if (vertColor.a > 0.5 && t > 0.58)
             {
-                float2 strandUv = float2(uv.x * 0.92 + vertColor.b * 3.13, t);
+                float seedD = (floor(vertColor.b * 255.0 + 0.5) + vertColor.r) / 255.0; // seed packed over two 8-bit channels
+                float2 strandUv = float2(uv.x * 0.92 + seedD * 3.13, t);
                 float cardAlpha = SAMPLE_TEXTURE2D(_AlphaMap, sampler_AlphaMap, strandUv).r;
                 float edgeDist = min(abs(uv.x - 0.34), abs(uv.x - 0.66));
                 float lateralFray = smoothstep(0.0, 0.075, edgeDist);
@@ -222,7 +223,7 @@ Shader "AetherStrand/SculptedHair_URP"
                 AetherApplyTipAlphaClip(input.uv, input.vertColor, input.positionCS.xy);
 
                 float t = saturate(input.uv.y);
-                float seed = input.vertColor.b;
+                float seed = (floor(input.vertColor.b * 255.0 + 0.5) + input.vertColor.r) / 255.0;
                 float layerAOv = input.vertColor.g;
                 float scalpRoot = input.scalpRoot;
                 float2 sampleUv = float2(input.uv.x * 0.92 + seed * 3.13, t);

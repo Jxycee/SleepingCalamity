@@ -415,7 +415,7 @@ namespace AetherStrand.Editor
                         uvs.Add(new Vector2(PU[r], t));
                         uv2.Add(new Vector2(lk.scalpRoot, 0f));
                         float under = PY[r] < -0.1f ? 0.85f : 1.0f;
-                        colors.Add(new Color(t, lk.layerAO * under, lk.seed, maskVal));
+                        { float sh = Mathf.Floor(Mathf.Clamp01(lk.seed) * 255f); colors.Add(new Color(Mathf.Clamp01(lk.seed) * 255f - sh, lk.layerAO * under, sh / 255f, maskVal)); }
                         weights.Add(bw);
                     }
                 }
@@ -429,7 +429,7 @@ namespace AetherStrand.Editor
                 tans.Add(new Vector4(-tt.x, tt.y, tt.z, 1f));
                 uvs.Add(new Vector2(0.5f, 1.0f));
                 uv2.Add(new Vector2(lk.scalpRoot, 0f));
-                colors.Add(new Color(1f, lk.layerAO, lk.seed, maskVal));
+                { float sh = Mathf.Floor(Mathf.Clamp01(lk.seed) * 255f); colors.Add(new Color(Mathf.Clamp01(lk.seed) * 255f - sh, lk.layerAO, sh / 255f, maskVal)); }
                 weights.Add(ComputeRingWeight(ringsPerLock, 1.0f, isDynamic, chainBones));
 
                 // Index order reversed vs web: the X mirror (RH -> LH) flips winding, and Unity treats clockwise as front
