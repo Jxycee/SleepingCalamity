@@ -1,4 +1,4 @@
-State: DONE (A/B not won: 5 of 6 cameras lose after two rounds; check running, line below)
+State: DONE (A/B not won: 5 of 6 cameras lose after two rounds; check PASS on febb227b)
 Branch: claude/pass-a-wall-kit-c12454 (worktree .claude/worktrees/pl1-loop-proof-23a335), from claude/ground-blend-4d3fa9 (merged 237d9ecf). Pushed, not merged.
 needs: coordinator (decision on the A/B result)
 
@@ -10,6 +10,9 @@ needs: coordinator (decision on the A/B result)
 | 5e31e29a | Round 2: jagged ruined tops + foot rubble in sc_town_wall.py, matte breach rocks, lit ivy, larger butterflies (0.17 m, 24/flock), anchored trough cluster |
 | eb2e11b4 | Round 2 breach heap angular only; R22 frames |
 | 1144f3dd | Scoped build output (scenes, terrain, matte/lit material variants) |
+| febb227b | HollowmereSplitTests: manifest duplicate count was quadratic and hit its 180 s timeout (3094-line manifest); counted once |
+
+Check: `SC RESULT check PASS` (EditMode 1869/1869, PlayMode 310 passed, 36 skipped, 0 failed; PlayMode needed -TimeoutMinutes 70, the first run hit the 30 min stage limit at 118 tests while still progressing), `SC MARKER` = febb227b. Play loop = the PlayMode suite (walkway/collider tests included).
 
 ## Per-camera (HF whole frame before/after R22; blind A/B after vs before, /50, round 1 R21 then round 2 R22)
 | Camera | HF before/after | R21 | R22 |
