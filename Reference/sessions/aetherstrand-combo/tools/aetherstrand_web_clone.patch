@@ -1,0 +1,71 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 22bb601..d8b6904 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -123,14 +123,18 @@ function getInitialQueryParams(): {
+   const motionMode = reqSim && VALID_MOTIONS.includes(reqSim) ? reqSim : 'idle';
+   const showColliders = params.get('colliders') === '1';
+   const showBones = params.get('bones') === '1';
+-  return { captureMode, preset, randomSeed, forcedArchetype, visionMode, backdropMode, motionMode, showColliders, showBones };
++  let recipe: any = null;
++  try { const c = params.get('cfg'); if (c) recipe = JSON.parse(atob(c)); } catch {}
++  return { recipe, captureMode, preset, randomSeed, forcedArchetype, visionMode, backdropMode, motionMode, showColliders, showBones };
+ }
+ 
+ export default function App() {
+   const initialQuery = useMemo(() => getInitialQueryParams(), []);
+   const initialRandom = useMemo(
+     () =>
+-      initialQuery.randomSeed !== null || initialQuery.forcedArchetype !== null
++      initialQuery.recipe
++        ? { name: initialQuery.recipe.customName, basePreset: initialQuery.recipe.presetId, builder: initialQuery.recipe.builder, shader: initialQuery.recipe.shader, physics: initialQuery.recipe.physics } as any
++        : initialQuery.randomSeed !== null || initialQuery.forcedArchetype !== null
+         ? generateRandomHairstyle(initialQuery.randomSeed ?? 777, initialQuery.forcedArchetype ?? undefined)
+         : null,
+     [initialQuery.randomSeed, initialQuery.forcedArchetype]
+diff --git a/src/components/HairViewport.tsx b/src/components/HairViewport.tsx
+index 68a6c4e..ba1a17d 100644
+--- a/src/components/HairViewport.tsx
++++ b/src/components/HairViewport.tsx
+@@ -649,6 +649,7 @@ export const HairViewport = forwardRef<HairViewportHandle, HairViewportProps>(fu
+         }
+       }
+ 
++      if (urlParams.get('nobust') === '1') bust.rootGroup.visible = false;
+       const audit = worstAudit ?? hairSystem.auditQuality(bust.headPivot, activeSimMode);
+       const dataUrl = renderCaptureDataUrl(
+         renderer,
+diff --git a/src/engine/hairPhysics.ts b/src/engine/hairPhysics.ts
+index 2dc4a75..360849c 100644
+--- a/src/engine/hairPhysics.ts
++++ b/src/engine/hairPhysics.ts
+@@ -5303,8 +5303,11 @@ function serializeLocksForBlender(
+       seed: round5(lock.seed),
+       layerAO: round5(lock.layerAO),
+       isBaseShell: lock.isBaseShell,
++      scalpRoot: round5(lock.scalpRoot),
++      lockNormal: lock.lockNormal,
++      rootNormal: [round5(lock.rootNormalLocal.x), round5(-lock.rootNormalLocal.z), round5(lock.rootNormalLocal.y)],
+       points: pts,
+-    };
++    } as any;
+   }
+   return out;
+ }
+@@ -5319,8 +5322,14 @@ export function buildExportLocksForBlender(
+ ): ExportedHairLock[] {
+   const safeW = THREE.MathUtils.clamp(widthScale || 1.0, 0.65, 1.45);
+   const locks = builderConfig
+-    ? locksFromSpecs(buildCustomHairSpecs(builderConfig), builderConfig.seed)
++    ? locksFromSpecs(buildCustomHairSpecs(builderConfig), builderConfig.seed || 1337)
+     : generateLocksForPreset(presetId);
+-  bakeInterLockRestPose(locks, safeW, true);
++  if (builderConfig) {
++    // Mirror HairPhysicsSystem.loadCustomBuilder: head+bust collision-free settle, then re-bake for the live width scale.
++    bakeCollisionFreeRestPose(locks);
++    if (Math.abs(safeW - 1.0) > 0.03) bakeInterLockRestPose(locks, safeW, false);
++  } else {
++    bakeInterLockRestPose(locks, safeW, true);
++  }
+   return serializeLocksForBlender(locks, safeW);
+ }
