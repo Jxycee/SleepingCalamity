@@ -22,3 +22,6 @@ Target: web app Half-Up Cascade #059 (recipe recipes/halfup059.json, seed 445059
 
 Live Unity: UnityMCP connected (deny entry removed locally, uncommitted). Run harness via execute_code: set SC_PARITY_TAG/MATSET env then ParityRender.Run().
 Harness: tools/ParityRender.cs (scratch project outside repo), tools/web_export.ts (any recipe -> PresetGeometry.json).
+
+## Pushed upstream (2026-11-23)
+Jxycee/AetherStrand: branch parity-fixes and main fast-forwarded to 6dd8b74 (unity-plugin/, tools/unity-parity/, docs/unity-parity/, web exporter fields, capture cfg/nobust). Web generator still emits the old plugin zip.
