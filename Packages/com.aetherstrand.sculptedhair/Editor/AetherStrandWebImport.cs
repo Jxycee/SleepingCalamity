@@ -13,7 +13,7 @@ namespace AetherStrand.Editor
     public static class AetherStrandWebImport
     {
         /// <summary>Applies a web export to <paramref name="character"/>. Returns the hair renderer or null on failure.</summary>
-        public static SkinnedMeshRenderer Apply(GameObject character, string presetGeometryJson, string recipeJson, string outputFolder = "Assets/AetherStrandHair", string baseName = null)
+        public static SkinnedMeshRenderer Apply(GameObject character, string presetGeometryJson, string recipeJson, string outputFolder = "Assets/AetherStrandHair", string baseName = null, bool keepEyesClear = true)
         {
             if (character == null) { Debug.LogError("[AetherStrand] Apply: no character."); return null; }
             if (!File.Exists(presetGeometryJson)) { Debug.LogError("[AetherStrand] Apply: geometry not found: " + presetGeometryJson); return null; }
@@ -25,6 +25,7 @@ namespace AetherStrand.Editor
                 AssetDatabase.CreateFolder(parent, Path.GetFileName(outputFolder));
             }
 
+            presetGeometryJson = MaybeTrimForEyes(character, presetGeometryJson, outputFolder, baseName, keepEyesClear);
             Material mat = AetherStrandSetupWindow.CreateMaterialAsset(outputFolder + "/" + baseName + ".mat", recipeJson);
             if (mat == null) return null;
 
@@ -45,7 +46,7 @@ namespace AetherStrand.Editor
         /// Applies a web export with the exact web solver (AetherStrandWebHair): hair is a child of the head bone, the solver runs in web
         /// space and its vertices are mapped through the per-axis head fit into head-bone-local space. Returns the component or null.
         /// </summary>
-        public static AetherStrandWebHair ApplyLive(GameObject character, string presetGeometryJson, string recipeJson, string outputFolder = "Assets/AetherStrandHair", string baseName = null)
+        public static AetherStrandWebHair ApplyLive(GameObject character, string presetGeometryJson, string recipeJson, string outputFolder = "Assets/AetherStrandHair", string baseName = null, bool keepEyesClear = true)
         {
             if (character == null) { Debug.LogError("[AetherStrand] ApplyLive: no character."); return null; }
             if (!File.Exists(presetGeometryJson)) { Debug.LogError("[AetherStrand] ApplyLive: geometry not found: " + presetGeometryJson); return null; }
@@ -57,6 +58,7 @@ namespace AetherStrand.Editor
             if (!AssetDatabase.IsValidFolder(outputFolder))
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(outputFolder).Replace('\\', '/'), Path.GetFileName(outputFolder));
 
+            presetGeometryJson = MaybeTrimForEyes(character, presetGeometryJson, outputFolder, baseName, keepEyesClear);
             string geoAsset = outputFolder + "/" + baseName + "_geometry.json";
             File.Copy(presetGeometryJson, geoAsset, true);
             string recipeAsset = null;
@@ -82,6 +84,19 @@ namespace AetherStrand.Editor
             EditorUtility.SetDirty(character);
             Debug.Log("[AetherStrand] ApplyLive: fit " + fit.scale.ToString("F3") + " unitScale " + hair.unitScale.ToString("F3"));
             return hair;
+        }
+
+        public static string MaybeTrimForEyes(GameObject character, string geometryJson, string outputFolder, string baseName, bool keepEyesClear)
+        {
+            if (!keepEyesClear) return geometryJson;
+            Transform head = AetherStrandMeshGenerator.ResolveHeadBone(character);
+            if (head == null) return geometryJson;
+            if (!AetherStrandHeadFit.TryCompute(character, head, out AetherStrandHeadFit.Fit fit)) return geometryJson;
+            if (!AetherStrandFringeFit.TryMeasureEyes(character, head, out AetherStrandFringeFit.EyeLine eye)) return geometryJson;
+            string outPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outputFolder + "/x")), baseName + "_eyeclear_geometry.json");
+            int n = AetherStrandFringeFit.TrimForEyes(geometryJson, fit, eye, outPath);
+            Debug.Log("[AetherStrand] Eye-clear fringe: shortened " + n + " bangs locks (eye top y " + eye.topY.ToString("F3") + " in head space).");
+            return outPath;
         }
 
         [MenuItem("Tools/AetherStrand/Apply Web Export To Selected Character...")]

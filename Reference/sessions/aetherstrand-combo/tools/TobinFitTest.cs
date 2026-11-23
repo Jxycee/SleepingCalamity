@@ -35,6 +35,11 @@ public static class TobinFitTest
         tobin.transform.position = Vector3.zero; tobin.transform.rotation = Quaternion.identity;
         Transform head = null; foreach (var t in tobin.GetComponentsInChildren<Transform>(true)) if (t.name == "Head") head = t;
 
+        if (ParityRender.Env("SC_TOBIN_EYES", "0") == "1")
+        {
+            var wi = Type.GetType("AetherStrand.Editor.AetherStrandWebImport, AetherStrand.Editor");
+            geo = (string)wi.GetMethod("MaybeTrimForEyes", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { tobin, geo, "Assets/Parity", tag, true });
+        }
         Type genT = Type.GetType("AetherStrand.Editor.AetherStrandMeshGenerator, AetherStrand.Editor");
         Type parT = Type.GetType("AetherStrand.Editor.HairSculptParams, AetherStrand.Editor");
         Type winT = Type.GetType("AetherStrand.Editor.AetherStrandSetupWindow, AetherStrand.Editor");
