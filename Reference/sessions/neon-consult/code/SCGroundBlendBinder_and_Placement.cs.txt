@@ -1,0 +1,134 @@
+// Neon, exchange 3 (2026-11-22). Proposal, not applied (.txt so Unity doesn't compile it).
+// ===== Runtime/SCGroundBlendBinder.cs =====
+using UnityEngine;
+
+[ExecuteAlways]
+public sealed class SCGroundBlendBinder : MonoBehaviour
+{
+    public Texture2D HeightTex;
+    public Texture2D AlbedoTex;
+    public Vector4 GroundBounds;
+    public Vector4 GroundHeightParams;
+
+    private static readonly int IdHeight = Shader.PropertyToID("_SC_GroundHeightTex");
+    private static readonly int IdAlbedo = Shader.PropertyToID("_SC_GroundAlbedoTex");
+    private static readonly int IdBounds = Shader.PropertyToID("_SC_GroundBounds");
+    private static readonly int IdParams = Shader.PropertyToID("_SC_GroundHeightParams");
+
+    private void OnEnable() => Apply();
+    private void OnValidate() => Apply();
+
+    public void Apply()
+    {
+        if (HeightTex == null || AlbedoTex == null) return;
+        Shader.SetGlobalTexture(IdHeight, HeightTex);
+        Shader.SetGlobalTexture(IdAlbedo, AlbedoTex);
+        Shader.SetGlobalVector(IdBounds, GroundBounds);
+        Shader.SetGlobalVector(IdParams, GroundHeightParams);
+    }
+}
+
+// ===== Editor/SCPlacementGrounding.cs =====
+using UnityEngine;
+
+public static class SCPlacementGrounding
+{
+    /// <summary>
+    /// Grounds a prop/rubble/cap onto hostMask using a 5-point footprint check.
+    /// Returns false if support is missing or slope exceeds maxSlopeDeg (caller should skip/destroy).
+    /// </summary>
+    public static bool TryGroundAndSink(
+        Transform target,
+        LayerMask hostMask,
+        float sinkFraction = 0.20f,
+        float maxSlopeDeg = 45f,
+        bool alignToNormal = true,
+        int minSupportHits = 3,
+        float footprintInset = 0.65f,
+        float rayStartAbove = 5f,
+        float rayDistance = 20f)
+    {
+        if (target == null) return false;
+
+        // Temporarily disable own colliders so we never raycast against ourselves
+        var ownColliders = target.GetComponentsInChildren<Collider>(true);
+        bool[] prevEnabled = new bool[ownColliders.Length];
+        for (int i = 0; i < ownColliders.Length; i++)
+        {
+            prevEnabled[i] = ownColliders[i].enabled;
+            ownColliders[i].enabled = false;
+        }
+
+        try
+        {
+            if (!TryComputeWorldBounds(target, out Bounds b)) return false;
+
+            Vector3 c = b.center;
+            float ex = b.extents.x * footprintInset;
+            float ez = b.extents.z * footprintInset;
+            float startY = b.max.y + rayStartAbove;
+
+            // Fixed order for determinism: center + 4 footprint corners
+            Vector3[] origins =
+            {
+                new Vector3(c.x,      startY, c.z),
+                new Vector3(c.x - ex, startY, c.z - ez),
+                new Vector3(c.x + ex, startY, c.z - ez),
+                new Vector3(c.x - ex, startY, c.z + ez),
+                new Vector3(c.x + ex, startY, c.z + ez),
+            };
+
+            int hits = 0;
+            float lowestHitY = float.PositiveInfinity;
+            Vector3 avgNormal = Vector3.zero;
+            bool centerHit = false;
+
+            for (int i = 0; i < origins.Length; i++)
+            {
+                if (Physics.Raycast(origins[i], Vector3.down, out var hit, rayDistance, hostMask, QueryTriggerInteraction.Ignore))
+                {
+                    hits++;
+                    if (i == 0) centerHit = true;
+                    if (hit.point.y < lowestHitY) lowestHitY = hit.point.y;
+                    avgNormal += hit.normal;
+                }
+            }
+
+            if (!centerHit || hits < minSupportHits) return false;
+
+            avgNormal = avgNormal.normalized;
+            if (Vector3.Angle(Vector3.up, avgNormal) > maxSlopeDeg) return false;
+
+            if (alignToNormal)
+            {
+                // Preserve yaw, tilt gently to host normal
+                Quaternion tilt = Quaternion.FromToRotation(Vector3.up, avgNormal);
+                target.rotation = tilt * target.rotation;
+                TryComputeWorldBounds(target, out b);
+            }
+
+            float sinkMeters = Mathf.Clamp01(sinkFraction) * b.size.y;
+            float deltaY = (lowestHitY - b.min.y) - sinkMeters;
+            target.position += new Vector3(0f, deltaY, 0f);
+            return true;
+        }
+        finally
+        {
+            for (int i = 0; i < ownColliders.Length; i++)
+                ownColliders[i].enabled = prevEnabled[i];
+        }
+    }
+
+    private static bool TryComputeWorldBounds(Transform root, out Bounds bounds)
+    {
+        var renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool hasAny = false;
+        bounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (!hasAny) { bounds = renderers[i].bounds; hasAny = true; }
+            else bounds.Encapsulate(renderers[i].bounds);
+        }
+        return hasAny;
+    }
+}

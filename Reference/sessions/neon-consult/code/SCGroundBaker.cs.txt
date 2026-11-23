@@ -1,0 +1,243 @@
+// Neon, exchange 3 (2026-11-22). Proposal, not applied (.txt so Unity doesn't compile it). Editor/SCGroundBaker.cs
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+public static class SCGroundBaker
+{
+    public struct BakeResult
+    {
+        public Vector4 GroundBounds;       // (minX, minZ, 1/sizeX, 1/sizeZ)
+        public Vector4 GroundHeightParams; // (minY, rangeY, 1/res, 1/res)
+    }
+
+    public static BakeResult Bake(
+        Terrain terrain,
+        LayerMask cobbleStreetMask,
+        Bounds worldBoundsXZ,
+        int resolution,
+        string heightAssetPath,
+        string albedoAssetPath)
+    {
+        Physics.SyncTransforms();
+
+        float minX = worldBoundsXZ.min.x;
+        float minZ = worldBoundsXZ.min.z;
+        float sizeX = Mathf.Max(1e-3f, worldBoundsXZ.size.x);
+        float sizeZ = Mathf.Max(1e-3f, worldBoundsXZ.size.z);
+
+        // Pre-read TerrainData once on CPU
+        TerrainData td = terrain != null ? terrain.terrainData : null;
+        Vector3 tPos = terrain != null ? terrain.transform.position : Vector3.zero;
+        Vector3 tSize = td != null ? td.size : Vector3.one;
+        float[,,] alphaMaps = td != null ? td.GetAlphamaps(0, 0, td.alphamapWidth, td.alphamapHeight) : null;
+        int alphaW = td != null ? td.alphamapWidth : 0;
+        int alphaH = td != null ? td.alphamapHeight : 0;
+        TerrainLayer[] layers = td != null ? td.terrainLayers : Array.Empty<TerrainLayer>();
+
+        var cpuTexCache = new Dictionary<Texture2D, Texture2D>();
+        var tempAllocated = new List<Texture2D>();
+
+        Texture2D GetCpuReadable(Texture2D src)
+        {
+            if (src == null) return null;
+            if (cpuTexCache.TryGetValue(src, out var cached)) return cached;
+            if (src.isReadable) { cpuTexCache[src] = src; return src; }
+
+            string path = AssetDatabase.GetAssetPath(src);
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                string ext = Path.GetExtension(path).ToLowerInvariant();
+                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
+                {
+                    var tmp = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+                    if (tmp.LoadImage(File.ReadAllBytes(path), false))
+                    {
+                        cpuTexCache[src] = tmp;
+                        tempAllocated.Add(tmp);
+                        return tmp;
+                    }
+                    UnityEngine.Object.DestroyImmediate(tmp);
+                }
+                else
+                {
+                    Debug.LogWarning($"[SCGroundBaker] Non-readable non-PNG/JPG texture '{path}'; enable Read/Write or it falls back to flat tint.");
+                }
+            }
+            cpuTexCache[src] = null;
+            return null;
+        }
+
+        try
+        {
+            int count = resolution * resolution;
+            float[] heights = new float[count];
+            Color32[] albedos = new Color32[count];
+
+            float minY = float.PositiveInfinity;
+            float maxY = float.NegativeInfinity;
+            float rayTopY = (terrain != null ? tPos.y + tSize.y : worldBoundsXZ.max.y) + 50f;
+            float rayDist = (terrain != null ? tSize.y : worldBoundsXZ.size.y) + 150f;
+
+            for (int y = 0; y < resolution; y++)
+            {
+                float vz = (y + 0.5f) / resolution;
+                float wz = minZ + vz * sizeZ;
+
+                for (int x = 0; x < resolution; x++)
+                {
+                    float vx = (x + 0.5f) / resolution;
+                    float wx = minX + vx * sizeX;
+                    int idx = y * resolution + x;
+
+                    float h = terrain != null ? terrain.SampleHeight(new Vector3(wx, 0f, wz)) + tPos.y : 0f;
+                    bool hitStreet = false;
+                    RaycastHit streetHit = default;
+
+                    if (cobbleStreetMask.value != 0 &&
+                        Physics.Raycast(new Vector3(wx, rayTopY, wz), Vector3.down, out var hit, rayDist, cobbleStreetMask, QueryTriggerInteraction.Ignore))
+                    {
+                        if (hit.point.y >= h - 0.05f)
+                        {
+                            h = hit.point.y;
+                            hitStreet = true;
+                            streetHit = hit;
+                        }
+                    }
+
+                    heights[idx] = h;
+                    if (h < minY) minY = h;
+                    if (h > maxY) maxY = h;
+
+                    Color c = new Color(0.25f, 0.25f, 0.22f, 0.15f);
+                    if (hitStreet)
+                    {
+                        c = SampleStreetHit(streetHit, GetCpuReadable);
+                    }
+                    else if (td != null && alphaMaps != null && layers.Length > 0)
+                    {
+                        c = SampleTerrainAlbedo(wx, wz, tPos, tSize, alphaMaps, alphaW, alphaH, layers, GetCpuReadable);
+                    }
+
+                    albedos[idx] = new Color32(
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(c.r) * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(c.g) * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(c.b) * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(c.a) * 255f), 0, 255));
+                }
+            }
+
+            if (float.IsInfinity(minY)) { minY = 0f; maxY = 1f; }
+            float rangeY = Mathf.Max(0.01f, maxY - minY);
+
+            ushort[] r16 = new ushort[count];
+            for (int i = 0; i < count; i++)
+            {
+                float n = Mathf.Clamp01((heights[i] - minY) / rangeY);
+                r16[i] = (ushort)Mathf.RoundToInt(n * 65535f);
+            }
+            byte[] r16Bytes = new byte[count * 2];
+            Buffer.BlockCopy(r16, 0, r16Bytes, 0, r16Bytes.Length);
+
+            WriteOrUpdateTextureAsset(heightAssetPath, resolution, TextureFormat.R16, linear: true, t =>
+            {
+                t.LoadRawTextureData(r16Bytes);
+                t.Apply(updateMipmaps: false, makeNoLongerReadable: false);
+            });
+
+            WriteOrUpdateTextureAsset(albedoAssetPath, resolution, TextureFormat.RGBA32, linear: false, t =>
+            {
+                t.SetPixels32(albedos);
+                t.Apply(updateMipmaps: false, makeNoLongerReadable: false);
+            });
+
+            AssetDatabase.SaveAssets();
+
+            return new BakeResult
+            {
+                GroundBounds = new Vector4(minX, minZ, 1f / sizeX, 1f / sizeZ),
+                GroundHeightParams = new Vector4(minY, rangeY, 1f / resolution, 1f / resolution)
+            };
+        }
+        finally
+        {
+            foreach (var tmp in tempAllocated) UnityEngine.Object.DestroyImmediate(tmp);
+        }
+    }
+
+    private static Color SampleTerrainAlbedo(
+        float wx, float wz, Vector3 tPos, Vector3 tSize,
+        float[,,] alphaMaps, int alphaW, int alphaH,
+        TerrainLayer[] layers, Func<Texture2D, Texture2D> getReadable)
+    {
+        float tx = Mathf.Clamp01((wx - tPos.x) / Mathf.Max(1e-3f, tSize.x));
+        float tz = Mathf.Clamp01((wz - tPos.z) / Mathf.Max(1e-3f, tSize.z));
+        int ax = Mathf.Clamp(Mathf.FloorToInt(tx * (alphaW - 1)), 0, alphaW - 1);
+        int az = Mathf.Clamp(Mathf.FloorToInt(tz * (alphaH - 1)), 0, alphaH - 1);
+
+        Color accum = Color.clear;
+        float wSum = 0f;
+        int nLayers = Mathf.Min(layers.Length, alphaMaps.GetLength(2));
+        for (int l = 0; l < nLayers; l++)
+        {
+            float w = alphaMaps[az, ax, l]; // Unity alphamaps are [z, x, layer]
+            if (w <= 0.001f || layers[l] == null) continue;
+            var layer = layers[l];
+            Color lc = new Color(0.25f, 0.28f, 0.18f, layer.smoothness);
+            var tex = getReadable(layer.diffuseTexture);
+            if (tex != null)
+            {
+                float u = (wx - tPos.x + layer.tileOffset.x) / Mathf.Max(1e-3f, layer.tileSize.x);
+                float v = (wz - tPos.z + layer.tileOffset.y) / Mathf.Max(1e-3f, layer.tileSize.y);
+                Color s = tex.GetPixelBilinear(u - Mathf.Floor(u), v - Mathf.Floor(v));
+                lc = new Color(s.r, s.g, s.b, Mathf.Clamp01(layer.smoothness));
+            }
+            accum += lc * w;
+            wSum += w;
+        }
+        return wSum > 1e-4f ? accum / wSum : new Color(0.25f, 0.25f, 0.22f, 0.15f);
+    }
+
+    private static Color SampleStreetHit(RaycastHit hit, Func<Texture2D, Texture2D> getReadable)
+    {
+        var rend = hit.collider != null ? hit.collider.GetComponent<Renderer>() : null;
+        var mat = rend != null ? rend.sharedMaterial : null;
+        if (mat == null) return new Color(0.32f, 0.30f, 0.27f, 0.20f);
+
+        Color tint = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
+        float smooth = mat.HasProperty("_Smoothness") ? Mathf.Min(mat.GetFloat("_Smoothness"), 0.28f) : 0.20f;
+        var baseMap = mat.HasProperty("_BaseMap") ? getReadable(mat.GetTexture("_BaseMap") as Texture2D) : null;
+        if (baseMap == null) return new Color(tint.r, tint.g, tint.b, smooth);
+
+        Vector2 stScale = mat.GetTextureScale("_BaseMap");
+        Vector2 stOffset = mat.GetTextureOffset("_BaseMap");
+        Vector2 uv = Vector2.Scale(hit.textureCoord, stScale) + stOffset;
+        Color s = baseMap.GetPixelBilinear(uv.x - Mathf.Floor(uv.x), uv.y - Mathf.Floor(uv.y));
+        return new Color(s.r * tint.r, s.g * tint.g, s.b * tint.b, smooth);
+    }
+
+    private static void WriteOrUpdateTextureAsset(
+        string assetPath, int res, TextureFormat fmt, bool linear, Action<Texture2D> populate)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+        if (existing != null && existing.width == res && existing.height == res && existing.format == fmt)
+        {
+            existing.wrapMode = TextureWrapMode.Clamp;
+            existing.filterMode = FilterMode.Bilinear;
+            populate(existing);
+            EditorUtility.SetDirty(existing);
+            return;
+        }
+
+        if (existing != null) AssetDatabase.DeleteAsset(assetPath);
+        var tex = new Texture2D(res, res, fmt, mipChain: false, linear: linear)
+        {
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+        populate(tex);
+        AssetDatabase.CreateAsset(tex, assetPath);
+    }
+}
