@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ALL_ARCHETYPES, generateRandomHairstyle } from 'C:/Dev/scratch/AetherStrand/src/engine/hairBuilder';
-import { buildExportLocksForBlender } from 'C:/Dev/scratch/AetherStrand/src/engine/hairPhysics';
+import { exportGeometry } from './web_geometry';
 
 const out = process.argv[2] ?? 'C:/Dev/scratch/batch';
 fs.mkdirSync(out, { recursive: true });
@@ -19,23 +19,12 @@ ALL_ARCHETYPES.forEach((arch: string, i: number) => {
     shader: r.shader,
     physics: { ...r.physics, solverSubsteps: 1, collisionEnabled: true },
   };
-  const locks = buildExportLocksForBlender(r.basePreset, r.builder, r.physics.strandWidthScale ?? 1);
   const dir = path.join(out, arch);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'recipe.json'), JSON.stringify(recipe));
-  fs.writeFileSync(
-    path.join(dir, 'PresetGeometry.json'),
-    JSON.stringify({
-      schemaVersion: '2.0',
-      sourcePivot: [0, 0.44, 0],
-      strandWidthScale: recipe.physics.strandWidthScale ?? 1,
-      presetId: r.basePreset,
-      presetName: r.name,
-      coordinateSystem: 'blender_z_up_neg_y_front',
-      lockCount: locks.length,
-      locks,
-    })
-  );
+  const geo = exportGeometry(recipe);
+  fs.writeFileSync(path.join(dir, 'PresetGeometry.json'), JSON.stringify(geo));
+  const locks = geo.locks;
   index.push({ arch, name: r.name, seed, locks: locks.length });
   console.log(arch, r.name, locks.length);
 });

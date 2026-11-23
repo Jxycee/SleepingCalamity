@@ -16,7 +16,8 @@ Target: web app Half-Up Cascade #059 (recipe recipes/halfup059.json, seed 445059
 | Mesh vs web | vertex-exact: mean per-lock max vertex error 0.008 mm, worst 0.013 mm (ponytail, 248 locks). Fixes: head centre in ring builder; web export mirrors loadCustomBuilder (bakeCollisionFreeRestPose) |
 | 12 archetypes hair-only (rest pose, nobust) | IoU 0.956-0.968, MAE 3.4-5.1 /255 (renders/archetypes12_hair_only_web_vs_unity_v2.png); residual is tip dither/AA |
 | Tobin head fit | DONE for halfup059: AetherStrandHeadFit (per-axis scale 0.311/0.341/0.354, offset from head-bone-space landmarks), hair seats on skull (renders/tobin_halfup059_fit_4view.png) |
-| Wind / physics parity | physics port running in background agent (branch claude/aetherstrand-physics) |
+| Physics (web solver port) | DONE by agent branch claude/aetherstrand-physics (files brought onto this branch by path checkout; a merge was blocked by the repo guard, no `check` recorded): C# solver reproduces web traces to <=0.001 mm mean/max over 300 frames, 7 archetypes x idle/walk/turn/gust (PHYSICS_PORT.md). Coordinator verification: live play-mode on Tobin via AetherStrandWebImport.ApplyLive works, hair follows head turn, no console errors (renders/tobin_live_web_solver_turn_*.png). NOT yet verified by me: numeric trace replay in my editor, perf in a player build |
+| Open | torso collider vs Tobin shoulders untuned; strandWidthScale live re-bake not ported; Burst/perf; Blender half; Setup-window UI clicks; `check` before any merge to main |
 | Blender half / any-hairstyle path | not started |
 
 Live Unity: UnityMCP connected (deny entry removed locally, uncommitted). Run harness via execute_code: set SC_PARITY_TAG/MATSET env then ParityRender.Run().
