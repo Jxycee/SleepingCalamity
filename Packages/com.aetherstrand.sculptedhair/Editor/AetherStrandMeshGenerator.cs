@@ -303,8 +303,8 @@ namespace AetherStrand.Editor
         private static readonly float[] PY = { 1.0f, 0.42f, -0.32f, -0.45f, -0.32f, 0.42f, 1.0f };
         private static readonly float[] PNX = { 0.0f, 0.64409f, 0.94451f, 0.0f, -0.94451f, -0.64409f, 0.0f };
         private static readonly float[] PNY = { 1.0f, 0.76495f, -0.32849f, -1.0f, -0.32849f, 0.76495f, 1.0f };
-        // Web HEAD_CENTER_LOCAL (0,0.425,-0.01) minus head pivot (0,0.44,0), in head-local space.
-        private static readonly Vector3 WebHeadCenterLocal = new Vector3(0f, -0.015f, -0.01f);
+        // Web HEAD_CENTER_LOCAL (0,0.425,-0.01): points are already head-pivot-local, so use it as is.
+        private static readonly Vector3 WebHeadCenterLocal = new Vector3(0f, 0.425f, -0.01f);
 
         private static Mesh BuildVolumetricMesh(
             List<LockSpec> locks,
