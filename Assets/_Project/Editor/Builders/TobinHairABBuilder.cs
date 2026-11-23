@@ -25,6 +25,9 @@ namespace SleepingCalamity.EditorTools
         public const string HairDeckPrefab = Folder + "/Tobin_HairDeck.prefab";
         public const string AetherPrefab = Folder + "/Tobin_AetherStrand.prefab";
         public const string AetherBonePrefix = "Hair_";
+        public const bool UseUnityGenerator = true;   // false = the Blender FBX route (AetherHair/TobinAetherHair.fbx from tobin_aetherstrand.py)
+        public const string GeometryPath = "Packages/com.aetherstrand.sculptedhair/Presets/PresetGeometry.json";
+        public const string AetherMeshPath = AetherFolder + "/Tobin_AetherHair_Mesh.asset";
         public const float HeadHeight = 0.23f;   // chin to crown, metres (AutoSetupPhysics headHeightOverride)
         const string TexFolder = "Packages/com.aetherstrand.sculptedhair/Textures/";
 
@@ -34,7 +37,7 @@ namespace SleepingCalamity.EditorTools
         {
             var log = new StringBuilder();
             TobinBaseMaterialBuilder.Build();
-            BuildAetherMaterial(log);
+            BuildAetherMaterial(log);   // before the prefabs: the in-Unity generator binds this material
             BuilderUtil.WritePrefab(HairDeckPrefab, root => BuildVariant(root, aether: false, log));
             BuilderUtil.WritePrefab(AetherPrefab, root => BuildVariant(root, aether: true, log));
             AssetDatabase.SaveAssets();
@@ -69,17 +72,32 @@ namespace SleepingCalamity.EditorTools
                 // first build: structure (plain instances, not nested prefabs, so the hair rig can move under TobinBase's Head bone)
                 for (int i = root.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(root.transform.GetChild(i).gameObject);
                 var baseSrc = AssetDatabase.LoadAssetAtPath<GameObject>(TobinBaseModelImporter.ModelPath);
-                var hairSrc = AssetDatabase.LoadAssetAtPath<GameObject>(aether ? TobinAetherHairImporter.ModelPath : TobinHairMeshImporter.ModelPath);
-                if (baseSrc == null || hairSrc == null) throw new System.IO.FileNotFoundException("TobinBase or hair FBX missing for " + tag);
+                if (baseSrc == null) throw new System.IO.FileNotFoundException(TobinBaseModelImporter.ModelPath);
                 var tobin = Object.Instantiate(baseSrc, root.transform); tobin.name = "TobinBase";
-                var hair = Object.Instantiate(hairSrc, root.transform); hair.name = "Hair";
-                var hairAnim = hair.GetComponent<Animator>(); if (hairAnim != null) Object.DestroyImmediate(hairAnim);
                 var anim = tobin.GetComponent<Animator>(); if (anim == null) anim = tobin.AddComponent<Animator>();
                 anim.avatar = AssetDatabase.LoadAllAssetsAtPath(TobinBaseModelImporter.ModelPath).OfType<Avatar>().First();
                 var realHead0 = anim.GetBoneTransform(HumanBodyBones.Head);
-                var hairHead0 = hair.GetComponentsInChildren<Transform>(true).First(t => t.name == "Head");
-                log.AppendLine(tag + " head delta mm " + ((realHead0.position - hairHead0.position).magnitude * 1000f).ToString("F2"));
-                hairHead0.SetParent(realHead0, true);
+                GameObject hair;
+                if (aether && UseUnityGenerator)
+                {   // plugin's in-Unity generator (v2.5+): mesh + Hair_ chains straight under TobinBase's Head bone from the shipped PresetGeometry.json.
+                    // Runs only on the first build (it creates new objects), so rebuilds stay byte-identical; delete the prefab to regenerate.
+                    var mat0 = AssetDatabase.LoadAssetAtPath<Material>(AetherMatPath);
+                    var smr0 = AetherStrandMeshGenerator.GenerateAndAttach(root, new HairSculptParams(), GeometryPath, AetherMeshPath, mat0);
+                    if (smr0 == null) throw new System.InvalidOperationException("AetherStrandMeshGenerator.GenerateAndAttach returned null");
+                    hair = new GameObject("Hair"); hair.transform.SetParent(root.transform, false);
+                    smr0.transform.SetParent(hair.transform, true);
+                    log.AppendLine("aether generated mesh " + smr0.sharedMesh.vertexCount + " verts, " + (smr0.sharedMesh.triangles.Length / 3) + " tris, bones " + smr0.bones.Length);
+                }
+                else
+                {
+                    var hairSrc = AssetDatabase.LoadAssetAtPath<GameObject>(aether ? TobinAetherHairImporter.ModelPath : TobinHairMeshImporter.ModelPath);
+                    if (hairSrc == null) throw new System.IO.FileNotFoundException("hair FBX missing for " + tag);
+                    hair = Object.Instantiate(hairSrc, root.transform); hair.name = "Hair";
+                    var hairAnim = hair.GetComponent<Animator>(); if (hairAnim != null) Object.DestroyImmediate(hairAnim);
+                    var hairHead0 = hair.GetComponentsInChildren<Transform>(true).First(t => t.name == "Head");
+                    log.AppendLine(tag + " head delta mm " + ((realHead0.position - hairHead0.position).magnitude * 1000f).ToString("F2"));
+                    hairHead0.SetParent(realHead0, true);
+                }
                 tobinT = tobin.transform; hairT = hair.transform;
             }
             var animator = tobinT.GetComponent<Animator>();
@@ -97,7 +115,7 @@ namespace SleepingCalamity.EditorTools
                 return;
             }
 
-            var hairSmr = hairT.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r => r.name == "Tobin_AetherHair");
+            var hairSmr = hairT.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r => r.name == "Tobin_AetherHair" || r.name == "AetherStrand_HairMesh");
             hairSmr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(AetherMatPath);
             foreach (var r in hairT.GetComponentsInChildren<Renderer>(true)) if (r.name == "Tobin_HairShell") r.sharedMaterial = TobinHairMaterialBuilder.BuildCap();
             if (realHead.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("hair_", System.StringComparison.Ordinal)))

@@ -446,7 +446,7 @@ class AETHERSTRAND_OT_GenerateSculptedHair(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='EDIT')
         head_bone = arm_data.edit_bones.new("Head")
         head_bone.head = Vector((0.0, 0.0, 0.0))
-        head_bone.tail = Vector((0.0, 0.0, 0.425))
+        head_bone.tail = Vector((0.0, 0.0, 0.23))
         head_bone.use_deform = True
 
         for bone_names, spine in chain_definitions:

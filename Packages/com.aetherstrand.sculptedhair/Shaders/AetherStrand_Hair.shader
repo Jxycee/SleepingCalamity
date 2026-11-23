@@ -295,10 +295,13 @@ Shader "AetherStrand/SculptedHair_URP"
                     #endif
                     {
                         float3 aL = normalize(addLight.direction);
-                        float3 aCol = addLight.color * addLight.distanceAttenuation * addLight.shadowAttenuation;
-                        float aNdl = saturate((dot(perturbedN, aL) + 0.45) / 1.45);
-                        float aSpec = AS_StrandSpecular(t1, V, aL, _PrimaryPower * 0.8) * _PrimaryIntensity * 0.42;
-                        finalColor += (albedo * aNdl * totalAO + _PrimarySpecColor.rgb * aSpec * specMask) * aCol;
+                        float3 rawCol = addLight.color * addLight.distanceAttenuation * addLight.shadowAttenuation;
+                        // Soft-compress close warm point lights (torches) so hair keeps rich tone instead of neon blowout
+                        float3 aCol = rawCol / (1.0 + rawCol * 0.45);
+                        float aNdl = saturate((dot(perturbedN, aL) + 0.42) / 1.42) * 0.72;
+                        float aGate = smoothstep(-0.12, 0.45, dot(N, aL));
+                        float aSpec = AS_StrandSpecular(t1, V, aL, _PrimaryPower * 0.85) * _PrimaryIntensity * 0.36 * aGate;
+                        finalColor += (albedo * aNdl * totalAO + lerp(albedo * 1.25, _PrimarySpecColor.rgb, 0.50) * aSpec * specMask) * aCol;
                     }
                 LIGHT_LOOP_END
                 #endif
