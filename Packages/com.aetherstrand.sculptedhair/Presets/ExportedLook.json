@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "2.7.1",
+  "presetId": "parted_shag_medium",
+  "pipeline": "urp",
+  "lightingPreset": "studio",
+  "motionMode": "idle",
+  "visionMode": "shaded",
+  "backdropMode": "lighting",
+  "shader": {
+    "rootColor": "#1e1815",
+    "baseColor": "#3a2f28",
+    "tipColor": "#54463c",
+    "primarySpecColor": "#d8cfc8",
+    "secondarySpecColor": "#8c7666",
+    "primaryShift": 0.05,
+    "primaryPower": 64,
+    "primaryIntensity": 0.36,
+    "secondaryShift": -0.14,
+    "secondaryPower": 24,
+    "secondaryIntensity": 0.22,
+    "rimIntensity": 0.48,
+    "rimPower": 2.7,
+    "rootAO": 0.74,
+    "grooveDepth": 0.78,
+    "strandVariation": 0.28
+  },
+  "physics": {
+    "stiffness": 0.74,
+    "gravity": 3.8,
+    "windStrength": 0.0,
+    "windTurbulence": 0.24,
+    "windAzimuth": 28,
+    "damping": 0.1,
+    "inertia": 0.84,
+    "bendingSmoothness": 0.64,
+    "collisionMarginMm": 9,
+    "rootAnchor": 0.66,
+    "solverSubsteps": 3,
+    "strandWidthScale": 1,
+    "collisionEnabled": true
+  }
+}

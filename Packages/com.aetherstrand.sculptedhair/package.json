@@ -1,0 +1,20 @@
+{
+  "name": "com.aetherstrand.sculptedhair",
+  "version": "3.0.1",
+  "displayName": "AetherStrand Hair Studio (URP 17)",
+  "description": "Volumetric sculpted hair shader (URP / Unity 6) with carved fiber grooves, Kajiya-Kay dual-lobe specular, and substepped XPBD bone-chain physics.",
+  "unity": "6000.0",
+  "keywords": [
+    "hair",
+    "sculpted-hair",
+    "shader",
+    "kajiya-kay",
+    "physics",
+    "xpbd",
+    "verlet",
+    "urp"
+  ],
+  "author": {
+    "name": "AetherStrand Toolkit"
+  }
+}
