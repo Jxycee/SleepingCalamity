@@ -10,7 +10,10 @@ needs: coordinator (decision on the A/B result)
 | 5e31e29a | Round 2: jagged ruined tops + foot rubble in sc_town_wall.py, matte breach rocks, lit ivy, larger butterflies (0.17 m, 24/flock), anchored trough cluster |
 | eb2e11b4 | Round 2 breach heap angular only; R22 frames |
 | 1144f3dd | Scoped build output (scenes, terrain, matte/lit material variants) |
+| 44d63515 | Round 3 WIP (UNMEASURED, compile + fast gate only; no check/capture/A-B): skip Mud/puddle decals on the last 10 m of LowerLane (that was the floating dark blob; the decal was exposed once the rubble heap went). Not done: gate/pier rubble, JettyBack, OrchardGap texture cause, grime scaling, Orchard props. Suspects for OrchardGap smear: mesh LODs on adopted FBX or terrain texture stretch on the heap slope. Grime means vs old in neon-feedback.md |
 | febb227b | HollowmereSplitTests: manifest duplicate count was quadratic and hit its 180 s timeout (3094-line manifest); counted once |
+
+Round 3 stopped by the coordinator: 44d63515 is unmeasured; the check below covers febb227b only.
 
 Check: `SC RESULT check PASS` (EditMode 1869/1869, PlayMode 310 passed, 36 skipped, 0 failed; PlayMode needed -TimeoutMinutes 70, the first run hit the 30 min stage limit at 118 tests while still progressing), `SC MARKER` = febb227b. Play loop = the PlayMode suite (walkway/collider tests included).
 
