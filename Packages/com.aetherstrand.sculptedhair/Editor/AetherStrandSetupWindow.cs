@@ -175,7 +175,7 @@ namespace AetherStrand.Editor
             }
             EditorGUILayout.EndHorizontal();
 
-            _tabIndex = GUILayout.Toolbar(_tabIndex, new[] { "Presets", "Hair Builder", "Color & Shader", "Physics & Audit", "Batch / AI Eval" });
+            _tabIndex = GUILayout.Toolbar(_tabIndex, new[] { "Presets", "Hair Builder", "Color & Shader", "Physics & Audit", "AI Debug & Export" });
             EditorGUILayout.Space(4);
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
@@ -427,8 +427,48 @@ namespace AetherStrand.Editor
             }
         }
 
+        private string _diagOutputFolder = "Assets/AetherStrand_AI_Diag";
+        private string _lastDiagMarkdown = "";
+
         private void DrawBatchEvalTab()
         {
+            GUILayout.Label("AI Debug & Diagnostic Export (for Wren / Neon)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Exports millimeter Head-vs-Hair alignment deltas, skull bounds, collider config, 3-scenario deterministic motion audits (Rest, 60-deg Turn, 5 m/s Sprint), shader state, and a 4-Up Turnaround PNG.",
+                MessageType.Info);
+
+            _diagOutputFolder = EditorGUILayout.TextField("Diag Export Folder", _diagOutputFolder);
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(_characterRoot == null))
+            {
+                GUI.backgroundColor = new Color(0.45f, 0.85f, 0.98f);
+                if (GUILayout.Button("Export AI Diagnostic Bundle", GUILayout.Height(30)))
+                {
+                    var rep = AetherStrandAiDiagnostics.ExportBundle(_characterRoot, _diagOutputFolder, _hairRenderer);
+                    _lastDiagMarkdown = AetherStrandAiDiagnostics.FormatMarkdownSummary(rep);
+                    Capture4UpTurnaroundPng(Path.Combine(_diagOutputFolder, "aetherstrand_turnaround_4up.png").Replace('\\', '/'));
+                }
+                GUI.backgroundColor = Color.white;
+
+                if (GUILayout.Button("Copy MD Report", GUILayout.Height(30), GUILayout.Width(120)))
+                {
+                    var rep = AetherStrandAiDiagnostics.CollectReport(_characterRoot, _hairRenderer);
+                    _lastDiagMarkdown = AetherStrandAiDiagnostics.FormatMarkdownSummary(rep);
+                    EditorGUIUtility.systemCopyBuffer = _lastDiagMarkdown;
+                    Debug.Log("[AetherStrand] Copied AI Diagnostic Markdown report to clipboard.");
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (!string.IsNullOrEmpty(_lastDiagMarkdown))
+            {
+                EditorGUILayout.Space(4);
+                EditorGUILayout.TextArea(_lastDiagMarkdown, GUILayout.MinHeight(140));
+            }
+
+            EditorGUILayout.Space(8);
+            GUILayout.Label("Batch Paths & Manual Overrides", EditorStyles.boldLabel);
             _hairRenderer = (Renderer)EditorGUILayout.ObjectField("Hair Renderer", _hairRenderer, typeof(Renderer), true);
             _bonePrefix = EditorGUILayout.TextField("Hair Bone Prefix", _bonePrefix);
             _materialOutputPath = EditorGUILayout.TextField("Material Output Path", _materialOutputPath);
@@ -436,10 +476,10 @@ namespace AetherStrand.Editor
             _presetJsonPath = EditorGUILayout.TextField("Preset JSON (Opt)", _presetJsonPath);
             _headHeightOverride = EditorGUILayout.FloatField("Head Height Override", _headHeightOverride);
 
-            EditorGUILayout.Space(6);
-            if (GUILayout.Button("Export 4-Up Turnaround PNG (AI Eval)", GUILayout.Height(28)))
+            EditorGUILayout.Space(4);
+            if (GUILayout.Button("Export 4-Up Turnaround PNG Only", GUILayout.Height(24)))
                 Capture4UpTurnaroundPng("Assets/AetherStrand_Turnaround_4Up.png");
-            if (GUILayout.Button("Create / Update Material Asset Only", GUILayout.Height(26)))
+            if (GUILayout.Button("Create / Update Material Asset Only", GUILayout.Height(24)))
                 _activeMaterial = CreateMaterialAsset(_materialOutputPath, string.IsNullOrWhiteSpace(_presetJsonPath) ? null : _presetJsonPath);
         }
 

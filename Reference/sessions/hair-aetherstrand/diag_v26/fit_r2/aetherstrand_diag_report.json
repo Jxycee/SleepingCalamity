@@ -1,0 +1,241 @@
+﻿{
+    "pluginVersion": "2.6.0",
+    "characterName": "Tobin_AetherStrand",
+    "headBoneName": "Head",
+    "headBoneWorldPos": {
+        "x": 0.0,
+        "y": 1.7209999561309814,
+        "z": -0.011900000274181366
+    },
+    "headLocalForwardInCharSpace": {
+        "x": 0.0,
+        "y": 0.12189999967813492,
+        "z": 0.9925000071525574
+    },
+    "headLocalUpInCharSpace": {
+        "x": 0.0,
+        "y": 0.9925000071525574,
+        "z": -0.12189999967813492
+    },
+    "headLossyScale": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+    },
+    "hasHeadMeshBounds": true,
+    "headMeshBoundsInHeadLocal": {
+        "min": {
+            "x": -0.09700000286102295,
+            "y": -0.05000000074505806,
+            "z": -0.06669999659061432
+        },
+        "max": {
+            "x": 0.0949999988079071,
+            "y": 0.18770000338554382,
+            "z": 0.16689999401569366
+        },
+        "center": {
+            "x": -0.0010000000474974513,
+            "y": 0.06889999657869339,
+            "z": 0.05009999871253967
+        },
+        "size": {
+            "x": 0.19189999997615814,
+            "y": 0.23759999871253967,
+            "z": 0.23360000550746918
+        }
+    },
+    "hasHairMeshBounds": true,
+    "hairMeshBoundsInHeadLocal": {
+        "min": {
+            "x": -0.15729999542236328,
+            "y": -0.09749999642372131,
+            "z": -0.11320000141859055
+        },
+        "max": {
+            "x": 0.1446000039577484,
+            "y": 0.24809999763965607,
+            "z": 0.1712999939918518
+        },
+        "center": {
+            "x": -0.006300000008195639,
+            "y": 0.07530000060796738,
+            "z": 0.029100000858306885
+        },
+        "size": {
+            "x": 0.3018999993801117,
+            "y": 0.3456000089645386,
+            "z": 0.28450000286102295
+        }
+    },
+    "frontOverhangMm": 4.449999809265137,
+    "crownLiftMm": 60.400001525878906,
+    "backReachMm": 46.45000076293945,
+    "widthDeltaMm": 110.0,
+    "hairBoneRootCount": 44,
+    "bangsChainCount": 10,
+    "crownChainCount": 9,
+    "sidesChainCount": 1,
+    "rearChainCount": 24,
+    "shaderName": "AetherStrand/SculptedHair_URP",
+    "rootColorHex": "#2C1E15",
+    "baseColorHex": "#5A3F2C",
+    "tipColorHex": "#7A563C",
+    "headCenterBlend": 0.30000001192092896,
+    "alphaClip": 0.3400000035762787,
+    "grooveDepth": 0.7799999713897705,
+    "primaryIntensity": 0.36000001430511475,
+    "secondaryIntensity": 0.2199999988079071,
+    "boundTextureCount": 4,
+    "colliders": [
+        {
+            "name": "AS_Col_Cranium",
+            "parentBone": "Head",
+            "shape": "Sphere",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.1152999997138977,
+                "z": 0.004900000058114529
+            },
+            "worldCenter": {
+                "x": 0.0,
+                "y": 1.8359999656677246,
+                "z": -0.0210999995470047
+            },
+            "radius": 0.08739999681711197,
+            "capsuleHeight": 0.0,
+            "parentUniformScale": 1.0
+        },
+        {
+            "name": "AS_Col_FaceJaw",
+            "parentBone": "Head",
+            "shape": "Capsule",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.06459999829530716,
+                "z": 0.04039999842643738
+            },
+            "worldCenter": {
+                "x": 0.0,
+                "y": 1.7899999618530273,
+                "z": 0.0203000009059906
+            },
+            "radius": 0.06289999932050705,
+            "capsuleHeight": 0.07819999754428864,
+            "parentUniformScale": 1.0
+        },
+        {
+            "name": "AS_Col_Neck",
+            "parentBone": "Neck",
+            "shape": "Capsule",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.041099999099969864,
+                "z": 0.004999999888241291
+            },
+            "worldCenter": {
+                "x": 0.0,
+                "y": 1.6516000032424927,
+                "z": -0.03400000184774399
+            },
+            "radius": 0.050599999725818634,
+            "capsuleHeight": 0.0828000009059906,
+            "parentUniformScale": 1.0
+        },
+        {
+            "name": "AS_Col_UpperChest",
+            "parentBone": "Spine2",
+            "shape": "Capsule",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.02850000001490116,
+                "z": -0.005799999926239252
+            },
+            "worldCenter": {
+                "x": 0.0,
+                "y": 1.3997000455856323,
+                "z": 0.011699999682605267
+            },
+            "radius": 0.08739999681711197,
+            "capsuleHeight": 0.19550000131130219,
+            "parentUniformScale": 1.0
+        },
+        {
+            "name": "AS_Col_ShoulderL",
+            "parentBone": "LeftShoulder",
+            "shape": "Capsule",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "worldCenter": {
+                "x": -0.08190000057220459,
+                "y": 1.5074000358581543,
+                "z": -0.05979999899864197
+            },
+            "radius": 0.0551999993622303,
+            "capsuleHeight": 0.1103999987244606,
+            "parentUniformScale": 1.0
+        },
+        {
+            "name": "AS_Col_ShoulderR",
+            "parentBone": "RightShoulder",
+            "shape": "Capsule",
+            "localCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "worldCenter": {
+                "x": 0.08190000057220459,
+                "y": 1.5074000358581543,
+                "z": -0.05979999899864197
+            },
+            "radius": 0.0551999993622303,
+            "capsuleHeight": 0.1103999987244606,
+            "parentUniformScale": 1.0
+        }
+    ],
+    "scenarios": [
+        {
+            "scenario": "Rest_0.5s",
+            "verdict": "WARN",
+            "score": 82,
+            "totalChains": 44,
+            "colliderCount": 6,
+            "penetratingNodes": 0,
+            "interLockClipCount": 0,
+            "maxKinkAngleDeg": 37.68360137939453,
+            "maxStretchErrorPct": 8.620599746704102,
+            "meanTipSwayCm": 4.724899768829346
+        },
+        {
+            "scenario": "HeadTurn60_0.4s",
+            "verdict": "WARN",
+            "score": 78,
+            "totalChains": 44,
+            "colliderCount": 6,
+            "penetratingNodes": 0,
+            "interLockClipCount": 0,
+            "maxKinkAngleDeg": 40.76499938964844,
+            "maxStretchErrorPct": 9.318300247192383,
+            "meanTipSwayCm": 6.61870002746582
+        },
+        {
+            "scenario": "Sprint5msStop_0.4s",
+            "verdict": "WARN",
+            "score": 65,
+            "totalChains": 44,
+            "colliderCount": 6,
+            "penetratingNodes": 0,
+            "interLockClipCount": 0,
+            "maxKinkAngleDeg": 43.41389846801758,
+            "maxStretchErrorPct": 14.901000022888184,
+            "meanTipSwayCm": 7.081699848175049
+        }
+    ],
+    "flags": [
+        "ALIGNMENT: Hair crown sits 60.4 mm above skull top (possible crown loops)"
+    ]
+}

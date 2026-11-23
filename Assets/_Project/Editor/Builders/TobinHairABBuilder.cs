@@ -66,7 +66,19 @@ namespace SleepingCalamity.EditorTools
         // Fit of the shipped PresetGeometry onto Tobin's scalp with the generator's own knobs. The defaults (scale 1, no offset) seat the root cloud
         // 3-8 cm high and short of the front hairline (bald forehead in the round-2 capture). Measured from the root clouds in head-bone space
         // (preset vs the HairDeck card roots): width ratio 1.09, depth ratio 1.49 -> uniform 1.2; offset aligns the root-cloud top and centre.
-        public static HairSculptParams FitParams() => new HairSculptParams { overallScale = 1.2f, headLocalOffset = new Vector3(-0.005f, -0.064f, -0.002f) };
+        // SC_HAIR_FIT=default (v2.6 generator defaults, no fit) | tobin (round-2 fit). Round 3 starts with the generator's own knobs.
+        public static HairSculptParams FitParams()
+        {
+            string m = System.Environment.GetEnvironmentVariable("SC_HAIR_FIT");
+            if (m == "tobin") return new HairSculptParams { overallScale = 1.2f, headLocalOffset = new Vector3(-0.005f, -0.064f, -0.002f) };
+            if (m == "default" || string.IsNullOrEmpty(m)) return new HairSculptParams();
+            var a = m.Split(',');   // "scale,x,y,z[,bangs[,width]]"
+            var p = new HairSculptParams { overallScale = float.Parse(a[0], System.Globalization.CultureInfo.InvariantCulture), headLocalOffset = new Vector3(F(a[1]), F(a[2]), F(a[3])) };
+            if (a.Length > 4) p.bangsLength = F(a[4]);
+            if (a.Length > 5) p.widthScale = F(a[5]);
+            return p;
+        }
+        static float F(string s) => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
 
         static void BuildVariant(GameObject root, bool aether, StringBuilder log)
         {

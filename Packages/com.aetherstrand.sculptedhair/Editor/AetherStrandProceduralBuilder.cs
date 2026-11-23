@@ -52,7 +52,7 @@ namespace AetherStrand.Editor
 
         // Character Head-space alignment (exact skull-center-to-skull-center default for MetaPerson)
         public float overallScale = 1.0f;
-        public Vector3 headLocalOffset = new Vector3(0f, 0.0f, 0.012f);
+        public Vector3 headLocalOffset = new Vector3(0f, 0.005f, 0.032f);
         public int targetChainCount = 44;
         public int bonesPerChain = 5;
     }
@@ -109,7 +109,7 @@ namespace AetherStrand.Editor
                 Stiffness = 0.64f, Gravity = 4.2f, Damping = 0.095f, Inertia = 0.85f, Bending = 0.54f, RootAnchor = 0.64f,
                 Builder = new HairBuilderState
                 {
-                    archetype = HairArchetype.LayeredShag, partPosition = 0.42f, bangsLength = 0.60f, bangsSweep = -0.48f,
+                    archetype = HairArchetype.LayeredShag, partPosition = 0.42f, bangsLength = 0.72f, bangsSweep = -0.48f,
                     crownVolume = 0.45f, spikeLift = 0.14f, sideLength = 0.66f, backLength = 0.60f, layerShag = 0.68f,
                     curlAmplitude = 0f, density = 1.0f, strandWidth = 0.96f, seed = 202619
                 }
