@@ -409,7 +409,7 @@ namespace AetherStrand.Editor
                 colors.Add(new Color(1f, lk.layerAO, lk.seed, maskVal));
                 weights.Add(ComputeRingWeight(ringsPerLock, 1.0f, isDynamic, chainBones));
 
-                // Same index order as web: CCW-outward in RH becomes CW-outward after the X mirror = Unity front face
+                // Index order reversed vs web: the X mirror (RH -> LH) flips winding, and Unity treats clockwise as front
                 for (int k = 0; k < ringsPerLock - 1; k++)
                 {
                     int r0 = baseVert + k * ringVerts;
@@ -417,14 +417,14 @@ namespace AetherStrand.Editor
                     for (int r = 0; r < ringVerts - 1; r++)
                     {
                         int a = r0 + r, b = r0 + r + 1, c = r1 + r, d = r1 + r + 1;
-                        tris.Add(a); tris.Add(b); tris.Add(c);
-                        tris.Add(b); tris.Add(d); tris.Add(c);
+                        tris.Add(a); tris.Add(c); tris.Add(b);
+                        tris.Add(b); tris.Add(c); tris.Add(d);
                     }
                 }
                 int lastRow = baseVert + (ringsPerLock - 1) * ringVerts;
                 for (int r = 0; r < ringVerts - 1; r++)
                 {
-                    tris.Add(lastRow + r); tris.Add(lastRow + r + 1); tris.Add(tipVertIdx);
+                    tris.Add(lastRow + r); tris.Add(tipVertIdx); tris.Add(lastRow + r + 1);
                 }
             }
 

@@ -59,6 +59,18 @@ public static class ParityRender
     static string Env(string k, string d) { var v = Environment.GetEnvironmentVariable(k); return string.IsNullOrEmpty(v) ? d : v; }
     static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
 
+    public static void SetupPipeline()
+    {
+        Directory.CreateDirectory("Assets/Parity");
+        var data = ScriptableObject.CreateInstance<UniversalRendererData>();
+        AssetDatabase.CreateAsset(data, "Assets/Parity/ParityRenderer.asset");
+        var rp = UniversalRenderPipelineAsset.Create(data);
+        AssetDatabase.CreateAsset(rp, "Assets/Parity/ParityURP.asset");
+        AssetDatabase.SaveAssets();
+        GraphicsSettings.defaultRenderPipeline = rp; QualitySettings.renderPipeline = rp;
+        AssetDatabase.SaveAssets();
+    }
+
     public static void Run()
     {
         try { Inner(); Debug.Log("PARITY RESULT PASS"); }
@@ -76,8 +88,8 @@ public static class ParityRender
         float scale = float.Parse(Env("SC_PARITY_SCALE", "1"), System.Globalization.CultureInfo.InvariantCulture);
 
         ShaderUtil.allowAsyncCompilation = false;
-        var rp = UniversalRenderPipelineAsset.Create();
-        GraphicsSettings.defaultRenderPipeline = rp; QualitySettings.renderPipeline = rp;
+        // URP must already be the active pipeline (assigning inside this call only takes effect next frame).
+        if (GraphicsSettings.currentRenderPipeline == null) { Debug.LogError("PARITY no render pipeline asset active; run ParityRender.SetupPipeline first"); return; }
 
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         Directory.CreateDirectory("Assets/Parity");
@@ -102,22 +114,9 @@ public static class ParityRender
             var go = new GameObject("bust" + (bi++)); go.transform.SetParent(root.transform, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             mesh.RecalculateNormals();
-            var nn = mesh.normals; var cols = new Color[nn.Length];
-            Color alb = Hex(m.color).linear; float pi = Mathf.PI;
-            Func<string, float, Color> LC = (h, k) => Hex(h).linear * k;
-            Func<V3, Vector3> MDv = (d) => new Vector3(-d.x, d.y, d.z).normalized;
-            Vector3 dK = MDv(rig.keyD), dF = MDv(rig.fillD), dR = MDv(rig.rimD);
-            Color ck = LC(rig.keyC, rig.keyI / pi), cf = LC(rig.fillC, rig.fillI / pi), cr = LC(rig.rimC, rig.rimI / pi);
-            Color sky = LC(rig.skyC, rig.hemiI / pi), gnd = LC(rig.gndC, rig.hemiI / pi);
-            for (int vi = 0; vi < nn.Length; vi++)
-            {
-                Vector3 n = nn[vi].normalized;
-                Color c = Color.Lerp(gnd, sky, n.y * 0.5f + 0.5f) + ck * Mathf.Max(0, Vector3.Dot(n, dK)) + cf * Mathf.Max(0, Vector3.Dot(n, dF)) + cr * Mathf.Max(0, Vector3.Dot(n, dR));
-                cols[vi] = new Color(alb.r * c.r, alb.g * c.g, alb.b * c.b, 1);
-            }
-            mesh.colors = cols;
-            var mat = new Material(Shader.Find("Hidden/Internal-Colored"));
-            mat.SetColor("_Color", Color.white); mat.SetInt("_SrcBlend", 1); mat.SetInt("_DstBlend", 0); mat.SetInt("_Cull", 0); mat.SetInt("_ZWrite", 1); mat.SetInt("_ZTest", 4);
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetColor("_BaseColor", Hex(m.color)); mat.SetFloat("_Smoothness", 1f - m.rough); mat.SetFloat("_Metallic", m.metal);
+            mat.SetFloat("_Cull", 0f);
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
         }
 
@@ -145,6 +144,11 @@ public static class ParityRender
         // web 3-light rig uniforms for the hair shader (colour = linear(hex) * intensity * web constant)
         Func<string, float, Vector4> LinC = (h, k) => { var c = Hex(h).linear * k; return new Vector4(c.r, c.g, c.b, 0); };
         Func<V3, Vector4> MDir = (d) => { var v = new Vector3(-d.x, d.y, d.z).normalized; return new Vector4(v.x, v.y, v.z, 0); };
+        foreach (var kv in Env("SC_PARITY_MATSET", "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pr = kv.Split('=');
+            if (pr.Length == 2) matA.SetFloat(pr[0], float.Parse(pr[1], System.Globalization.CultureInfo.InvariantCulture));
+        }
         matA.SetFloat("_UseWebRig", 1f);
         matA.SetVector("_KeyDirW", MDir(rig.keyD)); matA.SetVector("_KeyColW", LinC(rig.keyC, rig.keyI * 0.42f));
         matA.SetVector("_FillDirW", MDir(rig.fillD)); matA.SetVector("_FillColW", LinC(rig.fillC, rig.fillI * 0.38f));
