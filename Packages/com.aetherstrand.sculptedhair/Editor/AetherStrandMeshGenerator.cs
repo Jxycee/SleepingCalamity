@@ -22,6 +22,10 @@ namespace AetherStrand.Editor
         public int targetChainCount = 44;
         public int bonesPerChain = 5;
         public bool autoFitToHeadMesh = true;
+        /// <summary>Set by GenerateAndAttach when AetherStrandHeadFit succeeded (per-axis scale + offset from web head space to this head).</summary>
+        public bool useHeadFit;
+        public Vector3 fitScale = Vector3.one;
+        public Vector3 fitOffset = Vector3.zero;
         /// <summary>Legacy: rescale by 0.23/maxZ when the JSON is in web-bust units. False = use overallScale only (parity mode).</summary>
         public bool legacyAutoNormalize = true;
     }
@@ -95,6 +99,16 @@ namespace AetherStrand.Editor
                 return null;
             }
 
+            AetherStrandHeadFit.Fit headFit = default(AetherStrandHeadFit.Fit);
+            if (p.autoFitToHeadMesh && p.headLocalOffset == Vector3.zero && AetherStrandHeadFit.TryCompute(characterRoot, headBone, out headFit))
+            {
+                p.useHeadFit = true; p.fitScale = headFit.scale; p.fitOffset = headFit.offset;
+                p.legacyAutoNormalize = false; p.overallScale = 1f;
+                Debug.Log("[AetherStrand] Head fit: scale " + headFit.scale.ToString("F3") + " offset " + headFit.offset.ToString("F3")
+                    + " (head h/w/d " + headFit.height.ToString("F3") + "/" + headFit.width.ToString("F3") + "/" + headFit.depth.ToString("F3") + ")");
+            }
+            else p.useHeadFit = false;
+
             List<LockSpec> locks = LoadLocksFromJson(presetGeometryJsonPath, p);
             if (locks.Count == 0)
             {
@@ -102,10 +116,6 @@ namespace AetherStrand.Editor
                 return null;
             }
 
-            if (p.autoFitToHeadMesh && p.headLocalOffset == Vector3.zero)
-            {
-                AutoSeatLocksToHeadMesh(characterRoot, headBone, locks);
-            }
 
             // 1. Clean previous generated rig & mesh object under Head / characterRoot
             RemovePreviousGeneratedHair(characterRoot, headBone);
@@ -212,6 +222,8 @@ namespace AetherStrand.Editor
             smr.rootBone = headBone;
             smr.sharedMaterial = hairMaterial;
             smr.updateWhenOffscreen = false;
+            var drv = hairGo.AddComponent<AetherStrandHeadCenterDriver>();
+            drv.headBone = headBone; drv.localCenter = WebHeadCenterLocal; drv.target = smr; drv.Apply();
             smr.localBounds = savedMesh.bounds;
 
             EditorUtility.SetDirty(characterRoot);
@@ -304,7 +316,7 @@ namespace AetherStrand.Editor
         private static readonly float[] PNX = { 0.0f, 0.64409f, 0.94451f, 0.0f, -0.94451f, -0.64409f, 0.0f };
         private static readonly float[] PNY = { 1.0f, 0.76495f, -0.32849f, -1.0f, -0.32849f, 0.76495f, 1.0f };
         // Web HEAD_CENTER_LOCAL (0,0.425,-0.01): points are already head-pivot-local, so use it as is.
-        private static readonly Vector3 WebHeadCenterLocal = new Vector3(0f, 0.425f, -0.01f);
+        private static Vector3 WebHeadCenterLocal = new Vector3(0f, 0.425f, -0.01f);
 
         private static Mesh BuildVolumetricMesh(
             List<LockSpec> locks,
@@ -554,7 +566,7 @@ namespace AetherStrand.Editor
             {
                 var pts = new Vector3[item.pts.Count];
                 for (int i = 0; i < item.pts.Count; i++)
-                    pts[i] = item.pts[i] * s + p.headLocalOffset;
+                    pts[i] = p.useHeadFit ? Vector3.Scale(item.pts[i], p.fitScale) + p.fitOffset : item.pts[i] * s + p.headLocalOffset;
 
                 if (!item.isBase)
                 {
@@ -568,8 +580,8 @@ namespace AetherStrand.Editor
                 list.Add(new LockSpec
                 {
                     zone = item.zone,
-                    width = item.w * s * Mathf.Clamp(p.widthScale, 0.4f, 1.8f),
-                    thickness = item.th * s * Mathf.Clamp(p.thicknessScale, 0.4f, 1.8f),
+                    width = item.w * (p.useHeadFit ? (p.fitScale.x + p.fitScale.z) * 0.5f : s) * Mathf.Clamp(p.widthScale, 0.4f, 1.8f),
+                    thickness = item.th * (p.useHeadFit ? (p.fitScale.x + p.fitScale.z) * 0.5f : s) * Mathf.Clamp(p.thicknessScale, 0.4f, 1.8f),
                     seed = item.seed,
                     layerAO = item.ao,
                     isBaseShell = item.isBase,
@@ -580,6 +592,7 @@ namespace AetherStrand.Editor
                 });
             }
 
+            WebHeadCenterLocal = p.useHeadFit ? Vector3.Scale(AetherStrandHeadFit.WebHeadCenter, p.fitScale) + p.fitOffset : AetherStrandHeadFit.WebHeadCenter;
             return list;
         }
 

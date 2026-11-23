@@ -17,7 +17,7 @@ public static class ParityRender
     [Serializable] class Rig { public string bg, keyC, fillC, rimC, skyC, gndC; public V3 keyD, fillD, rimD; public float keyI, fillI, rimI, hemiI; }
 
         // three.js ACESFilmicToneMapping (exposure 1.16) + sRGB, composited over the clear colour; 2x2 supersample to 512
-    static Texture2D ToneMapDownsample(Texture2D src, Color bgSrgb)
+    public static Texture2D ToneMapDownsample(Texture2D src, Color bgSrgb)
     {
         var px = src.GetPixels(); int W = src.width, N = W / 2;
         var outT = new Texture2D(N, N, TextureFormat.RGB24, false); var o = new Color[N * N];
@@ -35,7 +35,7 @@ public static class ParityRender
         }
         outT.SetPixels(o); outT.Apply(); return outT;
     }
-    static Color InverseBg(Color bgSrgb)
+    public static Color InverseBg(Color bgSrgb)
     {
         Color tgt = bgSrgb.linear; Color x = tgt;
         for (int it = 0; it < 200; it++)
@@ -56,8 +56,8 @@ public static class ParityRender
         return new Color(Mathf.Clamp01(1.60475f * r1 - 0.53108f * g1 - 0.07367f * b1), Mathf.Clamp01(-0.10208f * r1 + 1.10813f * g1 - 0.00605f * b1), Mathf.Clamp01(-0.00327f * r1 - 0.07276f * g1 + 1.07602f * b1), 1);
     }
 
-    static string Env(string k, string d) { var v = Environment.GetEnvironmentVariable(k); return string.IsNullOrEmpty(v) ? d : v; }
-    static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
+    public static string Env(string k, string d) { var v = Environment.GetEnvironmentVariable(k); return string.IsNullOrEmpty(v) ? d : v; }
+    public static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
 
     public static void SetupPipeline()
     {
@@ -149,6 +149,8 @@ public static class ParityRender
             var pr = kv.Split('=');
             if (pr.Length == 2) matA.SetFloat(pr[0], float.Parse(pr[1], System.Globalization.CultureInfo.InvariantCulture));
         }
+        foreach (var tn in new[] { "_GrooveAoMap", "_FlowIdMap", "_NormalMap", "_AlphaMap" })
+        { var tx = matA.GetTexture(tn) as Texture2D; if (tx != null) tx.anisoLevel = int.Parse(Env("SC_PARITY_ANISO", "1")); }
         matA.SetFloat("_UseWebRig", 1f);
         matA.SetVector("_KeyDirW", MDir(rig.keyD)); matA.SetVector("_KeyColW", LinC(rig.keyC, rig.keyI * 0.42f));
         matA.SetVector("_FillDirW", MDir(rig.fillD)); matA.SetVector("_FillColW", LinC(rig.fillC, rig.fillI * 0.38f));
@@ -190,7 +192,7 @@ public static class ParityRender
         var tgts = new[] { new Vector3(0, .77f, 0), new Vector3(0, .77f, -.02f), new Vector3(0, .77f, -.05f), new Vector3(0, .77f, -.05f) };
         var gxs = new[] { 0, 1, 0, 1 }; var gys = new[] { 1, 1, 0, 0 };
         var sheet = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
-        var rt = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { antiAliasing = 1 };
+        var rt = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { antiAliasing = int.Parse(Env("SC_PARITY_MSAA", "1")) };
         for (int k = 0; k < 4; k++)
         {
             cam.transform.position = new Vector3(-poss[k].x, poss[k].y, poss[k].z);
