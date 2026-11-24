@@ -196,7 +196,7 @@ namespace AetherStrand.Editor
                 {
                     for (int i = 0; i < set.Length; i++)
                     {
-                        if (set[i].y < yCut) continue;
+                        if (set[i].y < yCut || set[i].y > yHi - 0.01f) continue; // below the cranium band, or above the head top (buns, tufts): not hugged
                         Vector3 w = headBone.TransformPoint(set[i]);
                         Vector3 cp = mc.ClosestPoint(w); float d = Vector3.Distance(cp, w);
                         if (d <= hugStart || d > 0.07f) continue;

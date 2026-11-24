@@ -724,7 +724,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     const knotTheta = Math.PI;
     const tkStart = specs.length;
     const KX = 0.72, KZ = 0.8;
-    const knotPhi = 0.42;
+    const knotPhi = 0.3;
     const knotAnchor = skullSurfacePoint(knotTheta, knotPhi, 0.012);
     // hairline: high forehead, receding temples, short sideburn in front of the ear, tapered nape
     const cutKnots: Array<[number, number]> = [
@@ -798,7 +798,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       for (let i = 0; i < cols; i++) {
         const theta = (i / cols) * Math.PI * 2 + row * 0.5 * (Math.PI * 2 / cols) + (rand() - 0.5) * 0.01;
         const cosT = Math.cos(theta);
-        if (Math.abs(Math.atan2(Math.sin(theta), cosT)) < 1.0) continue; // crisp front hairline: no stubble band
+        if (Math.abs(Math.atan2(Math.sin(theta), cosT)) < 1.75) continue; // crisp front hairline: no stubble band
         const lim = cutPhi(theta) + 0.05 + row * 0.025;
         const top = lim - 0.075;
         const pts = buildSculptedLock({
@@ -820,6 +820,28 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       }
     }
 
+    // soft sideburn edge: fine thin strands along the steep temple cut so the steps blend
+    for (let sd = -1; sd <= 1; sd += 2) {
+      for (let i = 0; i < 70; i++) {
+        const theta = sd * (0.85 + (i / 69) * 0.8);
+        pullStrand(theta, cutPhi(theta) - 0.01, 0.014 * wMul, 0, 0.1);
+      }
+    }
+    // second cap tier around the knot base (scalp pinholes)
+    for (let i = 0; i < 40; i++) {
+      const theta = (i / 40) * Math.PI * 2 + 0.07;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: theta, phiStart: 0.45, phiEnd: 1.2, baseLift: 0.005, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.35,
+      });
+      for (const p of pts) {
+        p.x = HEAD_CENTER_LOCAL.x + (p.x - HEAD_CENTER_LOCAL.x) * KX;
+        p.z = HEAD_CENTER_LOCAL.z + (p.z - HEAD_CENTER_LOCAL.z) * KZ;
+      }
+      specs.push({
+        pointsLocal: pts, width: 0.07 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.8,
+        layerOrder: 1, lockNormal: false, scalpRoot: 0.4,
+      });
+    }
     // crown cap: radial cover strands around the knot so no scalp pinholes show where the pulled strands converge
     for (let i = 0; i < 28; i++) {
       const theta = (i / 28) * Math.PI * 2;
@@ -837,10 +859,10 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     }
 
     // Zone 3A: topknot bun as a coil: helical strands wound round a short vertical axis, swirling to a top whorl
-    const bunR = 0.115;
+    const bunR = 0.13;
     const bunC = knotAnchor.clone();
-    bunC.z = HEAD_CENTER_LOCAL.z + (bunC.z - HEAD_CENTER_LOCAL.z) * KZ; bunC.x = HEAD_CENTER_LOCAL.x + (bunC.x - HEAD_CENTER_LOCAL.x) * KX; bunC.y += bunR * 0.4; bunC.z -= bunR * 0.3;
-    const tilt = 0.3; // bun leans back: top shifts toward -z
+    bunC.z = HEAD_CENTER_LOCAL.z + (bunC.z - HEAD_CENTER_LOCAL.z) * KZ; bunC.x = HEAD_CENTER_LOCAL.x + (bunC.x - HEAD_CENTER_LOCAL.x) * KX; bunC.y += bunR * 0.2; bunC.z -= bunR * 0.25;
+    const tilt = 0.45; // bun leans back: top shifts toward -z
     const coilCount = Math.round(54 * density);
     for (let i = 0; i < coilCount; i++) {
       const a0 = (i / coilCount) * Math.PI * 2;
@@ -854,7 +876,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
         const a = a0 + turns * t * Math.PI * 1.2;
         pts.push(new V3(
           bunC.x + rr * Math.cos(a),
-          bunC.y + bunR * 0.85 * hh,
+          bunC.y + bunR * 0.92 * hh,
           bunC.z + rr * Math.sin(a) * 1.1 - tilt * bunR * hh
         ));
       }
@@ -892,16 +914,16 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
         for (let k = 0; k < NODES_PER_LOCK; k++) {
           const t = k / (NODES_PER_LOCK - 1);
           const th = Math.PI + side * (0.04 + 0.1 * t) + (j - 1) * 0.02;
-          const ph = 0.5 + 0.75 * t;
+          const ph = 0.72 + 0.55 * t;
           const q = skullSurfacePoint(th, ph, 0.002);
           const lowT = THREE.MathUtils.clamp((HEAD_CENTER_LOCAL.y - q.y) / 0.08, 0, 1);
           q.x = HEAD_CENTER_LOCAL.x + (q.x - HEAD_CENTER_LOCAL.x) * (KX - 0.08 * lowT);
           q.z = HEAD_CENTER_LOCAL.z + (q.z - HEAD_CENTER_LOCAL.z) * (KZ - 0.06 * lowT);
-          q.addScaledVector(q.clone().sub(HEAD_CENTER_LOCAL).normalize(), 0.07 + 0.02 * t); // proud of the hair surface so the ends read
+          q.addScaledVector(q.clone().sub(HEAD_CENTER_LOCAL).normalize(), 0.05 + 0.012 * t); // proud of the hair surface so the ends read
           pts.push(q);
         }
         specs.push({
-          pointsLocal: pts, width: 0.04 * wMul, thickness: 0.012, stiffnessBias: 0.95, layerAO: 0.15,
+          pointsLocal: pts, width: 0.05 * wMul, thickness: 0.014, stiffnessBias: 0.95, layerAO: 1.0,
           layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
         });
       }
@@ -928,23 +950,28 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     }
 
     // Zone 3C: flared tuft tail rising out of the bun top (short narrow upward-flaring locks)
-    const tuftCount = Math.round(26 * density);
-    for (let i = 0; i < tuftCount; i++) {
-      const f = (i / (tuftCount - 1)) * 2 - 1;
-      const pts: THREE.Vector3[] = [];
-      const len = 0.12 + rand() * 0.03 - Math.abs(f) * 0.05;
-      for (let k = 0; k < NODES_PER_LOCK; k++) {
-        const t = k / (NODES_PER_LOCK - 1);
-        pts.push(new V3(
-          bunC.x + f * (0.02 + 0.13 * Math.pow(t, 1.1)),
-          bunC.y + bunR * 0.85 + len * Math.sin(t * Math.PI * 0.5) * (1 - 0.3 * Math.abs(f)),
-          bunC.z - tilt * bunR * 0.8 + (rand() - 0.5) * 0.002 - 0.06 * Math.pow(t, 1.5) * (0.5 + 0.5 * Math.abs(f)) + (i % 2 ? 0.02 : -0.01) * t
-        ));
+    const fanN = 10;
+    for (let i = 0; i < fanN; i++) {
+      const f = (i / (fanN - 1)) * 2 - 1;
+      for (let j = 0; j < 3; j++) {
+        const pts: THREE.Vector3[] = [];
+        const len = 0.17 + rand() * 0.03 - Math.abs(f) * 0.05;
+        const ang = f * 0.75 + (j - 1) * 0.05;
+        const dir = new V3(Math.sin(ang) * 0.9, 0.35 + 0.15 * Math.cos(ang), -0.85).normalize();
+        const base = new V3(bunC.x + f * 0.05, bunC.y + bunR * 0.45, bunC.z - bunR * 0.55 + (j - 1) * 0.008);
+        for (let k = 0; k < NODES_PER_LOCK; k++) {
+          const t = k / (NODES_PER_LOCK - 1);
+          pts.push(new V3(
+            base.x + dir.x * len * t * (1 + 0.5 * t),
+            base.y + dir.y * len * t - 0.02 * t * t,
+            base.z + dir.z * len * t
+          ));
+        }
+        specs.push({
+          pointsLocal: pts, width: (0.055 - Math.abs(f) * 0.012) * wMul, thickness: 0.012, stiffnessBias: 0.85,
+          layerAO: 0.45, layerOrder: 3, lockNormal: false, scalpRoot: 0.5,
+        });
       }
-      specs.push({
-        pointsLocal: pts, width: (0.052 - Math.abs(f) * 0.014) * wMul, thickness: 0.01, stiffnessBias: 0.9,
-        layerAO: 0.9, layerOrder: 3, lockNormal: false, scalpRoot: 0.5,
-      });
     }
 
     return specs;
@@ -1244,7 +1271,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       braid3(
         (u) => {
           const e = u * u * (3 - 2 * u) * 0.35 + u * 0.65;
-          return skullSurfacePoint(side * THREE.MathUtils.lerp(0.5, 3.0, u), THREE.MathUtils.lerp(0.98, 2.2, e), 0.03 + 0.02 * u * u);
+          return skullSurfacePoint(side * THREE.MathUtils.lerp(0.5, 3.0, u), THREE.MathUtils.lerp(0.98, 2.2, e), 0.03 + 0.02 * u * u + 0.014 * Math.sin(Math.PI * Math.min(1, u * 1.15)));
         },
         (p) => p.clone().sub(HEAD_CENTER_LOCAL).normalize(),
         0.04, 0.018, 0.034, 0.014, 0.95,
@@ -1254,11 +1281,17 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     // Zone 4: one regular 3-strand plait down the back centre, tie near the end
     {
       const rootP = skullSurfacePoint(Math.PI, 2.05, 0.04);
-      const plaitLen = 0.3;
-      const plaitCl = (u: number) => new V3(rootP.x + Math.sin(u * Math.PI * 1.6) * 0.008 * u,
-        rootP.y - plaitLen * u,
-        rootP.z - 0.05 * Math.sin(Math.min(1, u * 2.5) * Math.PI * 0.5) - 0.035 * u);
-      braid3(plaitCl, () => new V3(0, 0, -1), 0.05, 0.026, 0.042, 0.018, 0.97, new V3(0, 0.1, -1), 0.8, 0.6, true);
+      const plaitLen = 1.1;
+      // web units are about 3x Tobin metres: 1.1 reaches the shoulder blades. Hang on the nape, then lean back to clear the upper back
+      const plaitCl = (u: number) => {
+        const d = plaitLen * u;
+        const k = THREE.MathUtils.clamp(d / 0.9, 0, 1);
+        const sm = k * k * (3 - 2 * k);
+        return new V3(rootP.x + Math.sin(u * Math.PI * 1.2) * 0.004 * u,
+          rootP.y - d,
+          rootP.z - 0.012 - 0.2 * sm);
+      };
+      braid3(plaitCl, () => new V3(0, 0, -1), 0.052, 0.024, 0.04, 0.018, 0.97, new V3(0, 0.1, -1), 0.8, 0.6, true);
       const tp = plaitCl(0.96);
       for (let b = 0; b < 2; b++) {
         const tiePts: THREE.Vector3[] = [];
@@ -1414,6 +1447,8 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     const napeEndBase = THREE.MathUtils.lerp(1.85, 2.08, config.backLength);
     const sweepX = THREE.MathUtils.clamp(config.bangsSweep, -1, 1) * 0.045;
     const topVol = 0.016 + config.crownVolume * 0.020;
+    const mkR = (sd: number) => { let st = (sd >>> 0) || 1; return () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }; };
+    const rZ1 = mkR((config.seed || 1337) + 101), rZ2 = mkR((config.seed || 1337) + 202), rZ3 = mkR((config.seed || 1337) + 303);
 
     // Helper: map upper-dome (x, z) directly onto skull surface with custom radial lift
     const domePt = (x: number, z: number, lift: number): THREE.Vector3 => {
@@ -1448,8 +1483,8 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     // Cut line end phi by |theta|: sideburn over the ear top, arch behind the ear, curved nape (lowest at centre)
     const cropEndPhi = (th: number, napeEnd: number): number => {
       const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
-      const kn: Array<[number, number]> = [[0.9, 1.22], [1.3, 1.36], [1.5, 1.60], [1.7, 1.56], [1.95, 1.50], [2.3, 1.78], [2.7, napeEnd - 0.08], [3.1416, napeEnd]];
-      if (a <= kn[0][0]) return kn[0][1];
+      const kn: Array<[number, number]> = [[0.9, 1.22], [1.3, 1.30], [1.47, 1.64], [1.62, 1.52], [1.95, 1.50], [2.45, 1.80], [3.1416, napeEnd + 0.02]];
+      if (a < 1.3) return THREE.MathUtils.lerp(hairPhi(th) + 0.05, 1.36, THREE.MathUtils.smoothstep((a - 0.77) / 0.53, 0, 1));
       for (let k = 1; k < kn.length; k++) {
         if (a <= kn[k][0]) {
           const f = THREE.MathUtils.smoothstep((a - kn[k - 1][0]) / (kn[k][0] - kn[k - 1][0]), 0, 1);
@@ -1461,21 +1496,21 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
 
     // Zone 1: visible short dome fill (normal locks, solid for the first 58%, staggered tiers so there is no bare scalp)
     for (let tier = 0; tier < 8; tier++) {
-      const cnt = tier === 0 ? 14 : 34;
+      const cnt = tier === 0 ? 0 : 48;
       for (let i = 0; i < cnt; i++) {
-        const theta = (i / cnt) * Math.PI * 2 + tier * 0.21 + (rand() - 0.5) * 0.03;
+        const theta = (i / cnt) * Math.PI * 2 + tier * 0.21 + (rZ1() - 0.5) * 0.03;
         const cosT = Math.cos(theta);
         const lim = cosT > 0.5 ? hairPhi(theta) : cosT > 0.0 ? THREE.MathUtils.lerp(0.82, hairPhi(theta), Math.pow(cosT / 0.5, 1.5)) : THREE.MathUtils.lerp(0.78, 0.92, THREE.MathUtils.smoothstep(-cosT, 0.0, 0.6));
         const phiStart = tier === 0 ? 0.01 : 0.12 + tier * 0.19;
         if (phiStart >= lim - 0.12) continue;
         const pts = buildSculptedLock({ thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(lim - 0.02 - 0.07 * THREE.MathUtils.smoothstep(cosT, 0.2, 0.6), phiStart + 0.62), baseLift: 0.0025, midArch: 0.000, tipFlickOut: 0.0, napeHug: 1.4 });
-        specs.push({ pointsLocal: pts, width: 0.05 * wMul, thickness: 0.005, stiffnessBias: 0.99, layerAO: 0.97, layerOrder: 0, isFadeCap: true, fadeStart: 0.98, lockNormal: false, scalpRoot: 0.5 });
+        specs.push({ pointsLocal: pts, width: 0.034 * wMul, thickness: 0.005, stiffnessBias: 0.99, layerAO: 0.97, layerOrder: 0, lockNormal: false, scalpRoot: 0.5 });
       }
     }
 
     // Zone 1b: front hairline edge (narrow fade-cap band only at the very edge)
-    for (let i = 0; i < Math.round(260 * density); i++) {
-      const theta = (i / Math.round(260 * density)) * Math.PI * 2;
+    for (let i = 0; i < Math.round(420 * density); i++) {
+      const theta = (i / Math.round(420 * density)) * Math.PI * 2;
       if (Math.cos(theta) < 0.3) continue;
       const hp = hairPhi(theta);
       const pts = buildSculptedLock({ thetaStart: theta, thetaEnd: theta, phiStart: hp - 0.16, phiEnd: hp + 0.04, baseLift: 0.0035, midArch: 0.000, tipFlickOut: 0.0, napeHug: 1.2 });
@@ -1485,7 +1520,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     // Zone 2: Skull-hugging stubble fade cap (isFadeCap: flat overlapping ribbons + shader stipple fade)
     const fadeCols = Math.round(170 * density);
     for (let i = 0; i < fadeCols; i++) {
-      const theta = (i / fadeCols) * Math.PI * 2 + (rand() - 0.5) * 0.02;
+      const theta = (i / fadeCols) * Math.PI * 2 + (rZ2() - 0.5) * 0.02;
       const cosT = Math.cos(theta);
       if (cosT > 0.72) continue; // forehead stays bare below curved hairline
       const isBack = cosT < -0.25;
@@ -1495,7 +1530,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       const pts = buildSculptedLock({ thetaStart: theta, thetaEnd: theta, phiStart, phiEnd, baseLift: 0.0018, midArch: 0.000, tipFlickOut: 0.0, napeHug: 1.55 });
       // taper the fade toward the skull so the nape and sides do not flare into a helmet
       for (let n = 0; n < pts.length; n++) {
-        const f = 0.16 * Math.pow(n / (pts.length - 1), 1.6);
+        const f = 0.20 * Math.pow(n / (pts.length - 1), 1.5);
         pts[n].x = HEAD_CENTER_LOCAL.x + (pts[n].x - HEAD_CENTER_LOCAL.x) * (1 - f);
         pts[n].z = HEAD_CENTER_LOCAL.z + (pts[n].z - HEAD_CENTER_LOCAL.z) * (1 - f);
       }
@@ -1522,30 +1557,31 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
 
     // Zone 3: dense short top, many narrow locks lying forward-up in one direction
     {
-      const dx = 0.012 / Math.sqrt(density), dz = 0.016 / Math.sqrt(density);
+      const dx = 0.010 / Math.sqrt(density), dz = 0.013 / Math.sqrt(density);
       for (let zc = -0.27; zc <= 0.26; zc += dz) {
         for (let xc = -0.24; xc <= 0.24; xc += dx) {
-          const x0 = xc + (rand() - 0.5) * dx * 0.9;
-          const z0 = zc + (rand() - 0.5) * dz * 0.9;
+          const x0 = xc + (rZ3() - 0.5) * dx * 0.9;
+          const z0 = zc + (rZ3() - 0.5) * dz * 0.9;
           const rr = (x0 / 0.25) * (x0 / 0.25) + ((z0 + 0.0) / 0.30) * ((z0 + 0.0) / 0.30);
           if (rr > 1.0) continue;
           const zFrac = THREE.MathUtils.clamp((z0 + 0.27) / 0.53, 0, 1);
-          const len = (0.10 - 0.03 * zFrac + config.bangsLength * 0.03 * zFrac) * (0.88 + rand() * 0.24);
+          const len = (0.10 - 0.03 * zFrac + config.bangsLength * 0.03 * zFrac) * (0.7 + rZ3() * 0.6);
           const zEnd = z0 + len;
           const zCap = Math.min(0.262 - 0.06 * Math.pow(Math.abs(x0) / 0.25, 2), hairZ(Math.abs(x0)));
           const lenEff = Math.min(len, Math.max(0.05, zCap - z0));
           if (z0 > zCap - 0.01) continue;
+          const jx = (rZ3() - 0.5) * 0.03;
           const upQuiff = (0.006 + config.crownVolume * 0.014) * (0.4 + 0.6 * zFrac);
           const pts: THREE.Vector3[] = [];
           for (let n = 0; n < NODES_PER_LOCK; n++) {
             const t = n / (NODES_PER_LOCK - 1);
-            const x = x0 + sweepX * 0.5 * t;
+            const x = x0 + (sweepX * 0.5 + jx) * t;
             const z = z0 + lenEff * t;
             const lift = 0.0075 + (0.0012 + upQuiff * 0.6) * Math.pow(t, 0.9);
             pts.push(domePt(x, z, lift));
           }
           void zEnd;
-          specs.push({ pointsLocal: pts, width: (0.011 + rand() * 0.005) * wMul, thickness: 0.005, stiffnessBias: 0.97, layerAO: 0.95 + rand() * 0.05, layerOrder: 3, isFadeCap: true, fadeStart: 0.97, lockNormal: false, scalpRoot: 0.45 });
+          specs.push({ pointsLocal: pts, width: (0.015 + rZ3() * 0.007) * wMul, thickness: 0.006, stiffnessBias: 0.97, layerAO: 0.95 + rZ3() * 0.05, layerOrder: 3, lockNormal: false, scalpRoot: 0.45 });
         }
       }
     }
