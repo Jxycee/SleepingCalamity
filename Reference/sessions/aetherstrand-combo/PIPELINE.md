@@ -10,7 +10,7 @@ Status 2026-11-23. Everything below is measured in `STATUS.md`. The web app is t
 
 ## Measured today (Half-Up Cascade #059 and the 12 archetypes)
 - Mesh: vertex-exact vs web (0.008 mm mean per-lock max error, 248-lock ponytail style).
-- Hair-only render vs web, 12 styles: overlap 0.956-0.968, mean pixel error 3.4-5.1 of 255.
+- Hair-only render vs web, 12 styles: mean error inside the hair 0.68-0.82 of 255, side bias at most 0.28, silhouette overlap 0.956-0.969 (91 percent of the pixels that differ by more than 10/255 are silhouette anti-aliasing pixels).
 - Fit on Tobin: all 12 styles seat on the skull; no floating crown.
 - Motion: web solver port in progress (branch `claude/aetherstrand-physics`); see `PHYSICS_PORT.md` when it lands.
 
@@ -20,7 +20,8 @@ Status 2026-11-23. Everything below is measured in `STATUS.md`. The web app is t
 3. Triangle winding must be reversed when X is negated (Unity treats clockwise as front), otherwise lock normals invert and the hair renders at about half brightness.
 4. Shipped shader was an older, simplified variant (one light, other constants); replaced by an exact port of the web fragment shader.
 5. `AetherStrandAiDiagnostics.cs` empty in v3.0 (fixed in v3.0.1).
-6. Headless test gotcha: a render pipeline asset assigned in the same call does not apply until the next frame; everything rendered with the built-in pipeline.
+6. `AetherStrand_Normal.png.meta` had `textureType: 1` (Normal Map): Unity repacked the channels (R about 1.0 everywhere), so the shader's raw `rgb*2-1` decode pushed every groove normal one way, causing about 3/255 shading error and opposite-sign left/right bias. Set to Default (raw).
+7. Headless test gotcha: a render pipeline asset assigned in the same call does not apply until the next frame; everything rendered with the built-in pipeline.
 
 ## Neon task (AI hairstyle authoring), proposed
 Goal: given a reference image or description, produce a recipe that, run through steps 2-3, looks like the reference on Tobin.

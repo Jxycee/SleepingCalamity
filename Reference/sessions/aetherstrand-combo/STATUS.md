@@ -29,3 +29,6 @@ Jxycee/AetherStrand: branch parity-fixes and main fast-forwarded to 6dd8b74 (uni
 ## Other hairstyles on Tobin (2026-11-23)
 12 archetypes + 5 web presets (Leon, SOLDIER, Silver, Noctis, Crimson) fitted on Tobin with push-out of the real head surface: vertices inside head 0.03-0.06% (2-6 mm), roots inside 0% (HairEval). Renders: renders/tobin_named_presets.png, renders/tobin_12_archetypes.png. AI authoring loop and baseline: NEON_TASK.md (Neon not yet run; sessions give evidence only).
 Eye-clear fringe (AetherStrandFringeFit, opt-out via keepEyesClear): bangs locks in front of the eyes are shortened to end ~4 mm above the eye top; renders/tobin_eye_clear_before_after.png. Deliberate deviation from the web look.
+
+## Residual vs web closed (2026-11-23)
+Cause of the ~3/255 shading error and left/right bias: plugin normal-map texture imported as Normal Map (meta textureType 1). Fixed (Default). Bisect: web debug views (Strand ID, Normals, UV) agree to 1-2/255; with groove/spec/rim/AO zeroed Unity matched to 0.05-0.4/255; texture probe isolated the normal map. After fix, 12 archetypes: mean error inside hair 0.68-0.82/255, bias <=0.28, overlap 0.956-0.969; interior pixels differing >10/255: 0.52% of union; 91% of all mismatches on silhouette AA pixels.

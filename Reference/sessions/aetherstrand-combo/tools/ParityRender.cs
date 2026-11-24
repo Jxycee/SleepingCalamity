@@ -17,6 +17,7 @@ public static class ParityRender
     [Serializable] class Rig { public string bg, keyC, fillC, rimC, skyC, gndC; public V3 keyD, fillD, rimD; public float keyI, fillI, rimI, hemiI; }
 
         // three.js ACESFilmicToneMapping (exposure 1.16) + sRGB, composited over the clear colour; 2x2 supersample to 512
+    public static bool RawMode = false;
     public static Texture2D ToneMapDownsample(Texture2D src, Color bgSrgb)
     {
         var px = src.GetPixels(); int W = src.width, N = W / 2;
@@ -27,7 +28,7 @@ public static class ParityRender
             for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++)
             {
                 Color c = px[(y * 2 + j) * W + (x * 2 + i)];
-                Color tm = ACES(new Color(c.r, c.g, c.b), 1.16f);
+                Color tm = RawMode ? new Color(Mathf.Clamp01(c.r), Mathf.Clamp01(c.g), Mathf.Clamp01(c.b), 1) : ACES(new Color(c.r, c.g, c.b), 1.16f);
                 Color srgb = new Color(Lin2S(tm.r), Lin2S(tm.g), Lin2S(tm.b));
                 acc += srgb;
             }
@@ -173,7 +174,7 @@ public static class ParityRender
 
         var camGo = new GameObject("cam"); var cam = camGo.AddComponent<Camera>();
         cam.fieldOfView = 33; cam.aspect = 1; cam.nearClipPlane = 0.1f; cam.farClipPlane = 40;
-        cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = InverseBg(Hex(rig.bg)).gamma; cam.allowHDR = true; cam.allowMSAA = false;
+        cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = (RawMode ? Hex(rig.bg).linear : InverseBg(Hex(rig.bg))).gamma; cam.allowHDR = true; cam.allowMSAA = false;
         var ucd = camGo.AddComponent<UniversalAdditionalCameraData>(); ucd.renderPostProcessing = false; ucd.antialiasing = AntialiasingMode.None;
 
         if (Env("SC_PARITY_DIAG", "0") == "1")

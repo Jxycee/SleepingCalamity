@@ -11,6 +11,7 @@ Shader "AetherStrand/SculptedHair_URP"
         _AlphaClip ("Alpha Cutoff", Range(0.05, 0.85)) = 0.36
         [Header(Web Light Rig Parity)]
         _UseWebRig ("Use fixed web 3-light rig (parity)", Float) = 0
+        _DebugMode ("Debug view: 0 shaded, 1 strand id, 3 normals, 4 uv flow", Float) = 0
         _KeyDirW ("Key dir", Vector) = (0.3,0.7,0.6,0)
         _KeyColW ("Key col", Vector) = (1,1,1,0)
         _FillDirW ("Fill dir", Vector) = (-0.5,0.3,0.5,0)
@@ -92,6 +93,7 @@ Shader "AetherStrand/SculptedHair_URP"
             float  _RimIntensity;
             float  _RimPower;
             float  _UseWebRig;
+            float  _DebugMode;
             float4 _KeyDirW; float4 _KeyColW; float4 _FillDirW; float4 _FillColW; float4 _RimDirW; float4 _RimColW; float4 _AmbColW;
         CBUFFER_END
 
@@ -232,6 +234,28 @@ Shader "AetherStrand/SculptedHair_URP"
                 float3 lockN = normalize(input.normalWS) * faceSign;
                 float3 headN = normalize(input.positionWS - _HeadCenterWS.xyz + float3(0.0, 0.0001, 0.0));
                 float3 baseN = normalize(lerp(lockN, headN, 0.42));
+
+                if (_DebugMode > 0.5)
+                {
+                    // web AI-vision diagnostic modes (same math as the web fragment shader), colours in WEB space (x un-mirrored)
+                    float3 LKd = normalize(_KeyDirW.xyz);
+                    float ndlDiag = 0.52 + 0.48 * clamp(dot(lockN, LKd) * 0.5 + 0.5, 0.0, 1.0);
+                    float mask = input.vertColor.a;
+                    if (_DebugMode < 1.5)
+                    {
+                        float hue = frac(seed * 7.618 + (mask < 0.5 ? 0.58 : 0.0));
+                        float sat = mask < 0.5 ? 0.25 : 0.72;
+                        float val = mask < 0.5 ? 0.34 : (0.58 + 0.32 * t);
+                        float3 pp = abs(frac(hue.xxx + float3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+                        float3 rgb = val * lerp(float3(1, 1, 1), saturate(pp - 1.0), sat);
+                        return half4(rgb * ndlDiag, 1.0);
+                    }
+                    if (_DebugMode < 3.5) return half4(float3(-lockN.x, lockN.y, lockN.z) * 0.5 + 0.5, 1.0);
+                    if (_DebugMode > 5.5) return half4(SAMPLE_TEXTURE2D(_GrooveAoMap, sampler_GrooveAoMap, float2(input.uv.x * 0.92 + seed * 3.13, t)).r, SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, float2(input.uv.x * 0.92 + seed * 3.13, t)).r, SAMPLE_TEXTURE2D(_FlowIdMap, sampler_FlowIdMap, float2(input.uv.x * 0.92 + seed * 3.13, t)).r, 1.0);
+                    float3 ramp = lerp(float3(0.12, 0.25, 0.85), float3(0.98, 0.72, 0.16), t);
+                    float stripe = smoothstep(0.04, 0.0, abs(frac(t * 10.0) - 0.5) - 0.44);
+                    return half4(lerp(ramp * ndlDiag, float3(0.04, 0.05, 0.08), stripe * 0.65), 1.0);
+                }
 
                 float grooveAo = SAMPLE_TEXTURE2D(_GrooveAoMap, sampler_GrooveAoMap, sampleUv).r;
                 float3 flowId  = SAMPLE_TEXTURE2D(_FlowIdMap, sampler_FlowIdMap, sampleUv).rgb;
