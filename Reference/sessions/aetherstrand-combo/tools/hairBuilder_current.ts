@@ -833,11 +833,12 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       return frontKnots[frontKnots.length - 1][1];
     };
     const cutPhi = (th: number): number => {
-      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.2, earClearance: 0.12, behindEarPhi: 2.0, napePhi: 2.3, napeCurve: 1.2 });
+      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.2, earClearance: 0.12, behindEarPhi: 1.95, napePhi: 2.5, napeCurve: 0.8 });
       const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
       // hair comes straight down right behind the ear (no bald patch between the ear and the back hair)
-      const w = THREE.MathUtils.smoothstep(a, 1.93, 2.05);
-      return a > 1.93 ? Math.max(v, THREE.MathUtils.lerp(v, 2.05, w)) : v;
+      const w = THREE.MathUtils.smoothstep(a, 1.9, 1.98);
+      const tgt = THREE.MathUtils.lerp(2.05, 2.52, Math.pow(Math.max(0, a - 2.0) / (Math.PI - 2.0), 0.95)); // straight V down to the nape tip
+      return a > 1.9 ? Math.max(v, THREE.MathUtils.lerp(v, tgt, w)) : v;
     };
 
     // Zone 1: scalp cover under the pulled strands (snug, no scalp showing)
@@ -859,7 +860,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
     // meridian cover from the temple down to the cut line: great-circle strands toward the knot leave a triangle behind the ear, this fills it
     for (let i = 0; i < 64; i++) {
       const theta = (i / 64) * Math.PI * 2 + 0.05;
-      const endP = cutPhi(theta) - 0.03;
+      const endP = cutPhi(theta) - 0.1;
       if (endP < 1.2) continue;
       const pts = buildSculptedLock({
         thetaStart: theta, thetaEnd: theta, phiStart: 0.95, phiEnd: endP,
@@ -2156,7 +2157,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       const last = pts.length - 1;
       for (let n = 2; n <= last; n++) {
         const t = n / last;
-        const w = (Math.sin(t * TAU * 2.2 + phase) * amp + Math.sin(t * TAU * 0.8 + phase * 0.7 + 1.3) * amp * 0.4 * Math.pow(t, 2.0)) * Math.pow(t, 0.8);
+        const w = (Math.sin(t * TAU * 2.2 + phase) * amp + Math.sin(t * TAU * 0.8 + phase * 0.7 + 1.3) * amp * 0.4 * Math.pow(t, 2.0)) * Math.pow(t, 0.8) * (1 - 0.6 * Math.pow(t, 2.5));
         const c = n >= last - 3 ? Math.pow((n - (last - 3)) / 3, 2) : 0;
         pts[n].x += tx * (w + curl * c * 0.05);
         pts[n].z += tz * (w + curl * c * 0.05);
@@ -2170,7 +2171,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
         const below = THREE.MathUtils.clamp((eqY - p.y) / 0.25, 0, 1);
         const dy = (p.y - HEAD_CENTER_LOCAL.y) * (1 - below);
         const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy + dz * dz));
-        const k = dr * Math.min(1, n / 3) / len;
+        const k = dr * Math.min(1, n / 7) / len;
         p.x += dx * k; p.y += dy * k; p.z += dz * k;
       }
     };
@@ -2213,15 +2214,15 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
 
     // Zone 1a: swept-back crown. Locks root on the hairline (phi ~1.15-1.3, no bare forehead) and flow over the apex to the back of the head.
     for (let row = 0; row < 3; row++) {
-      const nS = 44;
+      const nS = 64;
       for (let i = 0; i < nS; i++) {
         const a = -1.05 + ((i + row * 0.35) / (nS - 1)) * 2.1;
         const dPart = a - partTheta;
         if (Math.abs(dPart) < 0.035) continue;
         const sd = dPart >= 0 ? 1 : -1;
         const aa = Math.abs(a) / 1.05;
-        const phiF = 1.27 + 0.14 * aa * aa + row * 0.035;
-        const phiB = 1.45 + rFr() * 0.3;
+        const phiF = 1.27 + 0.14 * aa * aa + row * 0.06 + (rFr() - 0.5) * 0.2;
+        const phiB = 1.9 + rFr() * 0.4;
         const pts: THREE.Vector3[] = [];
         for (let n = 0; n < NODES_PER_LOCK; n++) {
           const u = n / (NODES_PER_LOCK - 1);
@@ -2259,7 +2260,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
           phiEnd,
           baseLift: 0.012 + row * 0.004, midArch: 0.012, tipFlickOut: 0.008, napeHug: 0.7,
         });
-        wavify(pts, thEnd, 0.12, TAU * th * 0.55 + row, side);
+        wavify(pts, thEnd, 0.1, TAU * th * 0.55 + row * 0.1, side);
         radialPush(pts, 0.006 + row * 0.008);
         drape(pts, 0.1);
         specs.push({
@@ -2270,11 +2271,30 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       }
     }
 
+    // Zone 1c: a few face-framing strands falling forward from the part
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 5; k++) {
+        const th = side * (0.3 + k * 0.1 + rFr() * 0.04);
+        const pts = buildSculptedLock({
+          thetaStart: th, thetaEnd: side * (0.75 + k * 0.1),
+          phiStart: 1.2 + rFr() * 0.08, phiEnd: 2.45 + (k % 2) * 0.25 + rFr() * 0.2,
+          baseLift: 0.02, midArch: 0.02, tipFlickOut: 0.012, napeHug: 0.6,
+        });
+        wavify(pts, th, 0.07, k * 1.3 + side, -side);
+        radialPush(pts, 0.03 + k * 0.004);
+        specs.push({
+          smooth: 3, roundness: 0.7,
+          pointsLocal: pts, width: 0.034 * wMul, thickness: 0.012,
+          stiffnessBias: 0.7, layerAO: 0.9, layerOrder: 7, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
+    }
+
     // Zone 2: three depth layers of narrow round wavy locks; hem follows the wave phase so neighbours share S bundles
     const L = [
-      { n: 70, w: 0.09, dr: 0.004, amp: 0.15, ord: 1 },   // hidden under-fill
-      { n: 110, w: 0.07, dr: 0.025, amp: 0.17, ord: 2 },
-      { n: 130, w: 0.062, dr: 0.04, amp: 0.19, ord: 3 },
+      { n: 70, w: 0.09, dr: 0.004, amp: 0.2, ord: 1 },   // hidden under-fill
+      { n: 110, w: 0.075, dr: 0.025, amp: 0.215, ord: 2 },
+      { n: 130, w: 0.07, dr: 0.04, amp: 0.23, ord: 3 },
     ];
     for (let layer = 0; layer < 3; layer++) {
       const cfg = L[layer];
@@ -2285,27 +2305,27 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
         if (cosT > 0.3) continue;                         // front handled by zone 1b
         const isBack = cosT < -0.2;
         const side = th >= 0 ? 1 : -1;
-        const phase = TAU * (th * 0.55 + layer * 0.12);
+        const phase = TAU * (th * 0.55 + layer * 0.02);
         const bundle = 0.5 + 0.5 * Math.sin(phase);       // 0..1, shared by neighbours: coherent hem
         let thEnd = th;
         let phiEnd: number;
         if (!isBack) {
-          thEnd = Math.abs(th) < 2.05 ? side * (2.1 + rMid() * 0.2) : th;
-          phiEnd = sideEnd - bundle * 0.35 - rMid() * 0.05;
+          thEnd = Math.abs(th) < 2.05 ? side * (2.1 + bundle * 0.2) : th;
+          phiEnd = sideEnd - bundle * 0.3 - rMid() * 0.02;
         } else {
           thEnd = th + (rMid() - 0.5) * 0.04;
-          phiEnd = backEnd - bundle * 0.4 - rMid() * 0.05;
+          phiEnd = backEnd - bundle * 0.35 - rMid() * 0.02;
         }
-        const phiStart = 0.1 + layer * 0.08 + rMid() * 0.1;
+        const phiStart = layer * 0.03 + rMid() * 0.06;
         const pts = buildSculptedLock({
           thetaStart: th, thetaEnd: thEnd, phiStart, phiEnd,
           baseLift: 0.014 + layer * 0.004 + config.crownVolume * 0.008,
           midArch: 0.012 + layer * 0.004, tipFlickOut: 0.01 + layer * 0.004,
           napeHug: 0.45,
         });
-        wavify(pts, thEnd, cfg.amp, phase, Math.sin(th * 5 + layer) >= 0 ? 1 : -1);
+        wavify(pts, thEnd, cfg.amp, phase, Math.sin(phase * 0.5 + 0.7) >= 0 ? 1 : -1);
         radialPush(pts, cfg.dr);
-        drape(pts, 0.17 + layer * 0.015);
+        drape(pts, 0.14 + layer * 0.01);
         specs.push({
           smooth: 3, roundness: 0.6,
           pointsLocal: pts,

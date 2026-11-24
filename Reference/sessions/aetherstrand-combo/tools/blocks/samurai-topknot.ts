@@ -17,11 +17,12 @@
       return frontKnots[frontKnots.length - 1][1];
     };
     const cutPhi = (th: number): number => {
-      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.2, earClearance: 0.12, behindEarPhi: 2.0, napePhi: 2.3, napeCurve: 1.2 });
+      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.2, earClearance: 0.12, behindEarPhi: 1.95, napePhi: 2.5, napeCurve: 0.8 });
       const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
       // hair comes straight down right behind the ear (no bald patch between the ear and the back hair)
-      const w = THREE.MathUtils.smoothstep(a, 1.93, 2.05);
-      return a > 1.93 ? Math.max(v, THREE.MathUtils.lerp(v, 2.05, w)) : v;
+      const w = THREE.MathUtils.smoothstep(a, 1.9, 1.98);
+      const tgt = THREE.MathUtils.lerp(2.05, 2.52, Math.pow(Math.max(0, a - 2.0) / (Math.PI - 2.0), 0.95)); // straight V down to the nape tip
+      return a > 1.9 ? Math.max(v, THREE.MathUtils.lerp(v, tgt, w)) : v;
     };
 
     // Zone 1: scalp cover under the pulled strands (snug, no scalp showing)
@@ -43,7 +44,7 @@
     // meridian cover from the temple down to the cut line: great-circle strands toward the knot leave a triangle behind the ear, this fills it
     for (let i = 0; i < 64; i++) {
       const theta = (i / 64) * Math.PI * 2 + 0.05;
-      const endP = cutPhi(theta) - 0.03;
+      const endP = cutPhi(theta) - 0.1;
       if (endP < 1.2) continue;
       const pts = buildSculptedLock({
         thetaStart: theta, thetaEnd: theta, phiStart: 0.95, phiEnd: endP,
