@@ -122,7 +122,7 @@ namespace AetherStrand.Editor
             return res;
         }
 
-        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin, IList<float> margins = null, IList<bool> pullRoots = null, float rootGapMax = 0.009f, float rootGapKeep = 0.007f)
+        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin, IList<float> margins = null, IList<bool> pullRoots = null, float rootGapMax = 0.009f, float rootGapKeep = 0.007f, float hugStrength = 0f, float hugStart = 0.008f)
         {
             var hp = HeadPoints(characterRoot, headBone);
             if (hp.Count < 200) return 0;
@@ -177,6 +177,24 @@ namespace AetherStrand.Editor
                         set[1] = headBone.InverseTransformPoint(headBone.TransformPoint(set[1]) + dir0 * pull * 0.55f);
                         set[2] = headBone.InverseTransformPoint(headBone.TransformPoint(set[2]) + dir0 * pull * 0.22f);
                         moved++;
+                    }
+                }
+            }
+            // skull hug: pulls cranium-level points that stand off the head back toward it (crops, buns, braids that read as a helmet)
+            if (hugStrength > 0.001f)
+            {
+                float yLo = float.MaxValue, yHi = float.MinValue; foreach (var q in hp) { yLo = Mathf.Min(yLo, q.y); yHi = Mathf.Max(yHi, q.y); }
+                float yCut = yLo + 0.4f * (yHi - yLo);
+                foreach (var set in pointSets)
+                {
+                    for (int i = 0; i < set.Length; i++)
+                    {
+                        if (set[i].y < yCut) continue;
+                        Vector3 w = headBone.TransformPoint(set[i]);
+                        Vector3 cp = mc.ClosestPoint(w); float d = Vector3.Distance(cp, w);
+                        if (d <= hugStart || d > 0.07f) continue;
+                        float nd = hugStart + (d - hugStart) * (1f - Mathf.Clamp01(hugStrength));
+                        set[i] = headBone.InverseTransformPoint(cp + (w - cp).normalized * nd); moved++;
                     }
                 }
             }

@@ -23,6 +23,7 @@ export function exportGeometry(recipe: any): any {
     e.seed = lk.seed;
     e.scalpRoot = lk.scalpRoot;
     e.lockNormal = lk.lockNormal;
+    e.isFadeCap = Boolean(lk.isFadeCap);
     e.layerOrder = lk.layerOrder;
     e.mass = lk.mass;
     e.restMidR = lk.restMidR;

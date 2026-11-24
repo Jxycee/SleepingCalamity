@@ -29,7 +29,7 @@ namespace AetherStrand
         readonly Vector4[] tans;
         // per-ring tables (identical to the web's Float32Array tables)
         static readonly double[] RootSin = new double[AetherStrandWebSolver.N], TipTaper = new double[AetherStrandWebSolver.N],
-            BaseTipTaper = new double[AetherStrandWebSolver.N], ThickPow = new double[AetherStrandWebSolver.N];
+            BaseTipTaper = new double[AetherStrandWebSolver.N], TipFactor = new double[AetherStrandWebSolver.N], ThickPow = new double[AetherStrandWebSolver.N];
 
         static AetherStrandWebMesh()
         {
@@ -39,6 +39,7 @@ namespace AetherStrand
                 RootSin[k] = (float)System.Math.Sin(System.Math.Min(1.0, t * 4.2) * System.Math.PI * 0.5);
                 TipTaper[k] = (float)System.Math.Max(0.06, t < 0.44 ? 1.0 - t * 0.14 : System.Math.Pow((1.0 - t) / 0.56, 0.94) * 0.938);
                 BaseTipTaper[k] = (float)System.Math.Max(0.04, t < 0.42 ? 1.0 - t * 0.16 : System.Math.Pow((1.0 - t) / 0.58, 1.12) * 0.933);
+                TipFactor[k] = (float)t;
                 ThickPow[k] = (float)System.Math.Pow(System.Math.Max(0.04, 1.0 - t), 0.86);
             }
         }
@@ -55,7 +56,7 @@ namespace AetherStrand
             {
                 var d = locks[s];
                 int bv = s * VertsPerLock;
-                float mask = d.isBaseShell ? 0f : 1f;
+                float mask = d.isBaseShell ? 0f : d.isFadeCap ? 0.25f : 1f;
                 int vi = bv;
                 for (int k = 0; k < Rings; k++)
                 {
@@ -210,9 +211,10 @@ namespace AetherStrand
                     double rSin = RootSin[k];
                     double rootTuck = isBase ? 0.88 + 0.12 * rSin : rootMinW + (1.0 - rootMinW) * rSin;
                     double rootThickTuck = isBase ? 1.0 : 0.2 + 0.8 * rSin;
-                    double tipTaper = isBase ? BaseTipTaper[k] : TipTaper[k];
+                    bool isFade = lk.isFadeCap;
+                    double tipTaper = isFade ? 1.0 : (isBase ? BaseTipTaper[k] : TipTaper[k]);
                     double halfW = baseHalfW * rootTuck * tipTaper;
-                    double halfT = baseHalfT * rootThickTuck * ThickPow[k];
+                    double halfT = isFade ? baseHalfT * rootThickTuck * 0.55 * (1.0 - TipFactor[k] * 0.65) : baseHalfT * rootThickTuck * ThickPow[k];
 
                     for (int r = 0; r < RingVerts; r++)
                     {

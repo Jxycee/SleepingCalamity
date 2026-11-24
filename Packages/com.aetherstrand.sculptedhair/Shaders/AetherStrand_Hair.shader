@@ -109,7 +109,18 @@ Shader "AetherStrand/SculptedHair_URP"
         {
             #ifdef _USE_ALPHA_CLIP
             float t = saturate(uv.y);
-            // Solid cohesive root->mid body; outer lock tips (vertColor.a > 0.5 && t > 0.70) fray into fine wisps
+            // Mode 1: isFadeCap stubble (vertColor.a == 0.25): stochastic stipple dissolves toward the hairline
+            if (vertColor.a > 0.15 && vertColor.a < 0.45)
+            {
+                float coverage = pow(1.0 - smoothstep(0.25, 1.0, t), 0.75);
+                float2 cell = floor(float2(uv.x * 42.0 + vertColor.b * 17.0, t * 28.0));
+                float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
+                float ign = AetherInterleavedGradientNoise(screenPosXY);
+                float threshold = lerp(cellNoise, ign, 0.55);
+                clip(coverage - threshold);
+                return;
+            }
+            // Mode 2: solid cohesive root->mid body; outer lock tips (vertColor.a > 0.5 && t > 0.70) fray into fine wisps
             if (vertColor.a > 0.5 && t > 0.58)
             {
                 float seedD = (floor(vertColor.b * 255.0 + 0.5) + vertColor.r) / 255.0; // seed packed over two 8-bit channels
@@ -296,6 +307,7 @@ Shader "AetherStrand/SculptedHair_URP"
                 float grooveCrevice = lerp(1.0, grooveAo, _GrooveDepth * 0.68);
                 float domeGrad = lerp(0.84, 1.08, smoothstep(-0.55, 0.68, headN.y));
                 float totalAO = rootOcclusion * grooveCrevice * lerp(0.72, 1.04, layerAOv) * domeGrad;
+                if (input.vertColor.a > 0.15 && input.vertColor.a < 0.45) totalAO = lerp(totalAO, 0.92, t * 0.70);
 
                 // Light rig: web 3-light studio rig (_UseWebRig) or URP main light as key (game mode)
                 float3 LKey, LFill, LRim, keyCol, fillCol, rimCol, ambCol;
@@ -671,6 +683,17 @@ Shader "AetherStrand/SculptedHair_URP"
             {
                 float t = saturate(i.uv.y);
                 #ifdef _USE_ALPHA_CLIP
+                if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45)
+                {
+                    float coverage = pow(1.0 - smoothstep(0.25, 1.0, t), 0.75);
+                    float2 cell = floor(float2(i.uv.x * 42.0 + i.vertColor.b * 17.0, t * 28.0));
+                    float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
+                    float ign = frac(52.9829189 * frac(dot(i.pos.xy, float2(0.06711056, 0.00583715))));
+                    clip(coverage - lerp(cellNoise, ign, 0.55));
+                }
+                else
+                #endif
+                #ifdef _USE_ALPHA_CLIP
                 if (i.vertColor.a > 0.5 && t > 0.70)
                 {
                     float2 strandUv = float2(i.uv.x * 0.65 + i.vertColor.b * 3.13, t);
@@ -709,6 +732,7 @@ Shader "AetherStrand/SculptedHair_URP"
                 float rootShade = lerp(1.0 - _RootAO, 1.0, smoothstep(0.0, 0.36, t));
                 float grooveShade = lerp(1.0, grooveAO, _GrooveDepth);
                 float ao = rootShade * grooveShade * lerp(0.55, 1.0, i.vertColor.g);
+                if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45) ao = lerp(ao, 0.92, t * 0.70);
 
                 float wrapNdotL = saturate((dot(N, L) + 0.45) / 1.45);
                 float3 ambient = max(ShadeSH9(half4(N, 1.0)), float3(0.22, 0.22, 0.24));

@@ -42,7 +42,7 @@ namespace AetherStrand
             public int layerOrder = -1;               // <0: derive (base 0, else 2)
             public double restMidR = double.NaN;      // NaN: derive from rest[4]
             public double rootRawY = double.NaN;      // NaN: rest[0].y
-            public bool isBaseShell, lockNormal;
+            public bool isBaseShell, lockNormal, isFadeCap;
             public double[] rootNormal = { 0, 1, 0 }; // web head-local
         }
 

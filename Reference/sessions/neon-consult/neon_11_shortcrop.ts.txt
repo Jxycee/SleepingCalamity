@@ -1,0 +1,74 @@
+if (arch === 'short-crop') {
+  const sideEndBase = THREE.MathUtils.lerp(1.30, 1.46, config.sideLength); // cleanly above ears
+  const napeEndBase = THREE.MathUtils.lerp(1.68, 1.94, config.backLength);
+  const sweepX = THREE.MathUtils.clamp(config.bangsSweep, -1, 1) * 0.045;
+  const topVol = 0.016 + config.crownVolume * 0.020;
+
+  // Helper: map upper-dome (x, z) directly onto skull surface with custom radial lift
+  const domePt = (x: number, z: number, lift: number): THREE.Vector3 => {
+    const nx = x / SCALP_RX;
+    const nz = z / SCALP_RZ;
+    const r2 = nx * nx + nz * nz;
+    const scale = r2 > 0.88 ? Math.sqrt(0.88 / r2) : 1.0;
+    const cx = nx * scale;
+    const cz = nz * scale;
+    const cy = Math.sqrt(Math.max(0.04, 1.0 - cx * cx - cz * cz));
+    return new THREE.Vector3(
+      HEAD_CENTER_LOCAL.x + cx * (SCALP_RX + lift),
+      HEAD_CENTER_LOCAL.y + cy * (SCALP_RY + lift),
+      HEAD_CENTER_LOCAL.z + cz * (SCALP_RZ + lift)
+    );
+  };
+
+  // Zone 1: Tucked inner crown shell (strictly inside top tufts so it never swallows them)
+  for (let i = 0; i < 18; i++) {
+    const theta = (i / 18) * Math.PI * 2;
+    const cosT = Math.cos(theta);
+    const frontMaxPhi = 0.90 - 0.14 * Math.pow(Math.abs(Math.sin(theta)), 1.5); // curved male hairline
+    const maxPhi = cosT > 0.25 ? frontMaxPhi : cosT < -0.25 ? 0.92 : 0.78;
+    const pts = buildSculptedLock({ thetaStart: theta, thetaEnd: theta, phiStart: 0.01, phiEnd: maxPhi, baseLift: 0.000, midArch: 0.000, tipFlickOut: 0.0, napeHug: 1.4 });
+    specs.push({ pointsLocal: pts, width: 0.072 * wMul, thickness: 0.005, stiffnessBias: 0.99, layerAO: 0.78, layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.5 });
+  }
+
+  // Zone 2: Skull-hugging stubble fade cap (isFadeCap: flat overlapping ribbons + shader stipple fade)
+  const fadeCols = Math.round(36 * density);
+  for (let i = 0; i < fadeCols; i++) {
+    const theta = (i / fadeCols) * Math.PI * 2 + (rand() - 0.5) * 0.02;
+    const cosT = Math.cos(theta);
+    if (cosT > 0.42) continue; // forehead stays bare below curved hairline
+    const isBack = cosT < -0.25;
+    const phiStart = isBack ? 0.78 : 0.68;
+    const phiEnd = isBack ? napeEndBase : sideEndBase;
+    const pts = buildSculptedLock({ thetaStart: theta, thetaEnd: theta, phiStart, phiEnd, baseLift: 0.0018, midArch: 0.000, tipFlickOut: 0.0, napeHug: 1.55 });
+    specs.push({ pointsLocal: pts, width: 0.052 * wMul, thickness: 0.004, stiffnessBias: 0.99, layerAO: 0.86, layerOrder: 1, isFadeCap: true, lockNormal: false, scalpRoot: 0.4 });
+  }
+
+  // Zone 3: Narrower crown (|x| <= 0.175) with true BACK-TO-FRONT brushed forward-up tufts
+  const rowsZ = Math.round(7 * density);
+  for (let rz = 0; rz < rowsZ; rz++) {
+    const zFrac = rz / (rowsZ - 1); // 0 = rear crown, 1 = front hairline quiff
+    const zStart = THREE.MathUtils.lerp(-0.19, 0.155, zFrac);
+    const halfWidthX = THREE.MathUtils.lerp(0.145, 0.165, Math.sin(zFrac * Math.PI * 0.85));
+    const colsX = Math.max(5, Math.round(10 * density * (halfWidthX / 0.165)));
+    for (let cx = 0; cx < colsX; cx++) {
+      const xFrac = colsX === 1 ? 0 : (cx / (colsX - 1)) * 2 - 1;
+      const templeRecessZ = -0.042 * Math.pow(Math.abs(xFrac), 1.8) * zFrac;
+      const x0 = xFrac * halfWidthX + (rand() - 0.5) * 0.012;
+      const z0 = zStart + templeRecessZ + (rand() - 0.5) * 0.014;
+      const tuftLenZ = 0.072 + config.bangsLength * 0.030 * zFrac + (rand() - 0.5) * 0.014;
+      const upQuiff = (0.014 + config.crownVolume * 0.022) * Math.pow(zFrac, 1.35);
+      const pts: THREE.Vector3[] = [];
+      for (let n = 0; n < NODES_PER_LOCK; n++) {
+        const t = n / (NODES_PER_LOCK - 1);
+        const x = x0 + sweepX * t + xFrac * 0.008 * t;
+        const z = z0 + tuftLenZ * t;
+        const lift = THREE.MathUtils.lerp(0.008, topVol + upQuiff, Math.pow(t, 0.82));
+        const p = domePt(x, z, lift);
+        p.y += upQuiff * 0.65 * Math.pow(t, 1.4);
+        pts.push(p);
+      }
+      specs.push({ pointsLocal: pts, width: (0.020 + rand() * 0.008) * wMul, thickness: 0.010, stiffnessBias: 0.96, layerAO: 0.88 + zFrac * 0.08, layerOrder: 3, lockNormal: false, scalpRoot: 0.45 });
+    }
+  }
+  return specs;
+}

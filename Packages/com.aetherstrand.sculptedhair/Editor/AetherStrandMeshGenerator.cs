@@ -28,6 +28,8 @@ namespace AetherStrand.Editor
         public bool pushOutOfHead = true;
         public float headMargin = 0.003f;
         public float bangsMargin = 0.002f;
+        /// <summary>0..1: pulls cranium-level hair that stands off the skull back toward it (crops, buns, braids). 0 = web look.</summary>
+        public float hugStrength = 0f;
         public Vector3 fitScale = Vector3.one;
         public Vector3 fitOffset = Vector3.zero;
         /// <summary>Legacy: rescale by 0.23/maxZ when the JSON is in web-bust units. False = use overallScale only (parity mode).</summary>
@@ -57,6 +59,7 @@ namespace AetherStrand.Editor
             public float seed;
             public float layerAO;
             public bool isBaseShell;
+            public bool isFadeCap;
             public float scalpRoot = 0.65f;
             public bool lockNormal;
             public Vector3 rootNormal = Vector3.up;
@@ -129,7 +132,7 @@ namespace AetherStrand.Editor
                 foreach (var l in locks) mgs.Add(string.Equals(l.zone, "Bangs", StringComparison.OrdinalIgnoreCase) ? p.bangsMargin : p.headMargin);
                 var pulls = new List<bool>(locks.Count);
                 foreach (var l in locks) pulls.Add(!l.isBaseShell && !l.lockNormal);
-                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin, mgs, pulls);
+                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin, mgs, pulls, 0.009f, 0.007f, p.hugStrength);
                 Debug.Log("[AetherStrand] Pushed " + moved + " lock points out of the head (margin " + (p.headMargin * 1000f).ToString("F1") + " mm).");
             }
 
@@ -357,7 +360,7 @@ namespace AetherStrand.Editor
                 if (count < 2) continue;
                 int ringsPerLock = count - 1;
                 int baseVert = verts.Count;
-                float maskVal = lk.isBaseShell ? 0.0f : 1.0f;
+                float maskVal = lk.isBaseShell ? 0.0f : lk.isFadeCap ? 0.25f : 1.0f;
                 int[] chainBones = null;
                 bool isDynamic = !lk.isBaseShell && lockToChainBoneIndices.TryGetValue(lIdx, out chainBones) && chainBones.Length >= 2;
 
@@ -402,11 +405,12 @@ namespace AetherStrand.Editor
                     float rSin = Mathf.Sin(Mathf.Min(1f, t * 4.2f) * Mathf.PI * 0.5f);
                     float rootTuck = isBase ? 0.88f + 0.12f * rSin : rootMinW + (1f - rootMinW) * rSin;
                     float rootThickTuck = isBase ? 1.0f : 0.2f + 0.8f * rSin;
-                    float tipTaper = isBase
+                    bool isFade = lk.isFadeCap;
+                    float tipTaper = isFade ? 1.0f : isBase
                         ? Mathf.Max(0.04f, t < 0.42f ? 1f - t * 0.16f : Mathf.Pow((1f - t) / 0.58f, 1.12f) * 0.933f)
                         : Mathf.Max(0.06f, t < 0.44f ? 1f - t * 0.14f : Mathf.Pow((1f - t) / 0.56f, 0.94f) * 0.938f);
                     float halfW = baseHalfW * rootTuck * tipTaper;
-                    float halfT = baseHalfT * rootThickTuck * Mathf.Pow(Mathf.Max(0.04f, 1f - t), 0.86f);
+                    float halfT = baseHalfT * rootThickTuck * (isFade ? 0.55f * (1f - t * 0.65f) : Mathf.Pow(Mathf.Max(0.04f, 1f - t), 0.86f));
 
                     BoneWeight bw = ComputeRingWeight(k, t, isDynamic, chainBones);
                     Vector3 tangU = new Vector3(-tang.x, tang.y, tang.z);
@@ -528,7 +532,8 @@ namespace AetherStrand.Editor
             float maxZ = float.NegativeInfinity;
             float minZ = float.PositiveInfinity;
 
-            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN)>();
+            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN, bool fade)>();
+            var fadeRx = new Regex("\"isFadeCap\"\\s*:\\s*(true|false)");
             foreach (Match m in matches)
             {
                 string blk = m.Value;
@@ -571,7 +576,7 @@ namespace AetherStrand.Editor
                     rootN = new Vector3(-rx, rz, -ry);
                 }
                 if (pts.Count >= 2)
-                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN));
+                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN, fadeRx.Match(blk) is Match fm && fm.Success && fm.Groups[1].Value == "true"));
             }
 
             // Auto-normalize if an unscaled 0.97m web-bust JSON is fed in
@@ -601,6 +606,7 @@ namespace AetherStrand.Editor
                     seed = item.seed,
                     layerAO = item.ao,
                     isBaseShell = item.isBase,
+                    isFadeCap = item.fade,
                     scalpRoot = item.scalp,
                     lockNormal = item.lockN,
                     rootNormal = item.rootN,
