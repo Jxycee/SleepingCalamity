@@ -26,7 +26,8 @@ namespace AetherStrand.Editor
         public bool useHeadFit;
         /// <summary>After the fit, move lock points out of the character's real head surface (convex hull of the head mesh).</summary>
         public bool pushOutOfHead = true;
-        public float headMargin = 0.0015f;
+        public float headMargin = 0.003f;
+        public float bangsMargin = 0.002f;
         public Vector3 fitScale = Vector3.one;
         public Vector3 fitOffset = Vector3.zero;
         /// <summary>Legacy: rescale by 0.23/maxZ when the JSON is in web-bust units. False = use overallScale only (parity mode).</summary>
@@ -124,7 +125,9 @@ namespace AetherStrand.Editor
             {
                 var sets = new List<Vector3[]>(locks.Count);
                 foreach (var l in locks) sets.Add(l.points);
-                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin);
+                var mgs = new List<float>(locks.Count);
+                foreach (var l in locks) mgs.Add(string.Equals(l.zone, "Bangs", StringComparison.OrdinalIgnoreCase) ? p.bangsMargin : p.headMargin);
+                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin, mgs);
                 Debug.Log("[AetherStrand] Pushed " + moved + " lock points out of the head (margin " + (p.headMargin * 1000f).ToString("F1") + " mm).");
             }
 

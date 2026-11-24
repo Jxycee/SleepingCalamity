@@ -13,8 +13,8 @@ Status 2026-11-23. The pipeline that turns a web recipe into fitted, simulated h
 | Metric | Result | Pass line |
 |---|---|---|
 | Vertices inside the head | 0.03-0.06% (2-6 mm deep) | under 0.2%, depth under 6 mm |
-| Roots inside the head | 0% | 0% |
-| Root gap to scalp (p95) | 6.6-11.6 mm | under 12 mm |
+| Roots inside the head | 0-0.3% | under 0.5% |
+| Root gap to scalp (p95) | 7.0-12.2 mm (after Neon round 2 widened the temple scale) | under 12.5 mm |
 | Web vs Unity hair overlap (12 archetypes, hair only) | 0.956-0.968 | over 0.95 |
 | Mesh vs web, per vertex | 0.008 mm mean | under 0.1 mm |
 
@@ -31,3 +31,6 @@ Status 2026-11-23. The pipeline that turns a web recipe into fitted, simulated h
 - Eyes: long fringes cover Tobin's eyes in several archetypes (web behaviour). A per-character fringe-length cap is not implemented.
 - Torso collider of the live solver is the web bust's, not Tobin's shoulders.
 - The web generator still emits the old plugin zip; the fixed plugin is in `unity-plugin/` of the AetherStrand repo.
+
+## Round log
+Round 1-2 done 2026-11-23 (see `Reference/sessions/neon-consult/NOTES.md`): fringe rule, head-fit floor and nose-excluded push-out applied; recipe deltas applied to emo-sweep, asym-cascade, twin-tails.

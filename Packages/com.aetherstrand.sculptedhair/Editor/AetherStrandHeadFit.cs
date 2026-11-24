@@ -71,6 +71,8 @@ namespace AetherStrand.Editor
 
             float width = xMax - xMin, depth = zMax - zMin;
             var scale = new Vector3(width / WebWidth, h / WebHeight, depth / WebDepth);
+            // keep the temples from pinching: X scale never below 94% of the larger of Y/Z (judged on the renders, Neon round 2)
+            scale.x = Mathf.Max(scale.x, 0.94f * Mathf.Max(scale.y, scale.z));
             var centre = new Vector3((xMin + xMax) * 0.5f, 0f, (zMin + zMax) * 0.5f);
             fit.scale = scale;
             fit.offset = new Vector3(centre.x, yMin - WebChinY * scale.y, centre.z - WebDepthCentreZ * scale.z);
@@ -103,10 +105,18 @@ namespace AetherStrand.Editor
         /// Pushes points (head-bone space) out of the character's head (convex hull of the head mesh) to at least <paramref name="margin"/> metres.
         /// Returns the number of points moved. Used after the fit so hair never intersects the real head surface.
         /// </summary>
-        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin)
+        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin, IList<float> margins = null)
         {
             var hp = HeadPoints(characterRoot, headBone);
             if (hp.Count < 200) return 0;
+            {
+                // exclude the nose protrusion from the hull so bangs are not pushed off the brow in profile
+                float yMin = float.MaxValue, yMax = float.MinValue, zMin = float.MaxValue, zMax = float.MinValue;
+                foreach (var q in hp) { yMin = Mathf.Min(yMin, q.y); yMax = Mathf.Max(yMax, q.y); zMin = Mathf.Min(zMin, q.z); zMax = Mathf.Max(zMax, q.z); }
+                float hh = yMax - yMin, dd = zMax - zMin, zc = (zMin + zMax) * 0.5f;
+                hp.RemoveAll(q => q.y < yMin + 0.58f * hh && q.z > zc + 0.35f * dd);
+                if (hp.Count < 200) return 0;
+            }
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(hp);
             int nt = (hp.Count / 3) * 3; var tri = new int[nt]; for (int i = 0; i < nt; i++) tri[i] = i;
@@ -116,8 +126,11 @@ namespace AetherStrand.Editor
             Vector3 centre = Vector3.zero; foreach (var q in hp) centre += q; centre /= hp.Count;
             Vector3 centreW = headBone.TransformPoint(centre);
             int moved = 0;
+            int setIdx = -1;
             foreach (var set in pointSets)
             {
+                setIdx++;
+                float mg = margins != null && setIdx < margins.Count ? margins[setIdx] : margin;
                 for (int i = 0; i < set.Length; i++)
                 {
                     Vector3 w = headBone.TransformPoint(set[i]);
@@ -125,13 +138,13 @@ namespace AetherStrand.Editor
                     Vector3 target = w; bool move = false;
                     if (d > 1e-6f)
                     {
-                        if (d < margin) { target = w + (w - cp).normalized * (margin - d); move = true; }
+                        if (d < mg) { target = w + (w - cp).normalized * (mg - d); move = true; }
                     }
                     else
                     {
                         Vector3 dir = (w - centreW).normalized;
                         var ray = new Ray(w + dir * 0.6f, -dir);
-                        if (dir.sqrMagnitude > 1e-8f && mc.Raycast(ray, out RaycastHit hit, 1.2f)) { target = hit.point + dir * margin; move = true; }
+                        if (dir.sqrMagnitude > 1e-8f && mc.Raycast(ray, out RaycastHit hit, 1.2f)) { target = hit.point + dir * mg; move = true; }
                     }
                     if (move) { set[i] = headBone.InverseTransformPoint(target); moved++; }
                 }

@@ -38,7 +38,7 @@ namespace AetherStrand.Editor
         }
 
         /// <summary>Writes a trimmed copy of the geometry to <paramref name="outPath"/>; returns the number of locks shortened (0 = unchanged copy).</summary>
-        public static int TrimForEyes(string geometryJson, AetherStrandHeadFit.Fit fit, EyeLine eye, string outPath, float clearance = 0.004f)
+        public static int TrimForEyes(string geometryJson, AetherStrandHeadFit.Fit fit, EyeLine eye, string outPath, float clearance = 0.0f)
         {
             var root = (Dictionary<string, object>)AetherStrandJson.Parse(File.ReadAllText(geometryJson));
             var locks = (List<object>)root["locks"];
@@ -59,8 +59,10 @@ namespace AetherStrand.Editor
                     fitted[i] = AetherStrandHeadFit.Apply(fit, new Vector3(-web[i].x, web[i].y, web[i].z));
                 }
                 // per-lock deterministic jitter of the cut height (+-4 mm) so the fringe does not end on a ruler line
-                float jitter = (Hash01(AetherStrandJson.D(d, "seed", 0.5)) - 0.5f) * 0.008f;
-                float capLock = capY + jitter;
+                float tipX0 = Mathf.Abs(fitted[n - 1].x);
+                float ew0 = Mathf.Exp(-Mathf.Pow((tipX0 - eye.centreAbsX) / 0.030f, 2f));
+                float jitter = (Hash01(AetherStrandJson.D(d, "seed", 0.5)) - 0.5f) * 0.012f;   // +-6 mm
+                float capLock = capY + jitter - 0.022f * (1f - ew0);                                // arch toward the outer brow
                 int hit = -1;
                 for (int i = 1; i < n; i++)
                     if (fitted[i].y < capLock && fitted[i].z > frontZ && Mathf.Abs(fitted[i].x) < halfX) { hit = i; break; }
@@ -70,10 +72,12 @@ namespace AetherStrand.Editor
                 float f = Mathf.Max(0.18f, ((hit - 1) + t) / (n - 1));
                 // eye weight: Gaussian over the nearer eye centre at the lock's (original) tip x
                 float tipX = Mathf.Abs(fitted[n - 1].x);
-                float ew = Mathf.Exp(-Mathf.Pow((tipX - eye.centreAbsX) / 0.022f, 2f));
+                float ew = Mathf.Exp(-Mathf.Pow((tipX - eye.centreAbsX) / 0.030f, 2f));
                 // outward sweep (away from the face centreline), 10-14 degrees, ramped in over the lower lock
-                float sweepDeg = 10f + 4f * Hash01(AetherStrandJson.D(d, "seed", 0.5) + 1.7);
-                float outward = web[0].x >= 0f ? 1f : -1f; // web-space x of the root (web x = -unity x, sign handled in web space)
+                // 5-8 deg driven smoothly by |tipX| (adjacent locks sweep in parallel); direction follows the lock's own lateral flow
+                float sweepDeg = 5f + 3f * Mathf.Clamp01(tipX / Mathf.Max(0.001f, eye.halfWidthX + 0.02f));
+                float flow = web[n - 1].x - web[0].x;
+                float outward = Mathf.Abs(flow) > 0.008f * (1f / Mathf.Max(0.001f, fit.scale.x / 0.31f)) ? Mathf.Sign(flow) : (web[0].x >= 0f ? 1f : -1f);
                 var rs = new Vector3[n];
                 for (int i = 0; i < n; i++)
                 {
