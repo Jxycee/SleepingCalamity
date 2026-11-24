@@ -79,3 +79,10 @@ Result renders: `renders/k3_*_n2_4view.png` (parted fringe on twin-tails and hig
 - Applied Neon's twin-tail change in the web archetype builder (`hairBuilder.ts` twin-tails branch): anchorPhi 0.86 -> 0.71, anchorTheta 1.96 -> 2.08, root spread x0.7 (copy: `tools/hairBuilder_twin_tails_n3.ts`; also pushed upstream).
 - Round 5: twin-tails_n3 PASS. Scorecard 17/17 PASS on Tobin; Neon cleared the canonical unity-plugin build to ship. Evidence: `round4_pack/`, `renders/k5_twin-tails_n3_4view.png`.
 - Gemini UI note: the Send button works only after typing with the real `type` action and clicking by coordinate in a fresh tab; JS-inserted text never submits.
+
+## Rounds 6-7 (2026-11-23, Wren): Neon authors new hairstyles (the AI loop, first real run)
+- Round 6: Neon wrote 4 schema-2.0 recipes from character briefs (young hero, gruff veteran, village healer, rogue): `recipes/new_*.json`. No edits by us.
+- Pipeline ran unchanged (web export, Tobin fit, eye-clear, push-out): penetration worst 0.01% / 4.6 mm, root gap p95 worst 8.5 mm, roots inside 0.0% (`round6_pack/`).
+- Round 7 verdicts: Squire PASS, Apothecary PASS, Cutpurse PASS, Ironwatch Captain FAIL (centre inverted-V gap and wispy bangs read youthful, not a disciplined veteran cut).
+- Applied Neon's Captain deltas (`new_captain2.json`): still a wide centre gap, and max penetration depth 6.0 mm (on the <6 mm line). Not re-judged: our read is the 12 archetypes cannot make a cropped veteran. Neon's ask: add a short-crop / slicked-back archetype (short tapered sides and nape, no hanging forehead bangs). That is the next build, not done.
+- Loop verdict from Neon: works, 3/4 first-pass.
