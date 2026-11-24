@@ -61,6 +61,8 @@ export const ARCHETYPE_METADATA: ArchetypeMeta[] = [
   { id: 'twin-tails', label: 'Dual Twin-Tails', inspiration: 'JRPG Twin Cascade' },
   { id: 'emo-sweep', label: 'Side-Swept Fringe', inspiration: 'Riku / Dante' },
   { id: 'short-crop', label: 'Short Crop', inspiration: 'Veteran / Soldier crop' },
+  { id: 'braided-crown', label: 'Braided Crown', inspiration: 'Fantasy healer / noble braids' },
+  { id: 'samurai-topknot', label: 'Samurai Topknot', inspiration: 'Ronin / warrior high bun' },
 ];
 
 export const ALL_ARCHETYPES: HairBuilderArchetype[] = ARCHETYPE_METADATA.map((a) => a.id);
@@ -710,6 +712,181 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
   const isSpiky = arch === 'spiky-hero' || spikeAmt > 0.45;
   const isPulledScalp = isPonytail || isTwinTails;
   const napeHugBase = isBob || isPulledScalp ? 1.26 : isLong ? 0.84 : 1.06;
+
+  // NEON-SEED samurai-topknot
+  if (arch === 'samurai-topknot') {
+    const knotTheta = Math.PI;
+    const knotPhi = 0.44;
+    const knotAnchor = skullSurfacePoint(knotTheta, knotPhi, 0.016);
+
+    // Zone 1: Tight sleek base shell (ears exposed, clean nape)
+    for (let tier = 0; tier < 3; tier++) {
+      const count = 28;
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + tier * 0.21;
+        const cosT = Math.cos(theta);
+        const phiStart = tier === 0 ? 0.02 : 0.24 + tier * 0.36;
+        const maxPhi = cosT > 0.35 ? 1.3 : cosT < -0.25 ? 1.95 : 1.6;
+        if (phiStart >= maxPhi - 0.05) continue;
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.72),
+          baseLift: 0.003, midArch: 0.003, tipFlickOut: 0.0, napeHug: 1.35,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.1 * wMul, thickness: 0.01, stiffnessBias: 0.98, layerAO: 0.8,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
+    }
+
+    // Zone 2: pulled-back scalp strands converging into the knot
+    const pullCount = Math.round(46 * density);
+    for (let i = 0; i < pullCount; i++) {
+      const theta = (i / pullCount) * Math.PI * 2 + (rand() - 0.5) * 0.05;
+      const cosT = Math.cos(theta);
+      const phiStart = cosT > 0.35 ? 1.28 : cosT < -0.25 ? 1.9 : 1.56;
+      const targetTheta = theta > 0 ? Math.PI : -Math.PI;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: THREE.MathUtils.lerp(theta, targetTheta, 0.72), phiStart, phiEnd: knotPhi,
+        baseLift: 0.007 + config.crownVolume * 0.006, midArch: 0.004, tipFlickOut: 0.0, napeHug: 1.3,
+      });
+      pts[NODES_PER_LOCK - 1].lerp(knotAnchor, 0.85);
+      pts[NODES_PER_LOCK - 2].lerp(knotAnchor, 0.45);
+      specs.push({
+        pointsLocal: pts, width: (0.03 + rand() * 0.01) * wMul, thickness: 0.01, stiffnessBias: 0.97,
+        layerAO: 0.88, layerOrder: 2, lockNormal: false, scalpRoot: 0.35,
+      });
+    }
+
+    // Zone 3A: compact topknot bun core
+    const bunCount = Math.round(34 * density);
+    for (let i = 0; i < bunCount; i++) {
+      const ang = (i / bunCount) * Math.PI * 2;
+      const pts = buildGatheredTailLock({
+        anchorTheta: knotTheta + Math.cos(ang) * 0.08, anchorPhi: knotPhi + Math.sin(ang) * 0.06,
+        outDir: new THREE.Vector3(Math.cos(ang) * 0.28, 0.74, -0.62),
+        spreadX: Math.cos(ang) * 0.06, spreadZ: Math.sin(ang) * 0.06,
+        length: 0.17 + config.crownVolume * 0.05, archOut: 0.085, waveAmp: 0.004, wavePhase: ang,
+      });
+      specs.push({
+        pointsLocal: pts, width: 0.05 * wMul, thickness: 0.014, stiffnessBias: 0.94, layerAO: 0.86,
+        layerOrder: 3, lockNormal: false, scalpRoot: 0.5,
+      });
+    }
+
+    // Zone 3B: short flared warrior tail behind the tie
+    const tailCount = Math.round(16 * density);
+    for (let i = 0; i < tailCount; i++) {
+      const ang = (i / tailCount) * Math.PI * 2;
+      const pts = buildGatheredTailLock({
+        anchorTheta: knotTheta + Math.cos(ang) * 0.05, anchorPhi: knotPhi + 0.03,
+        outDir: new THREE.Vector3(Math.cos(ang) * 0.22, 0.28 + spikeAmt * 0.24, -0.92),
+        spreadX: Math.cos(ang) * 0.055, spreadZ: Math.sin(ang) * 0.035,
+        length: 0.14 + config.backLength * 0.14, archOut: 0.095, waveAmp: 0.008, wavePhase: ang * 1.5,
+      });
+      specs.push({
+        pointsLocal: pts, width: (0.026 + rand() * 0.01) * wMul, thickness: 0.011, stiffnessBias: 0.76,
+        layerAO: 0.92, layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
+      });
+    }
+
+    return specs;
+  }
+
+  // NEON-SEED braided-crown
+  if (arch === 'braided-crown') {
+    const backEndPhi = THREE.MathUtils.lerp(2.15, 2.85, config.backLength);
+    const sideEndPhi = THREE.MathUtils.lerp(1.92, 2.45, config.sideLength);
+
+    // Zone 1: Smooth base shell
+    for (let tier = 0; tier < 3; tier++) {
+      const count = 18;
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + tier * 0.22;
+        const cosT = Math.cos(theta);
+        if (tier >= 1 && cosT > 0.52) continue;
+        const isBack = cosT < -0.15;
+        const phiStart = tier === 0 ? 0.01 : 0.2 + tier * 0.38;
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta, phiStart,
+          phiEnd: Math.min(isBack ? backEndPhi - 0.1 : sideEndPhi - 0.12, phiStart + 1.25),
+          baseLift: 0.004, midArch: 0.006, tipFlickOut: 0.002, napeHug: 0.96,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.084 * wMul, thickness: 0.012, stiffnessBias: 0.88, layerAO: 0.82,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: tier === 0 ? 0.48 : 0.22,
+        });
+      }
+    }
+
+    // Zone 2: Center-parted smooth crown + under-hair
+    const canopyCount = Math.round(38 * density);
+    for (let i = 0; i < canopyCount; i++) {
+      const theta = (i / canopyCount) * Math.PI * 2 + (rand() - 0.5) * 0.05;
+      const cosT = Math.cos(theta);
+      if (cosT > 0.65) continue;
+      const isBack = cosT < -0.18;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: theta + (Math.sin(theta) > 0 ? 0.05 : -0.05),
+        phiStart: 0.06 + rand() * 0.18, phiEnd: isBack ? backEndPhi : sideEndPhi,
+        baseLift: 0.012 + config.crownVolume * 0.01, midArch: 0.01, tipFlickOut: 0.006, napeHug: 0.92,
+      });
+      specs.push({
+        pointsLocal: pts, width: (0.044 + rand() * 0.012) * wMul, thickness: 0.012, stiffnessBias: 0.74,
+        layerAO: 0.88, layerOrder: 2, lockNormal: false, scalpRoot: 0.35,
+      });
+    }
+
+    // Soft temple framing wisps
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const pts = buildSculptedLock({
+          thetaStart: side * (0.48 + k * 0.12), thetaEnd: side * (0.76 + k * 0.1),
+          phiStart: 0.84 + k * 0.05, phiEnd: 1.65 + config.bangsLength * 0.36 + k * 0.08,
+          baseLift: 0.01, midArch: 0.012, tipFlickOut: 0.008, napeHug: 0.85,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.024 * wMul, thickness: 0.009, stiffnessBias: 0.68, layerAO: 0.94,
+          layerOrder: 3, lockNormal: false, scalpRoot: 0.25,
+        });
+      }
+    }
+
+    // Zone 3: Twin woven side braids above the ears from temples to occipital join
+    for (const side of [-1, 1]) {
+      for (let s = 0; s < 6; s++) {
+        const phase = s % 2 === 0 ? 1 : -1;
+        const offsetPhi = (s - 2.5) * 0.024;
+        const pts = buildSculptedLock({
+          thetaStart: side * (0.44 + (s % 3) * 0.05), thetaEnd: side * 3.04,
+          phiStart: 0.88 + offsetPhi, phiEnd: 1.42 + offsetPhi * 0.6,
+          baseLift: 0.024 + (s % 3) * 0.004, midArch: 0.009, tipFlickOut: 0.0, sCurveAmp: phase * 0.048, napeHug: 1.25,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.034 * wMul, thickness: 0.016, stiffnessBias: 0.95,
+          layerAO: 0.9 - (s % 2) * 0.08, layerOrder: 3, lockNormal: false, scalpRoot: 0.45,
+        });
+      }
+    }
+
+    // Zone 4: Central woven back braid from the occipital join
+    const braidCount = Math.round(18 * density);
+    for (let i = 0; i < braidCount; i++) {
+      const phase = (i / braidCount) * Math.PI * 2;
+      const pts = buildGatheredTailLock({
+        anchorTheta: Math.PI + Math.cos(phase) * 0.06, anchorPhi: 1.42 + Math.sin(phase) * 0.03,
+        outDir: new THREE.Vector3(Math.cos(phase) * 0.14, -0.18, -0.96),
+        spreadX: Math.cos(phase) * 0.028, spreadZ: Math.sin(phase) * 0.022,
+        length: 0.36 + config.backLength * 0.28, archOut: 0.042, waveAmp: 0.018, wavePhase: phase * 2.0,
+      });
+      specs.push({
+        pointsLocal: pts, width: 0.032 * wMul, thickness: 0.015, stiffnessBias: 0.64, layerAO: 0.9,
+        layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
+      });
+    }
+
+    return specs;
+  }
 
   // NEON-SEED short-crop (standalone, early return)
   if (arch === 'short-crop') {
@@ -1482,6 +1659,8 @@ const ARCHETYPE_PRESET_MAP: Record<HairBuilderArchetype, HairPresetId> = {
   'twin-tails': 'crimson',
   'emo-sweep': 'leon',
   'short-crop': 'silver',
+  'braided-crown': 'crimson',
+  'samurai-topknot': 'noctis',
 };
 
 function buildArchetypeParameters(archetype: HairBuilderArchetype, rand: () => number, seed: number): HairBuilderConfig {
@@ -1591,6 +1770,36 @@ function buildArchetypeParameters(archetype: HairBuilderArchetype, rand: () => n
         layerShag: rRange(0.32, 0.62),
         density: rRange(0.96, 1.12),
         strandWidth: rRange(0.94, 1.1),
+        seed,
+      };
+    case 'samurai-topknot':
+      return {
+        archetype,
+        partPosition: rRange(-0.1, 0.1),
+        bangsLength: rRange(0.05, 0.25),
+        bangsSweep: rRange(-0.15, 0.15),
+        crownVolume: rRange(0.25, 0.5),
+        spikeLift: rRange(0.05, 0.25),
+        sideLength: rRange(0.15, 0.35),
+        backLength: rRange(0.25, 0.55),
+        layerShag: rRange(0.15, 0.4),
+        density: rRange(1.0, 1.16),
+        strandWidth: rRange(0.9, 1.08),
+        seed,
+      };
+    case 'braided-crown':
+      return {
+        archetype,
+        partPosition: rRange(-0.12, 0.12),
+        bangsLength: rRange(0.28, 0.52),
+        bangsSweep: rRange(-0.25, 0.25),
+        crownVolume: rRange(0.35, 0.6),
+        spikeLift: rRange(0, 0.06),
+        sideLength: rRange(0.45, 0.7),
+        backLength: rRange(0.62, 0.88),
+        layerShag: rRange(0.18, 0.42),
+        density: rRange(1.0, 1.16),
+        strandWidth: rRange(0.92, 1.1),
         seed,
       };
     case 'short-crop':

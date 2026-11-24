@@ -1,0 +1,79 @@
+  if (arch === 'samurai-topknot') {
+    const knotTheta = Math.PI;
+    const knotPhi = 0.44;
+    const knotAnchor = skullSurfacePoint(knotTheta, knotPhi, 0.016);
+
+    // Zone 1: Tight sleek base shell (ears exposed, clean nape)
+    for (let tier = 0; tier < 3; tier++) {
+      const count = 18;
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + tier * 0.21;
+        const cosT = Math.cos(theta);
+        const phiStart = tier === 0 ? 0.02 : 0.24 + tier * 0.36;
+        const maxPhi = cosT > 0.35 ? 0.96 : cosT < -0.25 ? 1.88 : 1.38;
+        if (phiStart >= maxPhi - 0.15) continue;
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.72),
+          baseLift: 0.003, midArch: 0.003, tipFlickOut: 0.0, napeHug: 1.35,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.072 * wMul, thickness: 0.01, stiffnessBias: 0.98, layerAO: 0.8,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
+    }
+
+    // Zone 2: pulled-back scalp strands converging into the knot
+    const pullCount = Math.round(46 * density);
+    for (let i = 0; i < pullCount; i++) {
+      const theta = (i / pullCount) * Math.PI * 2 + (rand() - 0.5) * 0.05;
+      const cosT = Math.cos(theta);
+      const phiStart = cosT > 0.35 ? 0.94 : cosT < -0.25 ? 1.84 : 1.34;
+      const targetTheta = theta > 0 ? Math.PI : -Math.PI;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: THREE.MathUtils.lerp(theta, targetTheta, 0.72), phiStart, phiEnd: knotPhi,
+        baseLift: 0.007 + config.crownVolume * 0.006, midArch: 0.004, tipFlickOut: 0.0, napeHug: 1.3,
+      });
+      pts[NODES_PER_LOCK - 1].lerp(knotAnchor, 0.85);
+      pts[NODES_PER_LOCK - 2].lerp(knotAnchor, 0.45);
+      specs.push({
+        pointsLocal: pts, width: (0.03 + rand() * 0.01) * wMul, thickness: 0.01, stiffnessBias: 0.97,
+        layerAO: 0.88, layerOrder: 2, lockNormal: false, scalpRoot: 0.35,
+      });
+    }
+
+    // Zone 3A: compact topknot bun core
+    const bunCount = Math.round(20 * density);
+    for (let i = 0; i < bunCount; i++) {
+      const ang = (i / bunCount) * Math.PI * 2;
+      const pts = buildGatheredTailLock({
+        anchorTheta: knotTheta + Math.cos(ang) * 0.08, anchorPhi: knotPhi + Math.sin(ang) * 0.06,
+        outDir: new THREE.Vector3(Math.cos(ang) * 0.28, 0.74, -0.62),
+        spreadX: Math.cos(ang) * 0.042, spreadZ: Math.sin(ang) * 0.042,
+        length: 0.085 + config.crownVolume * 0.035, archOut: 0.058, waveAmp: 0.004, wavePhase: ang,
+      });
+      specs.push({
+        pointsLocal: pts, width: 0.036 * wMul, thickness: 0.014, stiffnessBias: 0.94, layerAO: 0.86,
+        layerOrder: 3, lockNormal: false, scalpRoot: 0.5,
+      });
+    }
+
+    // Zone 3B: short flared warrior tail behind the tie
+    const tailCount = Math.round(16 * density);
+    for (let i = 0; i < tailCount; i++) {
+      const ang = (i / tailCount) * Math.PI * 2;
+      const pts = buildGatheredTailLock({
+        anchorTheta: knotTheta + Math.cos(ang) * 0.05, anchorPhi: knotPhi + 0.03,
+        outDir: new THREE.Vector3(Math.cos(ang) * 0.22, 0.28 + spikeAmt * 0.24, -0.92),
+        spreadX: Math.cos(ang) * 0.055, spreadZ: Math.sin(ang) * 0.035,
+        length: 0.14 + config.backLength * 0.14, archOut: 0.095, waveAmp: 0.008, wavePhase: ang * 1.5,
+      });
+      specs.push({
+        pointsLocal: pts, width: (0.026 + rand() * 0.01) * wMul, thickness: 0.011, stiffnessBias: 0.76,
+        layerAO: 0.92, layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
+      });
+    }
+
+    return specs;
+  }
+
