@@ -68,3 +68,8 @@ Sent: bug list + measured parity, then (via Drive folder "Hair Trial - AetherStr
 - Q3 slider deltas for the weakest three, applied to recipes (clamped to ranges): see `renders/tobin_weakest3_before_after_neon_deltas.png` (spikes gone on emo-sweep and asym-cascade, twin-tails fuller).
 - Q4 head fit: X scale floored at 94% of max(Y,Z) (0.31 -> 0.33) to stop temple pinch; nose excluded from the push-out hull; margins bangs 2 mm, crown/back 3 mm (Neon said 4 mm; 3 mm kept the root gap lower). Applied.
 Measured after: all 17 styles, vertices inside head at most 0.01% (3.8 mm deep); root gap p95 worst 12.2 mm (swept-back, line was 12), roots inside head worst 0.3% (one preset, line 0%). The two small misses come from the wider temple scale.
+
+## Round 3 (2026-11-23, Wren): post-change judging of all 17 styles
+Neon judged the post-round-2 renders (`round3_pack/`): 14/17 PASS; FAIL: sleek-bob (flat unparted curtain), high-ponytail (flat bangs, jagged gap behind ear), twin-tails_n1 (side tails low and forward). Head-fit audit: PASS on all 17, no changes needed. Penetration and root-gap numbers (round3_measurements) accepted against the original pass lines.
+Applied: fringe sigma 0.030 -> 0.034, arch -0.022 -> -0.026, centre-part lift +3 mm (AetherStrandFringeFit.cs); slider deltas for the three weakest as `recipes/*_n2.json` (sleek-bob bangsSweep clamped at 1.0). Neon's structural note for twin-tails (tie roots +30 mm up, -25 mm back in the archetype builder) is not applied: sliders alone already clear the ears; revisit if round 4 still fails it.
+Result renders: `renders/k3_*_n2_4view.png` (parted fringe on twin-tails and high-ponytail, ears clear). Not yet re-judged by Neon (optional round 4).

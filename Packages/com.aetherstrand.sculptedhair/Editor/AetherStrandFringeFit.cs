@@ -60,9 +60,9 @@ namespace AetherStrand.Editor
                 }
                 // per-lock deterministic jitter of the cut height (+-4 mm) so the fringe does not end on a ruler line
                 float tipX0 = Mathf.Abs(fitted[n - 1].x);
-                float ew0 = Mathf.Exp(-Mathf.Pow((tipX0 - eye.centreAbsX) / 0.030f, 2f));
+                float ew0 = Mathf.Exp(-Mathf.Pow((tipX0 - eye.centreAbsX) / 0.034f, 2f));
                 float jitter = (Hash01(AetherStrandJson.D(d, "seed", 0.5)) - 0.5f) * 0.012f;   // +-6 mm
-                float capLock = capY + jitter - 0.022f * (1f - ew0);                                // arch toward the outer brow
+                float capLock = capY + jitter - 0.026f * (1f - ew0) + 0.003f * Mathf.Exp(-Mathf.Pow(tipX0 / 0.012f, 2f));                                // arch toward the outer brow
                 int hit = -1;
                 for (int i = 1; i < n; i++)
                     if (fitted[i].y < capLock && fitted[i].z > frontZ && Mathf.Abs(fitted[i].x) < halfX) { hit = i; break; }
@@ -72,7 +72,7 @@ namespace AetherStrand.Editor
                 float f = Mathf.Max(0.18f, ((hit - 1) + t) / (n - 1));
                 // eye weight: Gaussian over the nearer eye centre at the lock's (original) tip x
                 float tipX = Mathf.Abs(fitted[n - 1].x);
-                float ew = Mathf.Exp(-Mathf.Pow((tipX - eye.centreAbsX) / 0.030f, 2f));
+                float ew = Mathf.Exp(-Mathf.Pow((tipX - eye.centreAbsX) / 0.034f, 2f));
                 // outward sweep (away from the face centreline), 10-14 degrees, ramped in over the lower lock
                 // 5-8 deg driven smoothly by |tipX| (adjacent locks sweep in parallel); direction follows the lock's own lateral flow
                 float sweepDeg = 5f + 3f * Mathf.Clamp01(tipX / Mathf.Max(0.001f, eye.halfWidthX + 0.02f));

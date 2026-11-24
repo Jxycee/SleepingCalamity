@@ -105,7 +105,24 @@ namespace AetherStrand.Editor
         /// Pushes points (head-bone space) out of the character's head (convex hull of the head mesh) to at least <paramref name="margin"/> metres.
         /// Returns the number of points moved. Used after the fit so hair never intersects the real head surface.
         /// </summary>
-        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin, IList<float> margins = null)
+        /// <summary>Reduces a point cloud to its extreme point along <paramref name="dirs"/> Fibonacci directions (hull of the result approximates the full hull, under Unity's convex polygon cap).</summary>
+        public static List<Vector3> ExtremePoints(List<Vector3> pts, int dirs = 120)
+        {
+            var c = Vector3.zero; foreach (var q in pts) c += q; c /= Mathf.Max(1, pts.Count);
+            var picked = new HashSet<int>(); float ga = Mathf.PI * (3f - Mathf.Sqrt(5f));
+            for (int i = 0; i < dirs; i++)
+            {
+                float y = 1f - 2f * (i + 0.5f) / dirs, r = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y)), th = ga * i;
+                var d = new Vector3(Mathf.Cos(th) * r, y, Mathf.Sin(th) * r);
+                int best = -1; float bd = float.MinValue;
+                for (int k = 0; k < pts.Count; k++) { float v = Vector3.Dot(pts[k] - c, d); if (v > bd) { bd = v; best = k; } }
+                if (best >= 0) picked.Add(best);
+            }
+            var res = new List<Vector3>(picked.Count); foreach (int k in picked) res.Add(pts[k]);
+            return res;
+        }
+
+        public static int PushOutOfHead(GameObject characterRoot, Transform headBone, IList<Vector3[]> pointSets, float margin, IList<float> margins = null, IList<bool> pullRoots = null, float rootGapMax = 0.009f, float rootGapKeep = 0.007f)
         {
             var hp = HeadPoints(characterRoot, headBone);
             if (hp.Count < 200) return 0;
@@ -117,6 +134,7 @@ namespace AetherStrand.Editor
                 hp.RemoveAll(q => q.y < yMin + 0.58f * hh && q.z > zc + 0.35f * dd);
                 if (hp.Count < 200) return 0;
             }
+            hp = ExtremePoints(hp, 120);
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(hp);
             int nt = (hp.Count / 3) * 3; var tri = new int[nt]; for (int i = 0; i < nt; i++) tri[i] = i;
@@ -147,6 +165,19 @@ namespace AetherStrand.Editor
                         if (dir.sqrMagnitude > 1e-8f && mc.Raycast(ray, out RaycastHit hit, 1.2f)) { target = hit.point + dir * mg; move = true; }
                     }
                     if (move) { set[i] = headBone.InverseTransformPoint(target); moved++; }
+                }
+                // roots that float too far above the scalp are pulled back toward it (like the web's root pull-in), keeping a small gap
+                if (pullRoots != null && setIdx < pullRoots.Count && pullRoots[setIdx] && set.Length >= 3)
+                {
+                    Vector3 w0 = headBone.TransformPoint(set[0]); Vector3 cp0 = mc.ClosestPoint(w0); float d0 = Vector3.Distance(cp0, w0);
+                    if (d0 > rootGapMax)
+                    {
+                        Vector3 dir0 = (cp0 - w0).normalized; float pull = d0 - rootGapKeep;
+                        set[0] = headBone.InverseTransformPoint(w0 + dir0 * pull);
+                        set[1] = headBone.InverseTransformPoint(headBone.TransformPoint(set[1]) + dir0 * pull * 0.55f);
+                        set[2] = headBone.InverseTransformPoint(headBone.TransformPoint(set[2]) + dir0 * pull * 0.22f);
+                        moved++;
+                    }
                 }
             }
             Object.DestroyImmediate(go); Object.DestroyImmediate(mesh);

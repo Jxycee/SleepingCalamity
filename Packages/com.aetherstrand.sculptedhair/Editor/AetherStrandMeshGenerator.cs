@@ -127,7 +127,9 @@ namespace AetherStrand.Editor
                 foreach (var l in locks) sets.Add(l.points);
                 var mgs = new List<float>(locks.Count);
                 foreach (var l in locks) mgs.Add(string.Equals(l.zone, "Bangs", StringComparison.OrdinalIgnoreCase) ? p.bangsMargin : p.headMargin);
-                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin, mgs);
+                var pulls = new List<bool>(locks.Count);
+                foreach (var l in locks) pulls.Add(!l.isBaseShell && !l.lockNormal);
+                int moved = AetherStrandHeadFit.PushOutOfHead(characterRoot, headBone, sets, p.headMargin, mgs, pulls);
                 Debug.Log("[AetherStrand] Pushed " + moved + " lock points out of the head (margin " + (p.headMargin * 1000f).ToString("F1") + " mm).");
             }
 
