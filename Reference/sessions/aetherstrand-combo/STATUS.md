@@ -35,3 +35,8 @@ Cause of the ~3/255 shading error and left/right bias: plugin normal-map texture
 
 ## 1:1 closed (2026-11-23)
 Cause of the last edge mismatch: harness resolved MSAA in linear HDR and tone-mapped after; the web tone-maps per sample in the fragment shader, so its resolve averages display-encoded values. Plugin shader now has `_ParityDisplay` (web ACES exposure 1.16 + sRGB in the shader, for A/B only); harness renders 512 px with real 4x MSAA. Also: web label boxes were counted as mismatch. Result on 12 archetypes: mean error 0.27/255 inside hair, 0.003% of pixels differ by >10/255 after +-1 px alignment. The test mannequin bust is not part of the comparison (Tobin replaces it); hair-only on both sides.
+
+## Bust (test mannequin) vs hair parity (2026-11-23)
+- The web shades its mannequin with three MeshStandardMaterial + PMREM RoomEnvironment IBL + PCF soft shadows; the hair shader uses none of these, and hair does not receive shadows.
+- Hair pixels in front of the bust (92% of interior hair pixels; the rest are occluded by the bust): Unity-with-bust vs web-with-bust mean error 0.22/255, 0.006% differ by >10/255. Bust occlusion of the hair overlaps 0.99 (front view) and 0.68-0.81 (back and side views, small areas).
+- Bust pixels themselves: Parity/BustWeb shader (same 3-light rig + hemisphere + web display transform) with a single calibrated ambient reaches ~0 brightness bias at ambient ~17 but ~40/255 mean error remains (IBL/shadow structure); not part of the plugin, not claimed.

@@ -115,9 +115,28 @@ public static class ParityRender
             var go = new GameObject("bust" + (bi++)); go.transform.SetParent(root.transform, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             mesh.RecalculateNormals();
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.SetColor("_BaseColor", Hex(m.color)); mat.SetFloat("_Smoothness", 1f - m.rough); mat.SetFloat("_Metallic", m.metal);
-            mat.SetFloat("_Cull", 0f);
+            Material mat;
+            var bw = Shader.Find("Parity/BustWeb");
+            if (Env("SC_PARITY_INSHADER", "0") == "1" && bw != null)
+            {
+                mat = new Material(bw);
+                mat.SetColor("_Color", Hex(m.color)); mat.SetFloat("_Rough", m.rough);
+                Func<string, float, Vector4> LL = (h, k) => { var c = Hex(h).linear * k; return new Vector4(c.r, c.g, c.b, 0); };
+                Func<V3, Vector4> MD = (d) => { var q = new Vector3(-d.x, d.y, d.z).normalized; return new Vector4(q.x, q.y, q.z, 0); };
+                float pi = Mathf.PI;
+                mat.SetVector("_KeyDirW", MD(rig.keyD)); mat.SetVector("_KeyColW", LL(rig.keyC, rig.keyI / pi));
+                mat.SetVector("_FillDirW", MD(rig.fillD)); mat.SetVector("_FillColW", LL(rig.fillC, rig.fillI / pi));
+                mat.SetVector("_RimDirW", MD(rig.rimD)); mat.SetVector("_RimColW", LL(rig.rimC, rig.rimI / pi));
+                mat.SetVector("_SkyW", LL(rig.skyC, rig.hemiI / pi)); mat.SetVector("_GndW", LL(rig.gndC, rig.hemiI / pi));
+                float ea = float.Parse(Env("SC_PARITY_ENVAMB", "0.35"), System.Globalization.CultureInfo.InvariantCulture);
+                mat.SetVector("_EnvAmb", new Vector4(ea, ea, ea, 0)); mat.SetFloat("_SpecK", float.Parse(Env("SC_PARITY_SPECK", "0.04"), System.Globalization.CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                mat.SetColor("_BaseColor", Hex(m.color)); mat.SetFloat("_Smoothness", 1f - m.rough); mat.SetFloat("_Metallic", m.metal);
+                mat.SetFloat("_Cull", 0f);
+            }
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
         }
 
