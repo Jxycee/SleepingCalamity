@@ -134,6 +134,13 @@ namespace AetherStrand.Editor
                 hp.RemoveAll(q => q.y < yMin + 0.58f * hh && q.z > zc + 0.35f * dd);
                 if (hp.Count < 200) return 0;
             }
+            // with the skull hug on, leave the ears out of the push-out hull: a hull over the ears is ~10 mm wider than the cranium and floors the hair width there
+            if (hugStrength > 0.001f)
+            {
+                float eyLo = float.MaxValue, eyHi = float.MinValue; foreach (var q in hp) { eyLo = Mathf.Min(eyLo, q.y); eyHi = Mathf.Max(eyHi, q.y); }
+                float eh = eyHi - eyLo, crX = 0f; foreach (var q in hp) if (q.y > eyLo + 0.62f * eh) crX = Mathf.Max(crX, Mathf.Abs(q.x));
+                if (crX > 0.04f) { var kept = hp.FindAll(q => !(q.y > eyLo + 0.28f * eh && q.y < eyLo + 0.62f * eh && Mathf.Abs(q.x) > crX * 1.03f)); if (kept.Count >= 200) hp = kept; }
+            }
             hp = ExtremePoints(hp, 120);
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(hp);

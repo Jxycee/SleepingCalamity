@@ -60,6 +60,7 @@ namespace AetherStrand.Editor
             public float layerAO;
             public bool isBaseShell;
             public bool isFadeCap;
+            public float fadeStart = float.NaN; // NaN: default fade curve (alpha 0.25)
             public float scalpRoot = 0.65f;
             public bool lockNormal;
             public Vector3 rootNormal = Vector3.up;
@@ -360,7 +361,7 @@ namespace AetherStrand.Editor
                 if (count < 2) continue;
                 int ringsPerLock = count - 1;
                 int baseVert = verts.Count;
-                float maskVal = lk.isBaseShell ? 0.0f : lk.isFadeCap ? 0.25f : 1.0f;
+                float maskVal = lk.isBaseShell ? 0.0f : lk.isFadeCap ? (float.IsNaN(lk.fadeStart) ? 0.25f : 0.16f + 0.28f * Mathf.Clamp01(lk.fadeStart)) : 1.0f;
                 int[] chainBones = null;
                 bool isDynamic = !lk.isBaseShell && lockToChainBoneIndices.TryGetValue(lIdx, out chainBones) && chainBones.Length >= 2;
 
@@ -532,8 +533,9 @@ namespace AetherStrand.Editor
             float maxZ = float.NegativeInfinity;
             float minZ = float.PositiveInfinity;
 
-            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN, bool fade)>();
+            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN, bool fade, float fadeStart)>();
             var fadeRx = new Regex("\"isFadeCap\"\\s*:\\s*(true|false)");
+            var fadeStartRx = new Regex("\"fadeStart\"\\s*:\\s*([-0-9.eE+]+)");
             foreach (Match m in matches)
             {
                 string blk = m.Value;
@@ -576,7 +578,7 @@ namespace AetherStrand.Editor
                     rootN = new Vector3(-rx, rz, -ry);
                 }
                 if (pts.Count >= 2)
-                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN, fadeRx.Match(blk) is Match fm && fm.Success && fm.Groups[1].Value == "true"));
+                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN, fadeRx.Match(blk) is Match fm && fm.Success && fm.Groups[1].Value == "true", fadeStartRx.Match(blk) is Match fsm && fsm.Success ? ParseF(fsm.Groups[1].Value, 0.25f) : float.NaN));
             }
 
             // Auto-normalize if an unscaled 0.97m web-bust JSON is fed in
@@ -607,6 +609,7 @@ namespace AetherStrand.Editor
                     layerAO = item.ao,
                     isBaseShell = item.isBase,
                     isFadeCap = item.fade,
+                    fadeStart = item.fadeStart,
                     scalpRoot = item.scalp,
                     lockNormal = item.lockN,
                     rootNormal = item.rootN,

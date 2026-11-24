@@ -112,11 +112,12 @@ Shader "AetherStrand/SculptedHair_URP"
             // Mode 1: isFadeCap stubble (vertColor.a == 0.25): stochastic stipple dissolves toward the hairline
             if (vertColor.a > 0.15 && vertColor.a < 0.45)
             {
-                float coverage = pow(1.0 - smoothstep(0.25, 1.0, t), 0.75);
+                float fadeStart0 = abs(vertColor.a - 0.25) < 0.002 ? 0.25 : clamp((vertColor.a - 0.16) / 0.28, 0.0, 1.0);
+                float coverage = pow(1.0 - smoothstep(fadeStart0, 1.0, t), 0.75);
                 float2 cell = floor(float2(uv.x * 42.0 + vertColor.b * 17.0, t * 28.0));
                 float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
                 float ign = AetherInterleavedGradientNoise(screenPosXY);
-                float threshold = lerp(cellNoise, ign, 0.55);
+                float threshold = lerp(cellNoise, ign, 0.86);
                 clip(coverage - threshold);
                 return;
             }
@@ -685,11 +686,12 @@ Shader "AetherStrand/SculptedHair_URP"
                 #ifdef _USE_ALPHA_CLIP
                 if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45)
                 {
-                    float coverage = pow(1.0 - smoothstep(0.25, 1.0, t), 0.75);
+                    float fadeStart0 = abs(i.vertColor.a - 0.25) < 0.002 ? 0.25 : clamp((i.vertColor.a - 0.16) / 0.28, 0.0, 1.0);
+                    float coverage = pow(1.0 - smoothstep(fadeStart0, 1.0, t), 0.75);
                     float2 cell = floor(float2(i.uv.x * 42.0 + i.vertColor.b * 17.0, t * 28.0));
                     float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
                     float ign = frac(52.9829189 * frac(dot(i.pos.xy, float2(0.06711056, 0.00583715))));
-                    clip(coverage - lerp(cellNoise, ign, 0.55));
+                    clip(coverage - lerp(cellNoise, ign, 0.86));
                 }
                 else
                 #endif

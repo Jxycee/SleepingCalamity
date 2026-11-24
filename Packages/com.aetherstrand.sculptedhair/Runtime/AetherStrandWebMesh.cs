@@ -56,7 +56,7 @@ namespace AetherStrand
             {
                 var d = locks[s];
                 int bv = s * VertsPerLock;
-                float mask = d.isBaseShell ? 0f : d.isFadeCap ? 0.25f : 1f;
+                float mask = d.isBaseShell ? 0f : d.isFadeCap ? (double.IsNaN(d.fadeStart) ? 0.25f : 0.16f + 0.28f * Mathf.Clamp01((float)d.fadeStart)) : 1f;
                 int vi = bv;
                 for (int k = 0; k < Rings; k++)
                 {

@@ -24,6 +24,7 @@ export function exportGeometry(recipe: any): any {
     e.scalpRoot = lk.scalpRoot;
     e.lockNormal = lk.lockNormal;
     e.isFadeCap = Boolean(lk.isFadeCap);
+    if (lk.fadeStart !== undefined) e.fadeStart = lk.fadeStart;
     e.layerOrder = lk.layerOrder;
     e.mass = lk.mass;
     e.restMidR = lk.restMidR;

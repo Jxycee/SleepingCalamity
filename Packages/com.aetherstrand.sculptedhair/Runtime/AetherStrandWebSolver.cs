@@ -43,6 +43,7 @@ namespace AetherStrand
             public double restMidR = double.NaN;      // NaN: derive from rest[4]
             public double rootRawY = double.NaN;      // NaN: rest[0].y
             public bool isBaseShell, lockNormal, isFadeCap;
+            public double fadeStart = double.NaN;     // NaN: default fade curve (alpha 0.25)
             public double[] rootNormal = { 0, 1, 0 }; // web head-local
         }
 

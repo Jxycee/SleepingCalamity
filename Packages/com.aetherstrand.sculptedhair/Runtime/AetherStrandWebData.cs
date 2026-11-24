@@ -129,6 +129,7 @@ namespace AetherStrand
                 ld.isBaseShell = AetherStrandJson.B(d, "isBaseShell", false);
                 ld.lockNormal = AetherStrandJson.B(d, "lockNormal", false);
                 ld.isFadeCap = AetherStrandJson.B(d, "isFadeCap", false);
+                ld.fadeStart = AetherStrandJson.D(d, "fadeStart", double.NaN);
                 if (AetherStrandJson.Has(d, "rootNormal"))
                 {
                     double[] rn = AetherStrandJson.Arr(d["rootNormal"]);
