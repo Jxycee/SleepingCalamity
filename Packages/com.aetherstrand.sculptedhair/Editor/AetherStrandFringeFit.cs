@@ -15,13 +15,13 @@ namespace AetherStrand.Editor
     /// </summary>
     public static class AetherStrandFringeFit
     {
-        public struct EyeLine { public float topY, centreZ, halfWidthX; }
+        public struct EyeLine { public float topY, centreZ, halfWidthX, centreAbsX; }
 
         /// <summary>Eye landmarks in head-bone space from the character's eyeball renderers; false if none found.</summary>
         public static bool TryMeasureEyes(GameObject character, Transform head, out EyeLine eye)
         {
             eye = default(EyeLine);
-            float top = float.MinValue, zSum = 0, xMax = 0; int n = 0;
+            float top = float.MinValue, zSum = 0, xMax = 0, xcSum = 0; int n = 0;
             foreach (var r in character.GetComponentsInChildren<Renderer>(true))
             {
                 if (!r.name.ToLowerInvariant().Contains("eyeball")) continue;
@@ -29,11 +29,11 @@ namespace AetherStrand.Editor
                 Vector3 c = head.InverseTransformPoint(b.center);
                 float ey = b.extents.y; // world-aligned half height; fine for a sphere-like eyeball
                 top = Mathf.Max(top, c.y + ey);
-                zSum += c.z; n++;
+                zSum += c.z; xcSum += Mathf.Abs(c.x); n++;
                 xMax = Mathf.Max(xMax, Mathf.Abs(c.x) + b.extents.x);
             }
             if (n == 0) return false;
-            eye.topY = top; eye.centreZ = zSum / n; eye.halfWidthX = xMax;
+            eye.topY = top; eye.centreZ = zSum / n; eye.halfWidthX = xMax; eye.centreAbsX = xcSum / n;
             return true;
         }
 
@@ -58,26 +58,50 @@ namespace AetherStrand.Editor
                     web[i] = new Vector3((float)p[0], (float)p[2], (float)-p[1]);
                     fitted[i] = AetherStrandHeadFit.Apply(fit, new Vector3(-web[i].x, web[i].y, web[i].z));
                 }
+                // per-lock deterministic jitter of the cut height (+-4 mm) so the fringe does not end on a ruler line
+                float jitter = (Hash01(AetherStrandJson.D(d, "seed", 0.5)) - 0.5f) * 0.008f;
+                float capLock = capY + jitter;
                 int hit = -1;
                 for (int i = 1; i < n; i++)
-                    if (fitted[i].y < capY && fitted[i].z > frontZ && Mathf.Abs(fitted[i].x) < halfX) { hit = i; break; }
+                    if (fitted[i].y < capLock && fitted[i].z > frontZ && Mathf.Abs(fitted[i].x) < halfX) { hit = i; break; }
                 if (hit < 0) continue;
                 float dy = fitted[hit - 1].y - fitted[hit].y;
-                float t = dy > 1e-6f ? Mathf.Clamp01((fitted[hit - 1].y - capY) / dy) : 0f;
+                float t = dy > 1e-6f ? Mathf.Clamp01((fitted[hit - 1].y - capLock) / dy) : 0f;
                 float f = Mathf.Max(0.18f, ((hit - 1) + t) / (n - 1));
-                var np = new List<object>(n);
+                // eye weight: Gaussian over the nearer eye centre at the lock's (original) tip x
+                float tipX = Mathf.Abs(fitted[n - 1].x);
+                float ew = Mathf.Exp(-Mathf.Pow((tipX - eye.centreAbsX) / 0.022f, 2f));
+                // outward sweep (away from the face centreline), 10-14 degrees, ramped in over the lower lock
+                float sweepDeg = 10f + 4f * Hash01(AetherStrandJson.D(d, "seed", 0.5) + 1.7);
+                float outward = web[0].x >= 0f ? 1f : -1f; // web-space x of the root (web x = -unity x, sign handled in web space)
+                var rs = new Vector3[n];
                 for (int i = 0; i < n; i++)
                 {
                     float u = (float)i / (n - 1) * f * (n - 1);
                     int i0 = Mathf.Clamp(Mathf.FloorToInt(u), 0, n - 1), i1 = Mathf.Min(n - 1, i0 + 1);
-                    Vector3 w = Vector3.Lerp(web[i0], web[i1], u - i0);
-                    np.Add(new List<object> { (double)w.x, (double)(-w.z), (double)w.y });
+                    rs[i] = Vector3.Lerp(web[i0], web[i1], u - i0);
                 }
+                if (ew > 0.1f)
+                {
+                    float arc = 0f;
+                    for (int i = 1; i < n; i++)
+                    {
+                        float tt = (float)i / (n - 1);
+                        float ramp = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, tt));
+                        arc += (rs[i] - rs[i - 1]).magnitude;
+                        float ang = Mathf.Deg2Rad * sweepDeg * Mathf.Clamp01(ew) * ramp;
+                        rs[i].x += outward * Mathf.Tan(ang) * arc * 0.5f * ramp;
+                    }
+                }
+                var np = new List<object>(n);
+                for (int i = 0; i < n; i++) np.Add(new List<object> { (double)rs[i].x, (double)(-rs[i].z), (double)rs[i].y });
                 d["points"] = np; trimmed++;
             }
             File.WriteAllText(outPath, Write(root));
             return trimmed;
         }
+
+        static float Hash01(double x) { double v = System.Math.Sin(x * 12.9898) * 43758.5453; return (float)(v - System.Math.Floor(v)); }
 
         // minimal JSON writer for the plain Dictionary/List/double/string/bool tree AetherStrandJson.Parse produces
         static string Write(object o) { var sb = new StringBuilder(1 << 20); WriteValue(sb, o); return sb.ToString(); }

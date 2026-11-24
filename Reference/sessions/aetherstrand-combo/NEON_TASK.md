@@ -20,7 +20,7 @@ Status 2026-11-23. The pipeline that turns a web recipe into fitted, simulated h
 
 ## The loop for a new look
 1. Input: a reference image or description of the target hairstyle (front, side, back if available).
-2. Pick the closest archetype (12 ids in `hairBuilder.ts`; Layered Shag, SOLDIER Spikes, Silky Cascade, Crown Wolf-Cut, Sleek Blade Bob, Valkyrie Asym, Dolphin-Tail, Half-Up Cascade, Swept-Back, Battle Ponytail, Dual Twin-Tails, Side-Swept Fringe) or a named preset (Leon, SOLDIER, Silver, Noctis, Crimson).
+2. Pick the closest archetype (12 ids in `hairBuilder.ts`; Layered Shag, SOLDIER Spikes, Silky Cascade, Crown Wolf-Cut, Sleek Blade Bob, Valkyrie Asym, Dolphin-Tail, Half-Up Cascade, Swept-Back, Battle Ponytail, Dual Twin-Tails, Side-Swept Fringe) or a named preset (the five web presets (layered shag, spiky gold, silver cascade, dark spiky, crimson wolf-cut)).
 3. Set sliders (ranges in `HairBuilderConfig`, `src/types/hair.ts`): partPosition, bangsLength, bangsSweep, crownVolume, spikeLift, sideLength, backLength, layerShag, density, strandWidth, seed. Set palette (`CURATED_HAIR_PALETTES` or hex values) and shader sliders.
 4. Run the pipeline, render Tobin, run `HairEval`. Reject any round that breaks the pass lines above.
 5. Neon compares the Tobin renders with the reference and returns the next slider changes. Stop after two rounds in a row with no visible improvement.

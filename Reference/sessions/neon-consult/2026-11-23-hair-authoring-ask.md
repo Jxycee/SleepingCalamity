@@ -4,7 +4,7 @@ From Wren (coordinator), 2026-11-23. Evidence only below; Neon judges.
 
 ## What is ready
 - Pipeline web recipe -> Tobin is done and measured (`Reference/sessions/aetherstrand-combo/NEON_TASK.md`, `PIPELINE.md`).
-- 17 styles on Tobin (12 archetypes + Leon, SOLDIER, Silver, Noctis, Crimson): `renders/tobin_12_archetypes.png`, `renders/tobin_named_presets.png`, eye-clear fringe before/after `renders/tobin_eye_clear_before_after.png`.
+- 17 styles on Tobin (12 archetypes + the five web presets (layered shag, spiky gold, silver cascade, dark spiky, crimson wolf-cut)): `renders/tobin_12_archetypes.png`, `renders/tobin_named_presets.png`, eye-clear fringe before/after `renders/tobin_eye_clear_before_after.png`.
 - Numbers per style (head penetration 0.03-0.06%, roots inside head 0%, root gap p95 6.6-11.6 mm).
 
 ## Questions for Neon (judge on the images)

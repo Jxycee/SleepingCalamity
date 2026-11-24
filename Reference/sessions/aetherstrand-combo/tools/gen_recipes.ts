@@ -31,7 +31,7 @@ ALL_ARCHETYPES.forEach((arch: string, i: number) => {
 });
 fs.writeFileSync(path.join(out, 'index.json'), JSON.stringify(index));
 
-// The web app's named presets (Leon, SOLDIER, Silver, Noctis, Crimson) with their default builder configs.
+// The web app's named presets (the five web presets) with their default builder configs.
 for (const id of Object.keys(HAIR_PRESETS)) {
   const def: any = (HAIR_PRESETS as any)[id];
   const recipe = {
