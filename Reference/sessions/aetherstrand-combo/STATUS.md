@@ -43,3 +43,5 @@ Cause of the last edge mismatch: harness resolved MSAA in linear HDR and tone-ma
 
 ## Scope decision (user, 2026-11-23)
 1:1 with the web means hair only. The web demo's mannequin bust (three PBR + room IBL + shadows) is not part of the target. Hair parity: 0.27/255 mean error on 12 archetypes; hair in front of the bust 0.22/255. Decided 2026-11-23, current direction.
+
+- 2026-11-23: web generator now ships the canonical unity-plugin sources for URP (import.meta.glob raw, `applyCanonicalPlugin`); vite build embeds them. Pushed upstream. Copy: tools/unityPluginGenerator.ts. 17/17 Neon PASS (rounds 4-5).
