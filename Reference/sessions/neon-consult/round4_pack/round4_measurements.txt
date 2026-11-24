@@ -1,0 +1,17 @@
+k4_layered-shag verts=23244 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.6/8.1/10.1 rootPen=0.0%
+k4_spiky-hero verts=25584 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.9/8.3/10.5 rootPen=0.0%
+k4_long-cascade verts=22230 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.7/8.2/10.4 rootPen=0.0%
+k4_wolf-cut verts=25194 penetrating=0.00% depth(mean/max mm)=3.3/3.3 rootGap(mean/p95/max mm)=5.7/8.3/10.3 rootPen=0.0%
+k4_sleek-bob_n2 verts=17940 penetrating=0.01% depth(mean/max mm)=3.2/4.1 rootGap(mean/p95/max mm)=5.5/8.2/10.5 rootPen=0.0%
+k4_asym-cascade_n1 verts=20592 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.7/8.1/10.4 rootPen=0.0%
+k4_dolphin-long verts=20982 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.6/8.2/10.0 rootPen=0.0%
+k4_ribbon-halfup verts=21762 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.9/8.2/10.5 rootPen=0.0%
+k4_swept-back verts=21840 penetrating=0.00% depth(mean/max mm)=2.1/2.1 rootGap(mean/p95/max mm)=5.7/7.7/10.5 rootPen=0.0%
+k4_high-ponytail_n2 verts=19344 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.5/8.5/10.2 rootPen=0.0%
+k4_twin-tails_n2 verts=21138 penetrating=0.00% depth(mean/max mm)=1.5/1.5 rootGap(mean/p95/max mm)=5.0/8.5/10.1 rootPen=0.0%
+k4_emo-sweep_n1 verts=19188 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.4/7.7/10.5 rootPen=0.0%
+k4_preset-leon verts=22464 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.6/8.2/10.4 rootPen=0.0%
+k4_preset-soldier verts=24648 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.8/8.4/10.0 rootPen=0.0%
+k4_preset-silver verts=21762 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.7/8.3/10.4 rootPen=0.0%
+k4_preset-noctis verts=24180 penetrating=0.00% depth(mean/max mm)=3.3/3.3 rootGap(mean/p95/max mm)=5.6/8.1/10.0 rootPen=0.0%
+k4_preset-crimson verts=22620 penetrating=0.00% depth(mean/max mm)=0.0/0.0 rootGap(mean/p95/max mm)=5.7/8.3/10.4 rootPen=0.0%

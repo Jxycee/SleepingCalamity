@@ -73,3 +73,9 @@ Measured after: all 17 styles, vertices inside head at most 0.01% (3.8 mm deep);
 Neon judged the post-round-2 renders (`round3_pack/`): 14/17 PASS; FAIL: sleek-bob (flat unparted curtain), high-ponytail (flat bangs, jagged gap behind ear), twin-tails_n1 (side tails low and forward). Head-fit audit: PASS on all 17, no changes needed. Penetration and root-gap numbers (round3_measurements) accepted against the original pass lines.
 Applied: fringe sigma 0.030 -> 0.034, arch -0.022 -> -0.026, centre-part lift +3 mm (AetherStrandFringeFit.cs); slider deltas for the three weakest as `recipes/*_n2.json` (sleek-bob bangsSweep clamped at 1.0). Neon's structural note for twin-tails (tie roots +30 mm up, -25 mm back in the archetype builder) is not applied: sliders alone already clear the ears; revisit if round 4 still fails it.
 Result renders: `renders/k3_*_n2_4view.png` (parted fringe on twin-tails and high-ponytail, ears clear). Not yet re-judged by Neon (optional round 4).
+
+## Rounds 4-5 (2026-11-23, Wren): weakest three re-judged, 17/17
+- Round 4: re-measured all 17 after the fringe change (penetration worst 0.01% / 4.1 mm, root gap p95 worst 8.5 mm, roots inside 0.0%). Neon: sleek-bob_n2 PASS, high-ponytail_n2 PASS, twin-tails_n2 FAIL (tails too low and wide, boxy tie shelf). The other 14 keep their PASS (fringe change small).
+- Applied Neon's twin-tail change in the web archetype builder (`hairBuilder.ts` twin-tails branch): anchorPhi 0.86 -> 0.71, anchorTheta 1.96 -> 2.08, root spread x0.7 (copy: `tools/hairBuilder_twin_tails_n3.ts`; also pushed upstream).
+- Round 5: twin-tails_n3 PASS. Scorecard 17/17 PASS on Tobin; Neon cleared the canonical unity-plugin build to ship. Evidence: `round4_pack/`, `renders/k5_twin-tails_n3_4view.png`.
+- Gemini UI note: the Send button works only after typing with the real `type` action and clicking by coordinate in a fresh tab; JS-inserted text never submits.
