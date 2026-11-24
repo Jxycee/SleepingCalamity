@@ -40,3 +40,6 @@ Cause of the last edge mismatch: harness resolved MSAA in linear HDR and tone-ma
 - The web shades its mannequin with three MeshStandardMaterial + PMREM RoomEnvironment IBL + PCF soft shadows; the hair shader uses none of these, and hair does not receive shadows.
 - Hair pixels in front of the bust (92% of interior hair pixels; the rest are occluded by the bust): Unity-with-bust vs web-with-bust mean error 0.22/255, 0.006% differ by >10/255. Bust occlusion of the hair overlaps 0.99 (front view) and 0.68-0.81 (back and side views, small areas).
 - Bust pixels themselves: Parity/BustWeb shader (same 3-light rig + hemisphere + web display transform) with a single calibrated ambient reaches ~0 brightness bias at ambient ~17 but ~40/255 mean error remains (IBL/shadow structure); not part of the plugin, not claimed.
+
+## Scope decision (user, 2026-11-23)
+1:1 with the web means hair only. The web demo's mannequin bust (three PBR + room IBL + shadows) is not part of the target. Hair parity: 0.27/255 mean error on 12 archetypes; hair in front of the bust 0.22/255. Decided 2026-11-23, current direction.
