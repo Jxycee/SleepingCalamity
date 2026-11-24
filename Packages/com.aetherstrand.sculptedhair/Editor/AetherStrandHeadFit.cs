@@ -140,6 +140,8 @@ namespace AetherStrand.Editor
                 float eyLo = float.MaxValue, eyHi = float.MinValue; foreach (var q in hp) { eyLo = Mathf.Min(eyLo, q.y); eyHi = Mathf.Max(eyHi, q.y); }
                 float eh = eyHi - eyLo, crX = 0f; foreach (var q in hp) if (q.y > eyLo + 0.62f * eh) crX = Mathf.Max(crX, Mathf.Abs(q.x));
                 if (crX > 0.04f) { var kept = hp.FindAll(q => !(q.y > eyLo + 0.28f * eh && q.y < eyLo + 0.62f * eh && Mathf.Abs(q.x) > crX * 1.03f)); if (kept.Count >= 200) hp = kept; }
+                // neck concavity: a convex hull bridges the nape and holds hair off the neck; drop the low back-of-head/neck points so back hair can tuck in
+                { float zcN = 0f; foreach (var q in hp) zcN += q.z; zcN /= hp.Count; var keptN = hp.FindAll(q => !(q.y < eyLo + 0.30f * eh && q.z < zcN)); if (keptN.Count >= 200) hp = keptN; }
             }
             hp = ExtremePoints(hp, 120);
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };

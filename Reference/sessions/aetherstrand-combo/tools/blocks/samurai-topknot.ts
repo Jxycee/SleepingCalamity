@@ -17,12 +17,12 @@
       return frontKnots[frontKnots.length - 1][1];
     };
     const cutPhi = (th: number): number => {
-      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.2, earClearance: 0.12, behindEarPhi: 1.95, napePhi: 2.5, napeCurve: 0.8 });
+      const v = earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.5, sideburnGap: 0.12, sideburnTaper: 0.12, earClearance: 0.12, behindEarPhi: 1.95, napePhi: 2.5, napeCurve: 0.8 });
       const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
       // hair comes straight down right behind the ear (no bald patch between the ear and the back hair)
       const w = THREE.MathUtils.smoothstep(a, 1.9, 1.98);
-      const tgt = THREE.MathUtils.lerp(2.05, 2.52, Math.pow(Math.max(0, a - 2.0) / (Math.PI - 2.0), 0.95)); // straight V down to the nape tip
-      return a > 1.9 ? Math.max(v, THREE.MathUtils.lerp(v, tgt, w)) : v;
+      const tgt = THREE.MathUtils.lerp(1.92, 2.55, Math.pow(Math.max(0, a - 2.0) / (Math.PI - 2.0), 0.9)); // straight V down to the nape tip
+      return a > 1.9 ? THREE.MathUtils.lerp(v, tgt, w) : v;
     };
 
     // Zone 1: scalp cover under the pulled strands (snug, no scalp showing)
@@ -35,7 +35,7 @@
           baseLift: 0.001, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.35,
         });
         specs.push({
-          pointsLocal: pts, width: 0.07 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.8,
+          pointsLocal: pts, width: 0.07 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.95,
           layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
         });
       }
@@ -51,7 +51,7 @@
         baseLift: 0.001, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.35,
       });
       specs.push({
-        pointsLocal: pts, width: 0.05 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.8,
+        pointsLocal: pts, width: 0.05 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.95,
         layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
       });
     }
@@ -77,7 +77,7 @@
       }
       specs.push({
         pointsLocal: pts, width, thickness: 0.005, stiffnessBias: 0.97,
-        layerAO: 0.88, layerOrder: order, lockNormal: false, scalpRoot: 0.35, smooth: 3,
+        layerAO: 0.97, layerOrder: order, lockNormal: Math.abs(Math.atan2(Math.sin(theta), Math.cos(theta))) > 1.9 && phi0 > 1.85, scalpRoot: 0.35, smooth: 3,
       });
     };
     const pullCount = Math.round(540 * density);
@@ -106,7 +106,7 @@
         });
         specs.push({
           pointsLocal: pts, width: 0.03 * wMul, thickness: 0.003, stiffnessBias: 0.99,
-          layerAO: 0.92, layerOrder: 1, isFadeCap: true, fadeStart: 0.3, lockNormal: false, scalpRoot: 0.35,
+          layerAO: 0.92, layerOrder: 1, isFadeCap: true, fadeStart: 0.3, lockNormal: true, scalpRoot: 0.35,
         });
       }
     }
@@ -115,8 +115,8 @@
       for (const p of specs[si].pointsLocal) {
         const lowT = THREE.MathUtils.clamp((HEAD_CENTER_LOCAL.y - p.y) / 0.1, 0, 1);
         const nT = THREE.MathUtils.clamp((HEAD_CENTER_LOCAL.y - 0.1 - p.y) / 0.15, 0, 1); // nape tuck: the low back hair hugs the narrower neck
-        p.x = HEAD_CENTER_LOCAL.x + (p.x - HEAD_CENTER_LOCAL.x) * (KX - 0.12 * lowT - 0.05 * nT);
-        p.z = HEAD_CENTER_LOCAL.z + (p.z - HEAD_CENTER_LOCAL.z) * (KZ - 0.08 * lowT - 0.1 * nT);
+        p.x = HEAD_CENTER_LOCAL.x + (p.x - HEAD_CENTER_LOCAL.x) * (KX - 0.12 * lowT - 0.2 * nT);
+        p.z = HEAD_CENTER_LOCAL.z + (p.z - HEAD_CENTER_LOCAL.z) * (KZ - 0.08 * lowT - 0.22 * nT);
       }
     }
 
@@ -138,7 +138,7 @@
         p.z = HEAD_CENTER_LOCAL.z + (p.z - HEAD_CENTER_LOCAL.z) * KZ;
       }
       specs.push({
-        pointsLocal: pts, width: 0.07 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.8,
+        pointsLocal: pts, width: 0.07 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.95,
         layerOrder: 1, lockNormal: false, scalpRoot: 0.4,
       });
     }
@@ -153,7 +153,7 @@
         p.z = HEAD_CENTER_LOCAL.z + (p.z - HEAD_CENTER_LOCAL.z) * KZ;
       }
       specs.push({
-        pointsLocal: pts, width: 0.06 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.8,
+        pointsLocal: pts, width: 0.06 * wMul, thickness: 0.006, stiffnessBias: 0.98, layerAO: 0.95,
         layerOrder: 1, lockNormal: false, scalpRoot: 0.4,
       });
     }
@@ -181,7 +181,7 @@
         ));
       }
       specs.push({
-        pointsLocal: pts, width: 0.04 * wMul, thickness: 0.01, stiffnessBias: 0.95, layerAO: 0.86,
+        pointsLocal: pts, width: 0.04 * wMul, thickness: 0.01, stiffnessBias: 0.95, layerAO: 1.0,
         layerOrder: 2, lockNormal: false, scalpRoot: 0.5,
       });
     }
@@ -209,7 +209,7 @@
     // hanging tie ends: two short ribbons draped over the back of the dome from the knot (hug the squeezed skull)
     for (let e = 0; e < 2; e++) {
       const side = e === 0 ? -1 : 1;
-      for (let j = 0; j < 3; j++) {
+      for (let j = 0; j < 2; j++) {
         const pts: THREE.Vector3[] = [];
         for (let k = 0; k < NODES_PER_LOCK; k++) {
           const t = k / (NODES_PER_LOCK - 1);
@@ -223,7 +223,7 @@
           pts.push(q);
         }
         specs.push({
-          pointsLocal: pts, width: 0.05 * wMul, thickness: 0.014, stiffnessBias: 0.95, layerAO: 1.0,
+          pointsLocal: pts, width: 0.075 * wMul, thickness: 0.02, stiffnessBias: 0.95, layerAO: 0.35, smooth: 2,
           layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
         });
       }
@@ -268,7 +268,7 @@
           ));
         }
         specs.push({
-          pointsLocal: pts, width: (0.05 - Math.abs(f) * 0.01) * wMul, thickness: 0.012, stiffnessBias: 0.85, smooth: 2,
+          pointsLocal: pts, width: (0.075 - Math.abs(f) * 0.015) * wMul, thickness: 0.014, stiffnessBias: 0.85, smooth: 2, roundness: 0.4,
           layerAO: 0.45, layerOrder: 3, lockNormal: false, scalpRoot: 0.5,
         });
       }
