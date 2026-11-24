@@ -17,9 +17,9 @@
     "seed": 4407
   },
   "shader": {
-    "rootColor": "#5e5a56",
-    "baseColor": "#8f8b87",
-    "tipColor": "#b4b1ad",
+    "rootColor": "#35332f",
+    "baseColor": "#85827e",
+    "tipColor": "#aaa7a3",
     "primarySpecColor": "#f2eee8",
     "secondarySpecColor": "#b0a89e",
     "primaryShift": 0.08,
@@ -30,7 +30,7 @@
     "secondaryIntensity": 0.22,
     "rimIntensity": 0.4,
     "rimPower": 2.9,
-    "rootAO": 0.4,
+    "rootAO": 0.6,
     "grooveDepth": 0.68,
     "strandVariation": 0.2
   },

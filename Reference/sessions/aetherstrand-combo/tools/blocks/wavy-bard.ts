@@ -1,30 +1,50 @@
   if (arch === 'wavy-bard') {
+    // WB-BEGIN wavy-bard: shoulder-length full waves; many narrow round locks in 3 depth layers, S-wave bundles share phase
     const partTheta = THREE.MathUtils.clamp(config.partPosition, -1, 1) * 0.42;
-    const backEnd = THREE.MathUtils.lerp(3.1, 4.0, config.backLength);
-    const sideEnd = THREE.MathUtils.lerp(3.0, 3.8, config.sideLength);
+    const backEnd = THREE.MathUtils.lerp(2.75, 3.65, config.backLength);
+    const sideEnd = THREE.MathUtils.lerp(2.7, 3.45, config.sideLength);
     const TAU = Math.PI * 2;
     const wrap = (a: number) => { let x = a % TAU; if (x > Math.PI) x -= TAU; if (x < -Math.PI) x += TAU; return x; };
     const eqY = HEAD_CENTER_LOCAL.y + Math.cos(1.75) * SCALP_RY;
     // coherent wave: phase is a smooth function of theta and rank, so neighbours form S bundles
-    const wavify = (pts: THREE.Vector3[], th: number, amp: number, phase: number, layerOut: number, clear: number, curl: number) => {
-      const tx = Math.cos(th), tz = -Math.sin(th), ox = Math.sin(th), oz = Math.cos(th);
+    const wavify = (pts: THREE.Vector3[], th: number, amp: number, phase: number, curl: number) => {
+      const tx = Math.cos(th), tz = -Math.sin(th);
       const last = pts.length - 1;
       for (let n = 2; n <= last; n++) {
         const t = n / last;
-        const w = (Math.sin(t * TAU * 1.8 + phase) * amp + Math.sin(t * TAU * 1.0 + phase * 0.7 + 1.3) * amp * 0.5 * Math.pow(t, 2.5)) * Math.pow(t, 0.7);
-        const dd = Math.max(0, eqY - pts[n].y - 0.24);
-        const c = n >= last - 4 ? Math.pow((n - (last - 4)) / 4, 2) : 0;
-        const out = layerOut * Math.min(1, t * 2.2) + clear * 0.3 * (1 - Math.exp(-dd * 4.2)) + c * 0.03 * curl;
-        pts[n].x += tx * (w + curl * c * 0.06) + ox * out;
-        pts[n].z += tz * (w + curl * c * 0.06) + oz * out;
+        const w = (Math.sin(t * TAU * 2.2 + phase) * amp + Math.sin(t * TAU * 0.8 + phase * 0.7 + 1.3) * amp * 0.4 * Math.pow(t, 2.0)) * Math.pow(t, 0.8);
+        const c = n >= last - 3 ? Math.pow((n - (last - 3)) / 3, 2) : 0;
+        pts[n].x += tx * (w + curl * c * 0.05);
+        pts[n].z += tz * (w + curl * c * 0.05);
       }
     };
-    const rShell = seededRand((config.seed || 1) + 11);
+    // push every node outward from the head (horizontal below the equator): layered parallax
+    const radialPush = (pts: THREE.Vector3[], dr: number) => {
+      for (let n = 1; n < pts.length; n++) {
+        const p = pts[n];
+        const dx = p.x - HEAD_CENTER_LOCAL.x, dz = p.z - HEAD_CENTER_LOCAL.z;
+        const below = THREE.MathUtils.clamp((eqY - p.y) / 0.25, 0, 1);
+        const dy = (p.y - HEAD_CENTER_LOCAL.y) * (1 - below);
+        const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy + dz * dz));
+        const k = dr * Math.min(1, n / 3) / len;
+        p.x += dx * k; p.y += dy * k; p.z += dz * k;
+      }
+    };
+    // lift the hair clear of neck and shoulders so the waves sit on the body, widest at the shoulders
+    const drape = (pts: THREE.Vector3[], amt: number) => {
+      for (let n = 1; n < pts.length; n++) {
+        const p = pts[n];
+        const dx = p.x - HEAD_CENTER_LOCAL.x, dz = p.z - HEAD_CENTER_LOCAL.z;
+        const len = Math.max(1e-4, Math.sqrt(dx * dx + dz * dz));
+        const d = THREE.MathUtils.clamp((eqY - p.y - 0.2) / 0.45, 0, 1);
+        const k = amt * d * d * (3 - 2 * d) / len;
+        p.x += dx * k * 0.6; p.z += dz * k;
+      }
+    };
     const rMid = seededRand((config.seed || 1) + 23);
     const rFr = seededRand((config.seed || 1) + 51);
-    void rShell;
 
-    // Zone 1: inner shell, seals the scalp
+    // Zone 1: inner shell, seals the scalp (hidden fill)
     for (let tier = 0; tier < 3; tier++) {
       const count = 22;
       for (let i = 0; i < count; i++) {
@@ -47,74 +67,111 @@
       }
     }
 
-    // Zone 1b: face-framing fringe, 3 rows of narrow overlapping locks swept from the part behind the ears
+    // Zone 1a: swept-back crown. Locks root on the hairline (phi ~1.15-1.3, no bare forehead) and flow over the apex to the back of the head.
     for (let row = 0; row < 3; row++) {
-      const nR = 30;
+      const nS = 44;
+      for (let i = 0; i < nS; i++) {
+        const a = -1.05 + ((i + row * 0.35) / (nS - 1)) * 2.1;
+        const dPart = a - partTheta;
+        if (Math.abs(dPart) < 0.035) continue;
+        const sd = dPart >= 0 ? 1 : -1;
+        const aa = Math.abs(a) / 1.05;
+        const phiF = 1.27 + 0.14 * aa * aa + row * 0.035;
+        const phiB = 1.45 + rFr() * 0.3;
+        const pts: THREE.Vector3[] = [];
+        for (let n = 0; n < NODES_PER_LOCK; n++) {
+          const u = n / (NODES_PER_LOCK - 1);
+          const sPar = THREE.MathUtils.lerp(-phiF, phiB, u);
+          const front = sPar < 0;
+          const phi = Math.abs(sPar);
+          const sway = Math.sin(u * Math.PI * 2.2 + a * 3 + row) * 0.035 * Math.sin(u * Math.PI);
+          const th = front ? a * (1 + (1 - Math.abs(sPar) / phiF) * 0.25) + sd * sway : Math.PI - a * 0.85 - sd * 0.1 + sd * sway;
+          pts.push(skullSurfacePoint(th, phi, 0.005 + row * 0.003 + Math.sin(u * Math.PI) * 0.004));
+        }
+        radialPush(pts, 0.0 + row * 0.003);
+        specs.push({
+          smooth: 3, roundness: 0.65,
+          pointsLocal: pts, width: (0.034 + row * 0.004) * wMul, thickness: 0.012,
+          stiffnessBias: 0.7, layerAO: 0.86, layerOrder: 3 + row, lockNormal: false, scalpRoot: 0.45,
+        });
+      }
+    }
+
+    // Zone 1b: face-framing locks from the part. Sweep-back pieces end behind the ear, framing pieces fall in front of it.
+    for (let row = 0; row < 3; row++) {
+      const nR = 34;
       for (let i = 0; i < nR; i++) {
-        const th = -0.9 + ((i + row * 0.33) / nR) * 1.8 + (rFr() - 0.5) * 0.02;
+        const th = -0.85 + ((i + row * 0.33) / nR) * 1.7 + (rFr() - 0.5) * 0.02;
         const dPart = th - partTheta;
         const side = dPart >= 0 ? 1 : -1;
-        const nearPart = Math.abs(dPart) < 0.07;
+        const nearPart = Math.abs(dPart) < 0.06;
+        const framing = Math.abs(th) > 0.5 && (i % 3 === 0);
+        if (Math.abs(th) < 0.5) continue;
+        const thEnd = framing ? side * (1.5 + rFr() * 0.22) : side * (2.0 + row * 0.1 + rFr() * 0.25);
+        const phiEnd = framing ? 3.05 + rFr() * 0.35 : 2.5 + row * 0.2 + rFr() * 0.3;
         const pts = buildSculptedLock({
-          thetaStart: th, thetaEnd: side * (2.05 + row * 0.1 + rFr() * 0.25),
-          phiStart: nearPart ? 0.5 : 0.18 + row * 0.08 + rFr() * 0.08,
-          phiEnd: 2.45 + row * 0.25 + rFr() * 0.3,
-          baseLift: 0.018 + row * 0.004, midArch: 0.016, tipFlickOut: 0.012, napeHug: 0.7,
+          thetaStart: th, thetaEnd: thEnd,
+          phiStart: nearPart ? 0.28 : 0.18 + row * 0.07 + rFr() * 0.08,
+          phiEnd,
+          baseLift: 0.012 + row * 0.004, midArch: 0.012, tipFlickOut: 0.008, napeHug: 0.7,
         });
-        wavify(pts, side * 2.1, 0.05, TAU * th * 0.55 + row, 0.02 + row * 0.015, 1.0, side);
+        wavify(pts, thEnd, 0.12, TAU * th * 0.55 + row, side);
+        radialPush(pts, 0.006 + row * 0.008);
+        drape(pts, 0.1);
         specs.push({
-          smooth: 3,
-          pointsLocal: pts, width: (0.06 + row * 0.005) * wMul, thickness: 0.012,
+          smooth: 3, roundness: 0.65,
+          pointsLocal: pts, width: (0.032 + row * 0.004) * wMul, thickness: 0.012,
           stiffnessBias: 0.7, layerAO: 0.86, layerOrder: 4 + row, lockNormal: false, scalpRoot: 0.4,
         });
       }
     }
 
-    // Zone 2: three depth layers of wide overlapping wavy locks
-    const layerCount = [56, 76, 92];
-    const layerOut = [0.0, 0.04, 0.085];
+    // Zone 2: three depth layers of narrow round wavy locks; hem follows the wave phase so neighbours share S bundles
+    const L = [
+      { n: 70, w: 0.09, dr: 0.004, amp: 0.15, ord: 1 },   // hidden under-fill
+      { n: 110, w: 0.07, dr: 0.025, amp: 0.17, ord: 2 },
+      { n: 130, w: 0.062, dr: 0.04, amp: 0.19, ord: 3 },
+    ];
     for (let layer = 0; layer < 3; layer++) {
-      const count = Math.round(layerCount[layer] * density / 1.15);
+      const cfg = L[layer];
+      const count = Math.round(cfg.n * density / 1.15);
       for (let i = 0; i < count; i++) {
-        const th = wrap((i / count) * TAU + layer * 0.06 + (rMid() - 0.5) * 0.05);
+        const th = wrap((i / count) * TAU + layer * 0.04 + (rMid() - 0.5) * 0.02);
         const cosT = Math.cos(th);
-        const isFront = cosT > 0.35;
+        if (cosT > 0.3) continue;                         // front handled by zone 1b
         const isBack = cosT < -0.2;
-        const side = th - partTheta >= 0 ? 1 : -1;
-        const phiStart = isFront ? 0.30 + rMid() * 0.25 : 0.10 + layer * 0.10 + rMid() * 0.14;
-        const step = rMid(); // continuous length variation: ragged soft hem
+        const side = th >= 0 ? 1 : -1;
+        const phase = TAU * (th * 0.55 + layer * 0.12);
+        const bundle = 0.5 + 0.5 * Math.sin(phase);       // 0..1, shared by neighbours: coherent hem
         let thEnd = th;
         let phiEnd: number;
-        if (isFront) {
-          // face-framing waves: front locks fall in front of the ear; others swept behind it
-          const framing = false;
-          thEnd = side * (framing ? 1.45 + rMid() * 0.1 : 2.05 + rMid() * 0.3);
-          phiEnd = (framing ? 3.4 : THREE.MathUtils.lerp(2.9, 3.5, config.bangsLength)) - step * 0.4;
-        } else if (!isBack) {
-          const s = th >= 0 ? 1 : -1;
-          thEnd = Math.abs(th) < 2.05 ? s * (2.1 + rMid() * 0.3) : th;
-          phiEnd = sideEnd - step * 0.45;
+        if (!isBack) {
+          thEnd = Math.abs(th) < 2.05 ? side * (2.1 + rMid() * 0.2) : th;
+          phiEnd = sideEnd - bundle * 0.35 - rMid() * 0.05;
         } else {
-          thEnd = th + (rMid() - 0.5) * 0.1;
-          phiEnd = backEnd - step * 0.55;
+          thEnd = th + (rMid() - 0.5) * 0.04;
+          phiEnd = backEnd - bundle * 0.4 - rMid() * 0.05;
         }
-        const phase = TAU * (th * 0.55 + layer * 0.12) + step * 0.6;
+        const phiStart = 0.1 + layer * 0.08 + rMid() * 0.1;
         const pts = buildSculptedLock({
           thetaStart: th, thetaEnd: thEnd, phiStart, phiEnd,
-          baseLift: 0.016 + layer * 0.006 + config.crownVolume * 0.010,
-          midArch: 0.016 + layer * 0.008, tipFlickOut: 0.012 + layer * 0.006,
-          napeHug: 0.7,
+          baseLift: 0.014 + layer * 0.004 + config.crownVolume * 0.008,
+          midArch: 0.012 + layer * 0.004, tipFlickOut: 0.01 + layer * 0.004,
+          napeHug: 0.45,
         });
-        wavify(pts, thEnd, 0.13 + layer * 0.014, phase, layerOut[layer], 1.0, Math.sin(th * 5 + layer) >= 0 ? 1 : -1);
+        wavify(pts, thEnd, cfg.amp, phase, Math.sin(th * 5 + layer) >= 0 ? 1 : -1);
+        radialPush(pts, cfg.dr);
+        drape(pts, 0.17 + layer * 0.015);
         specs.push({
-          smooth: 3,
+          smooth: 3, roundness: 0.6,
           pointsLocal: pts,
-          width: (0.11 + layer * 0.025 + rMid() * 0.03) * wMul,
-          thickness: 0.014,
-          stiffnessBias: 0.7 - layer * 0.06, layerAO: 0.78 + layer * 0.06, layerOrder: 1 + layer,
+          width: cfg.w * wMul * (0.85 + rMid() * 0.3),
+          thickness: 0.013,
+          stiffnessBias: 0.7 - layer * 0.06, layerAO: 0.78 + layer * 0.06, layerOrder: cfg.ord,
           lockNormal: false, scalpRoot: 0.3 + 0.03 * (2 - layer),
         });
       }
     }
     return specs;
+    // WB-END
   }

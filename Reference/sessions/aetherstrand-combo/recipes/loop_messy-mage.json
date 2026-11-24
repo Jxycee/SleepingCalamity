@@ -17,22 +17,22 @@
     "seed": 4417
   },
   "shader": {
-    "rootColor": "#120d0a",
-    "baseColor": "#241c17",
-    "tipColor": "#463832",
+    "rootColor": "#0e0907",
+    "baseColor": "#1d150f",
+    "tipColor": "#3c2e26",
     "primarySpecColor": "#8c867f",
     "secondarySpecColor": "#4a3a2e",
-    "primaryShift": 0.08,
-    "primaryPower": 76,
-    "primaryIntensity": 0.34,
+    "primaryShift": 0.06,
+    "primaryPower": 60,
+    "primaryIntensity": 0.5,
     "secondaryShift": -0.15,
     "secondaryPower": 28,
-    "secondaryIntensity": 0.18,
+    "secondaryIntensity": 0.2,
     "rimIntensity": 0.26,
     "rimPower": 2.9,
-    "rootAO": 0.5,
-    "grooveDepth": 0.68,
-    "strandVariation": 0.34
+    "rootAO": 0.4,
+    "grooveDepth": 0.55,
+    "strandVariation": 0.42
   },
   "physics": {
     "stiffness": 0.6,
