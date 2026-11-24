@@ -338,6 +338,41 @@ Shader "AetherStrand/SculptedHair_URP"
                 float3 rimScatter = rimTint * fresnel * backGate * tipWeight * _RimIntensity * 0.42 * lerp(0.72, 1.0, layerAOv);
 
                 float3 finalColor = diffuse + specular + rimScatter;
+
+                // Game mode (URP lights): keep additional lights (torches, Forward+ cluster loop) and fog. Parity mode (_UseWebRig) skips both, like the web.
+                if (_UseWebRig < 0.5)
+                {
+                    #if defined(_ADDITIONAL_LIGHTS) || defined(_CLUSTER_LIGHT_LOOP)
+                    InputData inputData = (InputData)0;
+                    inputData.positionWS = input.positionWS;
+                    inputData.normalWS = perturbedN;
+                    inputData.viewDirectionWS = V;
+                    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+
+                    #ifdef _LIGHT_LAYERS
+                    uint meshRenderingLayers = GetMeshRenderingLayer();
+                    #endif
+
+                    uint pixelLightCount = GetAdditionalLightsCount();
+                    LIGHT_LOOP_BEGIN(pixelLightCount)
+                        Light addLight = GetAdditionalLight(lightIndex, input.positionWS);
+                        #ifdef _LIGHT_LAYERS
+                        if (IsMatchingLightLayer(addLight.layerMask, meshRenderingLayers))
+                        #endif
+                        {
+                            float3 aL = normalize(addLight.direction);
+                            float3 rawCol = addLight.color * addLight.distanceAttenuation * addLight.shadowAttenuation;
+                            // soft-compress close warm point lights (torches) so hair keeps rich tone instead of neon blowout
+                            float3 aCol = rawCol / (1.0 + rawCol * 0.45);
+                            float aNdl = saturate((dot(perturbedN, aL) + 0.42) / 1.42) * 0.72;
+                            float aGate = smoothstep(-0.12, 0.45, dot(baseN, aL));
+                            float aSpec = AS_StrandSpecular(t1, V, aL, _PrimaryPower * 0.85) * _PrimaryIntensity * 0.36 * aGate;
+                            finalColor += (albedo * aNdl * totalAO + lerp(albedo * 1.25, _PrimarySpecColor.rgb, 0.50) * aSpec * specMask) * aCol;
+                        }
+                    LIGHT_LOOP_END
+                    #endif
+                    finalColor = MixFog(finalColor, input.fogFactor);
+                }
                 return half4(finalColor, 1.0);
             }
             ENDHLSL
