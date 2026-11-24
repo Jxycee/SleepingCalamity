@@ -1,75 +1,75 @@
   if (arch === 'noble-hime') {
-    // NH-BEGIN noble-hime (long straight sleek, blunt bangs, hime sidelocks)
+    // NH-BEGIN noble-hime (long straight sleek, skull-hugging crown, blunt bangs, hime panels)
     const backEnd = THREE.MathUtils.lerp(3.7, 4.6, config.backLength);
-    const himeCheekEnd = THREE.MathUtils.lerp(1.95, 2.25, config.sideLength);
-    const bluntBrowPhi = THREE.MathUtils.lerp(1.62, 1.82, config.bangsLength);
-    const nhRandB = seededRand(config.seed * 7 + 11);
+    const himeEnd = THREE.MathUtils.lerp(2.35, 2.55, config.sideLength);
+    const bluntBrowPhi = THREE.MathUtils.lerp(1.62, 1.8, config.bangsLength);
+    const nhRand = seededRand(config.seed * 7 + 11);
 
-    // Zone 1: smooth base shell
+    // Zone 1: thin skull-hugging base shell
     for (let tier = 0; tier < 2; tier++) {
-      const count = 22;
+      const count = 24;
       for (let i = 0; i < count; i++) {
-        const theta = (i / count) * Math.PI * 2 + tier * 0.20;
-        const cosT = Math.cos(theta);
-        if (tier >= 1 && cosT > 0.58) continue;
-        const phiStart = tier === 0 ? 0.08 : 0.22 + tier * 0.40;
+        const theta = (i / count) * Math.PI * 2 + tier * 0.13;
+        if (tier >= 1 && Math.cos(theta) > 0.6) continue;
+        const phiStart = tier === 0 ? 0.12 : 0.5;
         const pts = buildSculptedLock({
           thetaStart: theta, thetaEnd: theta, phiStart,
-          phiEnd: Math.min(backEnd - 0.10, phiStart + 1.2),
-          baseLift: 0.004, midArch: 0.005, tipFlickOut: 0.001, napeHug: 0.88,
+          phiEnd: Math.min(backEnd - 0.10, phiStart + 1.6, Math.cos(theta) > 0.3 ? 1.25 : 9),
+          baseLift: 0.002, midArch: 0.002, tipFlickOut: 0.0, napeHug: 0.9,
         });
         specs.push({
-          pointsLocal: pts, width: 0.088 * wMul, thickness: 0.012, stiffnessBias: 0.78, layerAO: 0.82,
-          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: tier === 0 ? 0.48 : 0.22,
+          pointsLocal: pts, width: 0.09 * wMul, thickness: 0.01, stiffnessBias: 0.8, layerAO: 0.9,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: tier === 0 ? 0.5 : 0.3,
         });
       }
     }
 
-    // Zone 2: long straight back/rear-side curtain, blunt hem
-    const backCount = Math.round(60 * density);
+    // Zone 2: long straight back and rear-side curtain (behind the ears), straight hem
+    const backCount = Math.round(56 * density);
     for (let i = 0; i < backCount; i++) {
       const u = i / (backCount - 1);
-      const theta = THREE.MathUtils.lerp(0.8, Math.PI * 2 - 0.8, u);
-      const hemEnd = backEnd - 0.05 * Math.abs(Math.sin(theta * 0.5)) + (nhRandB() - 0.5) * 0.03;
+      const theta = THREE.MathUtils.lerp(1.4, Math.PI * 2 - 1.4, u);
+      const hemEnd = backEnd - 0.06 * Math.pow(Math.abs(Math.cos(theta * 0.5 - Math.PI / 2)), 2) + (nhRand() - 0.5) * 0.02;
       const pts = buildSculptedLock({
         thetaStart: theta, thetaEnd: theta,
-        phiStart: 0.30 + (i % 2) * 0.10, phiEnd: hemEnd,
-        baseLift: 0.016, midArch: 0.008, tipFlickOut: 0.002, napeHug: 0.86,
+        phiStart: 0.3 + (i % 2) * 0.08, phiEnd: hemEnd,
+        baseLift: 0.003, midArch: 0.002, tipFlickOut: 0.0, napeHug: 0.88,
       });
       specs.push({
-        pointsLocal: pts, width: 0.065 * wMul, thickness: 0.012, stiffnessBias: 0.68, layerAO: 0.90,
-        layerOrder: 2, lockNormal: true, scalpRoot: 0.35, isFadeCap: true, fadeStart: 0.97,
+        pointsLocal: pts, width: 0.07 * wMul, thickness: 0.011, stiffnessBias: 0.8, layerAO: 0.9,
+        layerOrder: 1, lockNormal: false, scalpRoot: 0.4, isFadeCap: true, fadeStart: 0.97,
       });
     }
 
-    // Zone 3: hime panels, 8 wide overlapping parallel ribbons per side, common straight hem
+    // Zone 3: hime panels, wide flat parallel ribbons from the temple to the jaw, separate from the curtain
     for (const side of [-1, 1]) {
-      for (let k = 0; k < 8; k++) {
-        const theta = side * (0.62 + k * 0.085);
+      for (let k = 0; k < 6; k++) {
+        const theta = side * (0.62 + k * 0.1);
         const pts = buildSculptedLock({
           thetaStart: theta, thetaEnd: theta,
-          phiStart: 0.36 + k * 0.02, phiEnd: himeCheekEnd,
-          baseLift: 0.045, midArch: 0.006, tipFlickOut: 0.0, napeHug: 1.05,
+          phiStart: 0.3 + k * 0.03, phiEnd: himeEnd + (nhRand() - 0.5) * 0.01,
+          baseLift: 0.008, midArch: 0.003, tipFlickOut: 0.012, napeHug: 1.0,
         });
         specs.push({
-          pointsLocal: pts, width: 0.07 * wMul, thickness: 0.012, stiffnessBias: 0.85, layerAO: 0.94,
-          layerOrder: 3, lockNormal: true, scalpRoot: 0.32, isFadeCap: true, fadeStart: 0.97,
+          pointsLocal: pts, width: 0.075 * wMul, thickness: 0.011, stiffnessBias: 0.85, layerAO: 0.9,
+          layerOrder: 2, lockNormal: false, scalpRoot: 0.34, isFadeCap: true, fadeStart: 0.97,
         });
       }
     }
 
-    // Zone 4: blunt straight bangs
-    const bangCount = Math.round(50 * density);
+    // Zone 4: blunt bangs from a centre part, temple to temple, straight hem
+    const bangCount = Math.round(46 * density);
     for (let i = 0; i < bangCount; i++) {
       const frac = (i / (bangCount - 1)) * 2 - 1;
-      const theta = frac * 0.58 + (frac >= 0 ? 0.02 : -0.02);
+      if (Math.abs(frac) < 0.03) continue;
+      const theta = frac * 0.52 + (frac >= 0 ? 0.03 : -0.03);
       const pts = buildSculptedLock({
-        thetaStart: theta, thetaEnd: theta,
-        phiStart: 0.24 + Math.abs(frac) * 0.12, phiEnd: bluntBrowPhi + frac * frac * 0.06,
-        baseLift: 0.015, midArch: 0.012, tipFlickOut: 0.006, napeHug: 1.1,
+        thetaStart: theta * 0.55, thetaEnd: theta,
+        phiStart: 0.3 + Math.abs(frac) * 0.08, phiEnd: bluntBrowPhi + frac * frac * 0.05 + (nhRand() - 0.5) * 0.004,
+        baseLift: 0.005, midArch: 0.003, tipFlickOut: 0.008, napeHug: 1.05,
       });
       specs.push({
-        pointsLocal: pts, width: 0.05 * wMul, thickness: 0.011, stiffnessBias: 0.90, layerAO: 0.92,
+        pointsLocal: pts, width: 0.075 * wMul, thickness: 0.011, stiffnessBias: 0.9, layerAO: 0.9,
         layerOrder: 3, lockNormal: false, scalpRoot: 0.36, isFadeCap: true, fadeStart: 0.97,
       });
     }
@@ -77,4 +77,3 @@
     return specs;
     // NH-END
   }
-
