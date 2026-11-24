@@ -61,6 +61,7 @@ export const ARCHETYPE_METADATA: ArchetypeMeta[] = [
   { id: 'twin-tails', label: 'Dual Twin-Tails', inspiration: 'JRPG Twin Cascade' },
   { id: 'emo-sweep', label: 'Side-Swept Fringe', inspiration: 'Riku / Dante' },
   { id: 'short-crop', label: 'Short Crop', inspiration: 'Veteran / Soldier crop' },
+  { id: 'undercut-fade', label: 'Undercut Fade', inspiration: 'Rogue / mercenary shaved sides' },
   { id: 'braided-crown', label: 'Braided Crown', inspiration: 'Fantasy healer / noble braids' },
   { id: 'samurai-topknot', label: 'Samurai Topknot', inspiration: 'Ronin / warrior high bun' },
 ];
@@ -716,7 +717,7 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
   // NEON-SEED samurai-topknot
   if (arch === 'samurai-topknot') {
     const knotTheta = Math.PI;
-    const knotPhi = 0.44;
+    const knotPhi = 0.3;
     const knotAnchor = skullSurfacePoint(knotTheta, knotPhi, 0.016);
 
     // Zone 1: Tight sleek base shell (ears exposed, clean nape)
@@ -764,9 +765,9 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
       const ang = (i / bunCount) * Math.PI * 2;
       const pts = buildGatheredTailLock({
         anchorTheta: knotTheta + Math.cos(ang) * 0.08, anchorPhi: knotPhi + Math.sin(ang) * 0.06,
-        outDir: new THREE.Vector3(Math.cos(ang) * 0.28, 0.74, -0.62),
+        outDir: new THREE.Vector3(Math.cos(ang) * 0.3, 0.9, -0.4),
         spreadX: Math.cos(ang) * 0.06, spreadZ: Math.sin(ang) * 0.06,
-        length: 0.17 + config.crownVolume * 0.05, archOut: 0.085, waveAmp: 0.004, wavePhase: ang,
+        length: 0.22 + config.crownVolume * 0.06, archOut: 0.105, waveAmp: 0.004, wavePhase: ang,
       });
       specs.push({
         pointsLocal: pts, width: 0.05 * wMul, thickness: 0.014, stiffnessBias: 0.94, layerAO: 0.86,
@@ -883,6 +884,81 @@ export function buildCustomHairSpecs(config: HairBuilderConfig): LockBuildSpec[]
         pointsLocal: pts, width: 0.032 * wMul, thickness: 0.015, stiffnessBias: 0.64, layerAO: 0.9,
         layerOrder: 4, lockNormal: false, scalpRoot: 0.4,
       });
+    }
+
+    return specs;
+  }
+
+  // NEON-SEED undercut-fade
+  if (arch === 'undercut-fade') {
+    const sweepSign = config.bangsSweep >= 0 ? 1 : -1;
+    const fadeSideEnd = THREE.MathUtils.lerp(1.5, 1.66, config.sideLength); // fade ends at the ear top
+    const fadeNapeEnd = THREE.MathUtils.lerp(1.9, 2.1, config.backLength);
+    const topSweepAmt = 0.48 + Math.abs(config.bangsSweep) * 0.36;
+    const frontHairline = 1.28;
+
+    // Zone 1: skin-tight faded scalp shell (dense: no scalp showing)
+    for (let tier = 0; tier < 3; tier++) {
+      const count = 28;
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + tier * 0.2;
+        const cosT = Math.cos(theta);
+        const maxPhi = cosT > 0.35 ? frontHairline - 0.04 : cosT < -0.25 ? fadeNapeEnd - 0.04 : fadeSideEnd - 0.04;
+        const phiStart = tier === 0 ? 0.01 : 0.22 + tier * 0.34;
+        if (phiStart >= maxPhi - 0.05) continue;
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.7),
+          baseLift: 0.002, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.4,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.095 * wMul, thickness: 0.008, stiffnessBias: 0.99, layerAO: 0.76,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
+    }
+
+    // Zone 2: ultra-short close-shaved sides & nape below the disconnect
+    const fadeCount = Math.round(60 * density);
+    for (let i = 0; i < fadeCount; i++) {
+      const theta = (i / fadeCount) * Math.PI * 2 + (rand() - 0.5) * 0.05;
+      const cosT = Math.cos(theta);
+      if (cosT > 0.46) continue;
+      const isBack = cosT < -0.25;
+      const maxPhi = isBack ? fadeNapeEnd : fadeSideEnd;
+      const phiStart = isBack ? 1.1 + rand() * 0.3 : 1.0 + rand() * 0.2;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.3),
+        baseLift: 0.003, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.45,
+      });
+      specs.push({
+        pointsLocal: pts, width: 0.028 * wMul, thickness: 0.007, stiffnessBias: 0.99, layerAO: 0.74,
+        layerOrder: 1, lockNormal: false, scalpRoot: 0.35,
+      });
+    }
+
+    // Zone 3: disconnected textured top locks swept diagonally across the crown
+    const topRings = 4;
+    for (let r = 0; r < topRings; r++) {
+      const rf = r / (topRings - 1);
+      const count = Math.round((16 + r * 6) * density);
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + r * 0.25 + (rand() - 0.5) * 0.08;
+        const cosT = Math.cos(theta);
+        const phiStart = 0.05 + rf * 0.64;
+        const isFront = cosT > 0.2;
+        const phiEnd = isFront
+          ? Math.min(frontHairline + config.bangsLength * 0.12, phiStart + 0.5)
+          : Math.min(1.2, phiStart + 0.46);
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta + sweepSign * topSweepAmt * (0.55 + rf * 0.45), phiStart, phiEnd,
+          baseLift: 0.018 + config.crownVolume * 0.022, midArch: 0.012 + config.crownVolume * 0.014,
+          tipFlickOut: 0.007 + spikeAmt * 0.014, napeHug: 1.15,
+        });
+        specs.push({
+          pointsLocal: pts, width: (0.03 + rand() * 0.014) * wMul, thickness: 0.013, stiffnessBias: 0.86,
+          layerAO: 0.9 + rf * 0.06, layerOrder: 3, lockNormal: false, scalpRoot: r === 0 ? 0.5 : 0.3,
+        });
+      }
     }
 
     return specs;
@@ -1659,6 +1735,7 @@ const ARCHETYPE_PRESET_MAP: Record<HairBuilderArchetype, HairPresetId> = {
   'twin-tails': 'crimson',
   'emo-sweep': 'leon',
   'short-crop': 'silver',
+  'undercut-fade': 'silver',
   'braided-crown': 'crimson',
   'samurai-topknot': 'noctis',
 };
@@ -1800,6 +1877,21 @@ function buildArchetypeParameters(archetype: HairBuilderArchetype, rand: () => n
         layerShag: rRange(0.18, 0.42),
         density: rRange(1.0, 1.16),
         strandWidth: rRange(0.92, 1.1),
+        seed,
+      };
+    case 'undercut-fade':
+      return {
+        archetype,
+        partPosition: rRange(-0.65, -0.25),
+        bangsLength: rRange(0.28, 0.55),
+        bangsSweep: rRange(0.45, 0.9),
+        crownVolume: rRange(0.48, 0.8),
+        spikeLift: rRange(0.12, 0.42),
+        sideLength: rRange(0.05, 0.22),
+        backLength: rRange(0.08, 0.26),
+        layerShag: rRange(0.45, 0.78),
+        density: rRange(0.98, 1.16),
+        strandWidth: rRange(0.86, 1.04),
         seed,
       };
     case 'short-crop':

@@ -1,0 +1,74 @@
+  if (arch === 'undercut-fade') {
+    const sweepSign = config.bangsSweep >= 0 ? 1 : -1;
+    const fadeSideEnd = THREE.MathUtils.lerp(1.5, 1.66, config.sideLength); // fade ends at the ear top
+    const fadeNapeEnd = THREE.MathUtils.lerp(1.9, 2.1, config.backLength);
+    const topSweepAmt = 0.48 + Math.abs(config.bangsSweep) * 0.36;
+    const frontHairline = 1.28;
+
+    // Zone 1: skin-tight faded scalp shell (dense: no scalp showing)
+    for (let tier = 0; tier < 3; tier++) {
+      const count = 28;
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + tier * 0.2;
+        const cosT = Math.cos(theta);
+        const maxPhi = cosT > 0.35 ? frontHairline - 0.04 : cosT < -0.25 ? fadeNapeEnd - 0.04 : fadeSideEnd - 0.04;
+        const phiStart = tier === 0 ? 0.01 : 0.22 + tier * 0.34;
+        if (phiStart >= maxPhi - 0.05) continue;
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.7),
+          baseLift: 0.002, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.4,
+        });
+        specs.push({
+          pointsLocal: pts, width: 0.095 * wMul, thickness: 0.008, stiffnessBias: 0.99, layerAO: 0.76,
+          layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
+    }
+
+    // Zone 2: ultra-short close-shaved sides & nape below the disconnect
+    const fadeCount = Math.round(60 * density);
+    for (let i = 0; i < fadeCount; i++) {
+      const theta = (i / fadeCount) * Math.PI * 2 + (rand() - 0.5) * 0.05;
+      const cosT = Math.cos(theta);
+      if (cosT > 0.46) continue;
+      const isBack = cosT < -0.25;
+      const maxPhi = isBack ? fadeNapeEnd : fadeSideEnd;
+      const phiStart = isBack ? 1.1 + rand() * 0.3 : 1.0 + rand() * 0.2;
+      const pts = buildSculptedLock({
+        thetaStart: theta, thetaEnd: theta, phiStart, phiEnd: Math.min(maxPhi, phiStart + 0.3),
+        baseLift: 0.003, midArch: 0.001, tipFlickOut: 0.0, napeHug: 1.45,
+      });
+      specs.push({
+        pointsLocal: pts, width: 0.028 * wMul, thickness: 0.007, stiffnessBias: 0.99, layerAO: 0.74,
+        layerOrder: 1, lockNormal: false, scalpRoot: 0.35,
+      });
+    }
+
+    // Zone 3: disconnected textured top locks swept diagonally across the crown
+    const topRings = 4;
+    for (let r = 0; r < topRings; r++) {
+      const rf = r / (topRings - 1);
+      const count = Math.round((16 + r * 6) * density);
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2 + r * 0.25 + (rand() - 0.5) * 0.08;
+        const cosT = Math.cos(theta);
+        const phiStart = 0.05 + rf * 0.64;
+        const isFront = cosT > 0.2;
+        const phiEnd = isFront
+          ? Math.min(frontHairline + config.bangsLength * 0.12, phiStart + 0.5)
+          : Math.min(1.2, phiStart + 0.46);
+        const pts = buildSculptedLock({
+          thetaStart: theta, thetaEnd: theta + sweepSign * topSweepAmt * (0.55 + rf * 0.45), phiStart, phiEnd,
+          baseLift: 0.018 + config.crownVolume * 0.022, midArch: 0.012 + config.crownVolume * 0.014,
+          tipFlickOut: 0.007 + spikeAmt * 0.014, napeHug: 1.15,
+        });
+        specs.push({
+          pointsLocal: pts, width: (0.03 + rand() * 0.014) * wMul, thickness: 0.013, stiffnessBias: 0.86,
+          layerAO: 0.9 + rf * 0.06, layerOrder: 3, lockNormal: false, scalpRoot: r === 0 ? 0.5 : 0.3,
+        });
+      }
+    }
+
+    return specs;
+  }
+
