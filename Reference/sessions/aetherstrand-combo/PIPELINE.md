@@ -10,7 +10,7 @@ Status 2026-11-23. Everything below is measured in `STATUS.md`. The web app is t
 
 ## Measured today (Half-Up Cascade #059 and the 12 archetypes)
 - Mesh: vertex-exact vs web (0.008 mm mean per-lock max error, 248-lock ponytail style).
-- Hair-only render vs web, 12 styles: mean error inside the hair 0.68-0.82 of 255, side bias at most 0.28, silhouette overlap 0.956-0.969 (91 percent of the pixels that differ by more than 10/255 are silhouette anti-aliasing pixels).
+- Hair-only render vs web, 12 archetypes (rest pose, web display transform applied in the shader, real 4x MSAA, web label boxes excluded): mean error inside the hair 0.27/255 (max 0.36), side bias at most 0.11, 0.94% of pixels differ by more than 10/255 raw and 0.003% after allowing a 1 px alignment (sub-pixel edge sampling). Earlier, larger numbers came from resolving MSAA in linear HDR before tone mapping and from counting the web's label boxes.
 - Fit on Tobin: all 12 styles seat on the skull; no floating crown.
 - Motion: web solver port in progress (branch `claude/aetherstrand-physics`); see `PHYSICS_PORT.md` when it lands.
 

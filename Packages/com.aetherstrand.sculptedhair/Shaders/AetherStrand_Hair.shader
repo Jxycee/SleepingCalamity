@@ -11,6 +11,7 @@ Shader "AetherStrand/SculptedHair_URP"
         _AlphaClip ("Alpha Cutoff", Range(0.05, 0.85)) = 0.36
         [Header(Web Light Rig Parity)]
         _UseWebRig ("Use fixed web 3-light rig (parity)", Float) = 0
+        _ParityDisplay ("Apply web display transform in shader (ACES exposure 1.16 + sRGB) for A/B tests", Float) = 0
         _DebugMode ("Debug view: 0 shaded, 1 strand id, 3 normals, 4 uv flow", Float) = 0
         _KeyDirW ("Key dir", Vector) = (0.3,0.7,0.6,0)
         _KeyColW ("Key col", Vector) = (1,1,1,0)
@@ -93,6 +94,7 @@ Shader "AetherStrand/SculptedHair_URP"
             float  _RimIntensity;
             float  _RimPower;
             float  _UseWebRig;
+            float  _ParityDisplay;
             float  _DebugMode;
             float4 _KeyDirW; float4 _KeyColW; float4 _FillDirW; float4 _FillColW; float4 _RimDirW; float4 _RimColW; float4 _AmbColW;
         CBUFFER_END
@@ -199,6 +201,21 @@ Shader "AetherStrand/SculptedHair_URP"
                 float sinTH = sqrt(max(0.0001, 1.0 - dotTH * dotTH));
                 float dirAtten = smoothstep(-1.0, 0.0, dotTH);
                 return dirAtten * pow(sinTH, exponent);
+            }
+
+            // three.js ACESFilmicToneMapping (exposure applied as exposure/0.6) followed by linear->sRGB, as the web fragment shader outputs.
+            float3 AS_WebDisplay(float3 c, float exposure)
+            {
+                c *= exposure / 0.6;
+                float3 a = float3(dot(c, float3(0.59719, 0.35458, 0.04823)), dot(c, float3(0.07600, 0.90834, 0.01566)), dot(c, float3(0.02840, 0.13383, 0.83777)));
+                float3 num = a * (a + 0.0245786) - 0.000090537;
+                float3 den = a * (0.983729 * a + 0.4329510) + 0.238081;
+                a = num / den;
+                float3 o = float3(dot(a, float3(1.60475, -0.53108, -0.07367)), dot(a, float3(-0.10208, 1.10813, -0.00605)), dot(a, float3(-0.00327, -0.07276, 1.07602)));
+                o = saturate(o);
+                float3 lo = o * 12.92;
+                float3 hi = 1.055 * pow(o, 1.0 / 2.4) - 0.055;
+                return lerp(hi, lo, step(o, 0.0031308));
             }
 
             Varyings Vert(Attributes input)
@@ -373,6 +390,7 @@ Shader "AetherStrand/SculptedHair_URP"
                     #endif
                     finalColor = MixFog(finalColor, input.fogFactor);
                 }
+                if (_ParityDisplay > 0.5) finalColor = AS_WebDisplay(finalColor, 1.16);
                 return half4(finalColor, 1.0);
             }
             ENDHLSL

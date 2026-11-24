@@ -15,7 +15,7 @@ Status 2026-11-23. The pipeline that turns a web recipe into fitted, simulated h
 | Vertices inside the head | 0.03-0.06% (2-6 mm deep) | under 0.2%, depth under 6 mm |
 | Roots inside the head | 0-0.3% | under 0.5% |
 | Root gap to scalp (p95) | 7.0-12.2 mm (after Neon round 2 widened the temple scale) | under 12.5 mm |
-| Web vs Unity hair overlap (12 archetypes, hair only) | 0.956-0.968 | over 0.95 |
+| Web vs Unity hair, 12 archetypes, hair only | mean error 0.27/255, 0.003% of pixels differ >10/255 (+-1 px) | mean error under 1/255 |
 | Mesh vs web, per vertex | 0.008 mm mean | under 0.1 mm |
 
 ## The loop for a new look

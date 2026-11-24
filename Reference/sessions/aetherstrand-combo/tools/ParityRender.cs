@@ -188,6 +188,13 @@ public static class ParityRender
             }
         }
         if (Env("SC_PARITY_NOBUST", "0") == "1") foreach (var mr in root.GetComponentsInChildren<MeshRenderer>()) mr.enabled = false;
+        bool inShader = Env("SC_PARITY_INSHADER", "0") == "1";
+        if (inShader)
+        {
+            matA.SetFloat("_ParityDisplay", 1f);
+            cam.allowHDR = false; cam.backgroundColor = Hex(rig.bg).gamma; // stored raw value = display-encoded background
+            var urpA = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset; if (urpA != null) urpA.msaaSampleCount = 4;
+        }
         var names = new[] { "FRONT", "BACK", "LEFT", "RIGHT" };
         var poss = new[] { new Vector3(0, .82f, 1.84f), new Vector3(0, .82f, -1.84f), new Vector3(1.86f, .82f, 0), new Vector3(-1.86f, .82f, 0) };
         var tgts = new[] { new Vector3(0, .77f, 0), new Vector3(0, .77f, -.02f), new Vector3(0, .77f, -.05f), new Vector3(0, .77f, -.05f) };
@@ -198,6 +205,15 @@ public static class ParityRender
         {
             cam.transform.position = new Vector3(-poss[k].x, poss[k].y, poss[k].z);
             cam.transform.LookAt(new Vector3(-tgts[k].x, tgts[k].y, tgts[k].z));
+            if (inShader) {
+                var rt8 = new RenderTexture(512, 512, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear) { antiAliasing = 4 };
+                cam.targetTexture = rt8; cam.Render(); RenderTexture.active = rt8;
+                var t8 = new Texture2D(512, 512, TextureFormat.RGB24, false); t8.ReadPixels(new Rect(0, 0, 512, 512), 0, 0); t8.Apply();
+                sheet.SetPixels(gxs[k] * 512, gys[k] * 512, 512, 512, t8.GetPixels());
+                File.WriteAllBytes(Path.Combine(outDir, tag + "_" + names[k] + ".png"), t8.EncodeToPNG());
+                RenderTexture.active = null; cam.targetTexture = null; rt8.Release();
+                continue;
+            }
             cam.targetTexture = rt; cam.Render();
             RenderTexture.active = rt;
             var th = new Texture2D(1024, 1024, TextureFormat.RGBAHalf, false); th.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0); th.Apply();

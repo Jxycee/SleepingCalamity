@@ -32,3 +32,6 @@ Eye-clear fringe (AetherStrandFringeFit, opt-out via keepEyesClear): bangs locks
 
 ## Residual vs web closed (2026-11-23)
 Cause of the ~3/255 shading error and left/right bias: plugin normal-map texture imported as Normal Map (meta textureType 1). Fixed (Default). Bisect: web debug views (Strand ID, Normals, UV) agree to 1-2/255; with groove/spec/rim/AO zeroed Unity matched to 0.05-0.4/255; texture probe isolated the normal map. After fix, 12 archetypes: mean error inside hair 0.68-0.82/255, bias <=0.28, overlap 0.956-0.969; interior pixels differing >10/255: 0.52% of union; 91% of all mismatches on silhouette AA pixels.
+
+## 1:1 closed (2026-11-23)
+Cause of the last edge mismatch: harness resolved MSAA in linear HDR and tone-mapped after; the web tone-maps per sample in the fragment shader, so its resolve averages display-encoded values. Plugin shader now has `_ParityDisplay` (web ACES exposure 1.16 + sRGB in the shader, for A/B only); harness renders 512 px with real 4x MSAA. Also: web label boxes were counted as mismatch. Result on 12 archetypes: mean error 0.27/255 inside hair, 0.003% of pixels differ by >10/255 after +-1 px alignment. The test mannequin bust is not part of the comparison (Tobin replaces it); hair-only on both sides.
