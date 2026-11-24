@@ -37,19 +37,8 @@
     };
 
     // Cut line end phi by |theta|: sideburn over the ear top, arch behind the ear, curved nape (lowest at centre)
-    const cropEndPhi = (th: number, napeEnd: number): number => {
-      const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
-      const kn: Array<[number, number]> = [[0.9, 1.22], [1.0, 1.22], [1.3, 1.36], [1.5, 1.52], [1.58, 1.70], [1.67, 1.52], [1.95, 1.56], [2.45, 1.86], [3.1416, napeEnd + 0.02]];
-      if (a < 1.0) return THREE.MathUtils.lerp(hairPhi(th) + 0.05, 1.22, THREE.MathUtils.smoothstep((a - 0.77) / 0.23, 0, 1));
-      for (let k = 1; k < kn.length; k++) {
-        if (a <= kn[k][0]) {
-          const fl = (a - kn[k - 1][0]) / (kn[k][0] - kn[k - 1][0]);
-          const f = a < 1.7 ? fl : THREE.MathUtils.smoothstep(fl, 0, 1);
-          return THREE.MathUtils.lerp(kn[k - 1][1], kn[k][1], f);
-        }
-      }
-      return napeEnd;
-    };
+    const cropEndPhi = (th: number, napeEnd: number): number =>
+      earAlignedCutPhi(th, { hairlinePhi: (x: number) => hairPhi(x) + 0.05, templeRecede: 0, sideburnLength: THREE.MathUtils.lerp(1.1, 1.3, config.sideLength), sideburnTaper: 0.30, earClearance: 0.05, napePhi: napeEnd + 0.02, napeCurve: 1.3 });
 
     // Zone 1: visible short dome fill (normal locks, solid for the first 58%, staggered tiers so there is no bare scalp)
     for (let tier = 0; tier < 8; tier++) {

@@ -14,7 +14,18 @@ namespace AetherStrand
     {
         public const int Rings = AetherStrandWebSolver.N - 1; // 11
         public const int RingVerts = 7;
-        public const int VertsPerLock = Rings * RingVerts + 1;
+        public const int VertsPerLock = Rings * RingVerts + 1; // legacy (smooth = 1); smoothed locks use vertBase / ringCount
+        readonly int[] ringCount, vertBase, lockSm;
+        static readonly double[] _ext = new double[(AetherStrandWebSolver.N + 2) * 3];
+        static double CR(double p0, double p1, double p2, double p3, double f)
+        {
+            double f2 = f * f;
+            return 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f2 + (3 * p1 - p0 - 3 * p2 + p3) * f2 * f);
+        }
+        static double CRD(double p0, double p1, double p2, double p3, double f)
+        {
+            return 0.5 * ((p2 - p0) + 2 * (2 * p0 - 5 * p1 + 4 * p2 - p3) * f + 3 * (3 * p1 - p0 - 3 * p2 + p3) * f * f);
+        }
 
         static readonly float[] PU = { 0.0f, 0.17f, 0.34f, 0.5f, 0.66f, 0.83f, 1.0f };
         static readonly double[] PX = { 0.0, 0.76, 1.0, 0.0, -1.0, -0.76, 0.0 };
@@ -47,20 +58,31 @@ namespace AetherStrand
         public AetherStrandWebMesh(AetherStrandWebSolver solver, AetherStrandWebSolver.LockData[] locks)
         {
             this.solver = solver; this.locks = locks;
-            int L = locks.Length, V = L * VertsPerLock;
+            int L = locks.Length;
+            ringCount = new int[L]; vertBase = new int[L + 1]; lockSm = new int[L];
+            int triCount = 0;
+            for (int s = 0; s < L; s++)
+            {
+                int sm0 = System.Math.Max(1, System.Math.Min(4, locks[s].smooth));
+                lockSm[s] = sm0; ringCount[s] = (AetherStrandWebSolver.N - 2) * sm0 + 1;
+                vertBase[s + 1] = vertBase[s] + ringCount[s] * RingVerts + 1;
+                triCount += (ringCount[s] - 2) * (RingVerts - 1) * 6 + (RingVerts - 1) * 3 + (RingVerts - 1) * 6;
+            }
+            int V = vertBase[L];
             verts = new Vector3[V]; norms = new Vector3[V]; tans = new Vector4[V];
             var uv = new Vector2[V]; var uv2 = new Vector2[V]; var col = new Color[V];
-            var tris = new int[L * ((Rings - 2) * (RingVerts - 1) * 6 + (RingVerts - 1) * 3 + (RingVerts - 1) * 6)];
+            var tris = new int[triCount];
             int ti = 0;
             for (int s = 0; s < L; s++)
             {
                 var d = locks[s];
-                int bv = s * VertsPerLock;
+                int bv = vertBase[s];
+                int rings = ringCount[s], sm1 = lockSm[s];
                 float mask = d.isBaseShell ? 0f : d.isFadeCap ? (double.IsNaN(d.fadeStart) ? 0.25f : 0.16f + 0.28f * Mathf.Clamp01((float)d.fadeStart)) : 1f;
                 int vi = bv;
-                for (int k = 0; k < Rings; k++)
+                for (int k = 0; k < rings; k++)
                 {
-                    float t = k / (float)(AetherStrandWebSolver.N - 1);
+                    float t = sm1 > 1 ? ((float)k / sm1) / (AetherStrandWebSolver.N - 1) : k / (float)(AetherStrandWebSolver.N - 1);
                     for (int r = 0; r < RingVerts; r++)
                     {
                         uv[vi] = new Vector2(PU[r], t);
@@ -73,7 +95,7 @@ namespace AetherStrand
                 int tip = vi;
                 uv[tip] = new Vector2(0.5f, 1f); uv2[tip] = new Vector2((float)d.scalpRoot, 0f);
                 { float sd = Mathf.Clamp01((float)d.seed) * 255f, sh = Mathf.Floor(sd); col[tip] = new Color(sd - sh, (float)d.layerAO, sh / 255f, mask); }
-                for (int k = 0; k < Rings - 1; k++)
+                for (int k = 0; k < rings - 1; k++)
                 {
                     int r0 = bv + k * RingVerts, r1 = bv + (k + 1) * RingVerts;
                     for (int r = 0; r < RingVerts - 1; r++)
@@ -83,7 +105,7 @@ namespace AetherStrand
                         tris[ti++] = b; tris[ti++] = c; tris[ti++] = dd;
                     }
                 }
-                int last = bv + (Rings - 1) * RingVerts;
+                int last = bv + (rings - 1) * RingVerts;
                 for (int r = 0; r < RingVerts - 1; r++) { tris[ti++] = last + r; tris[ti++] = tip; tris[ti++] = last + r + 1; }
             }
             mesh = new Mesh { name = "AetherStrandWebHair", indexFormat = IndexFormat.UInt32 };
@@ -169,13 +191,41 @@ namespace AetherStrand
                 double odInv = 1.0 / (odl == 0 ? 1.0 : odl);
                 odx *= odInv; ody *= odInv; odz *= odInv;
                 double ox = 0, oy = 1, oz = 0;
-
-                for (int k = 0; k < Rings; k++)
+                int sm = lockSm[s], rings = ringCount[s];
+                double round = lk.roundness;
+                if (sm > 1)
                 {
+                    int n = AetherStrandWebSolver.N;
+                    for (int q = 0; q < n; q++) { _ext[(q + 1) * 3] = X[b + q]; _ext[(q + 1) * 3 + 1] = Y[b + q]; _ext[(q + 1) * 3 + 2] = Z[b + q]; }
+                    for (int a = 0; a < 3; a++) { _ext[a] = 2 * _ext[3 + a] - _ext[6 + a]; _ext[(n + 1) * 3 + a] = 2 * _ext[n * 3 + a] - _ext[(n - 1) * 3 + a]; }
+                }
+
+                for (int m = 0; m < rings; m++)
+                {
+                    int k = sm == 1 ? m : m / sm;
                     int i = b + k;
-                    double px0 = X[i], py0 = Y[i], pz0 = Z[i];
-                    double tx, ty, tz;
-                    if (k == 0) { tx = X[i + 1] - px0; ty = Y[i + 1] - py0; tz = Z[i + 1] - pz0; }
+                    double px0, py0, pz0;
+                    double tx = 0, ty = 0, tz = 0;
+                    double sRs = 0, sTT = 0, sBT = 0, sTF = 0, sTP = 0;
+                    if (sm > 1)
+                    {
+                        double fu = (m - k * sm) / (double)sm; int e = k * 3;
+                        px0 = CR(_ext[e], _ext[e + 3], _ext[e + 6], _ext[e + 9], fu);
+                        py0 = CR(_ext[e + 1], _ext[e + 4], _ext[e + 7], _ext[e + 10], fu);
+                        pz0 = CR(_ext[e + 2], _ext[e + 5], _ext[e + 8], _ext[e + 11], fu);
+                        tx = CRD(_ext[e], _ext[e + 3], _ext[e + 6], _ext[e + 9], fu);
+                        ty = CRD(_ext[e + 1], _ext[e + 4], _ext[e + 7], _ext[e + 10], fu);
+                        tz = CRD(_ext[e + 2], _ext[e + 5], _ext[e + 8], _ext[e + 11], fu);
+                        double tt = (m / (double)sm) / (AetherStrandWebSolver.N - 1);
+                        sTF = tt;
+                        sRs = System.Math.Sin(System.Math.Min(1.0, tt * 4.2) * System.Math.PI * 0.5);
+                        sTT = System.Math.Max(0.06, tt < 0.44 ? 1.0 - tt * 0.14 : System.Math.Pow((1.0 - tt) / 0.56, 0.94) * 0.938);
+                        sBT = System.Math.Max(0.04, tt < 0.42 ? 1.0 - tt * 0.16 : System.Math.Pow((1.0 - tt) / 0.58, 1.12) * 0.933);
+                        sTP = System.Math.Pow(System.Math.Max(0.04, 1.0 - tt), 0.86);
+                    }
+                    else { px0 = X[i]; py0 = Y[i]; pz0 = Z[i]; }
+                    if (sm > 1) { }
+                    else if (k == 0) { tx = X[i + 1] - px0; ty = Y[i + 1] - py0; tz = Z[i + 1] - pz0; }
                     else { tx = X[i + 1] - X[i - 1]; ty = Y[i + 1] - Y[i - 1]; tz = Z[i + 1] - Z[i - 1]; }
                     double tl = System.Math.Sqrt(tx * tx + ty * ty + tz * tz);
                     double tInv = 1.0 / (tl == 0 ? 1.0 : tl);
@@ -208,13 +258,14 @@ namespace AetherStrand
 
                     ox = sy * tz - sz * ty; oy = sz * tx - sx * tz; oz = sx * ty - sy * tx;
 
-                    double rSin = RootSin[k];
+                    double rSin = sm > 1 ? sRs : RootSin[k];
                     double rootTuck = isBase ? 0.88 + 0.12 * rSin : rootMinW + (1.0 - rootMinW) * rSin;
                     double rootThickTuck = isBase ? 1.0 : 0.2 + 0.8 * rSin;
                     bool isFade = lk.isFadeCap;
-                    double tipTaper = isFade ? 1.0 : (isBase ? BaseTipTaper[k] : TipTaper[k]);
+                    double tipTaper = isFade ? 1.0 : (isBase ? (sm > 1 ? sBT : BaseTipTaper[k]) : (sm > 1 ? sTT : TipTaper[k]));
                     double halfW = baseHalfW * rootTuck * tipTaper;
-                    double halfT = isFade ? baseHalfT * rootThickTuck * 0.55 * (1.0 - TipFactor[k] * 0.65) : baseHalfT * rootThickTuck * ThickPow[k];
+                    double halfT = isFade ? baseHalfT * rootThickTuck * 0.55 * (1.0 - (sm > 1 ? sTF : TipFactor[k]) * 0.65) : baseHalfT * rootThickTuck * (sm > 1 ? sTP : ThickPow[k]);
+                    if (round > 0 && !isFade && !isBase) halfT += (halfW * 0.9 * rootThickTuck - halfT) * round;
 
                     for (int r = 0; r < RingVerts; r++)
                     {

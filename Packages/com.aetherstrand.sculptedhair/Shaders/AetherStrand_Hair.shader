@@ -22,6 +22,18 @@ Shader "AetherStrand/SculptedHair_URP"
         _AmbColW ("Ambient col", Vector) = (0.5,0.5,0.5,0)
         _DitherStrength ("Tip Interleaved-Noise Dither (Non-MSAA/TAA)", Range(0.0, 1.0)) = 0.0
 
+        [Header(Fade Cap (undercut and crop fades))]
+        _FadeOpacity ("Fade Opacity (dithered-opaque coverage)", Range(0.3, 1.0)) = 0.85
+        _FadeReach ("Fade Reach (latest t where a fade begins)", Range(0.0, 0.9)) = 0.45
+        _FadeSoftness ("Fade Softness (share of the fade that dithers out)", Range(0.05, 1.0)) = 0.85
+
+        [Header(Game Style Sheen And Clump Look)]
+        _SheenBand ("Soft Sheen Band Intensity", Range(0.0, 1.5)) = 0.30
+        _SheenPower ("Soft Sheen Band Power (low = wider)", Range(4.0, 60.0)) = 14.0
+        _ShadowLift ("Shadow / AO Lift (anti-mud)", Range(0.0, 0.8)) = 0.30
+        _ClumpVariation ("Per-Clump Brightness Variation", Range(0.0, 0.5)) = 0.20
+        _TipLighten ("Tip Lightening", Range(0.0, 0.6)) = 0.12
+
         [Header(Spherical Head Normal Smoothing)]
         _HeadCenterWS ("Head Center World Position", Vector) = (0.0, 0.865, -0.01, 0.0)
         _HeadCenterBlend ("Head-Center Normal Blend", Range(0.0, 1.0)) = 0.15
@@ -81,6 +93,14 @@ Shader "AetherStrand/SculptedHair_URP"
             float  _UseAlphaClip;
             float  _AlphaClip;
             float  _DitherStrength;
+            float  _FadeOpacity;
+            float  _FadeSoftness;
+            float  _FadeReach;
+            float  _SheenBand;
+            float  _SheenPower;
+            float  _ShadowLift;
+            float  _ClumpVariation;
+            float  _TipLighten;
             float  _HeadCenterBlend;
             float  _StrandVariation;
             float  _RootAO;
@@ -105,20 +125,30 @@ Shader "AetherStrand/SculptedHair_URP"
             return frac(magic.z * frac(dot(pixelPos, magic.xy)));
         }
 
+        // 0 until the fade starts (fadeStart), then 0..1 toward the hairline. vertColor.a: 0.25 = default start 0.25, else 0.16 + 0.28 * fadeStart
+        float AetherFadeU(float a, float t)
+        {
+            float fadeStart0 = abs(a - 0.25) < 0.002 ? 0.25 : clamp((a - 0.16) / 0.28, 0.0, 1.0);
+            // real fades (fadeStart < 0.9) begin no later than _FadeReach so the gradient is visible; hairline-only caps (>= 0.9) keep their start
+            fadeStart0 = fadeStart0 < 0.9 ? min(fadeStart0, _FadeReach) : fadeStart0;
+            return smoothstep(fadeStart0, 1.0, t);
+        }
+
         void AetherApplyTipAlphaClip(float2 uv, float4 vertColor, float2 screenPosXY)
         {
             #ifdef _USE_ALPHA_CLIP
             float t = saturate(uv.y);
-            // Mode 1: isFadeCap stubble (vertColor.a == 0.25): stochastic stipple dissolves toward the hairline
+            // Mode 1: isFadeCap (vertColor.a == 0.25): dithered-opaque fade. Stays mostly opaque (_FadeOpacity) over the
+            // body of the fade and only the last _FadeSoftness of it breaks up (fine interleaved-gradient dither) toward the hairline.
             if (vertColor.a > 0.15 && vertColor.a < 0.45)
             {
-                float fadeStart0 = abs(vertColor.a - 0.25) < 0.002 ? 0.25 : clamp((vertColor.a - 0.16) / 0.28, 0.0, 1.0);
-                float coverage = pow(1.0 - smoothstep(fadeStart0, 1.0, t), 0.75);
-                float2 cell = floor(float2(uv.x * 42.0 + vertColor.b * 17.0, t * 28.0));
-                float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
-                float ign = AetherInterleavedGradientNoise(screenPosXY);
-                float threshold = lerp(cellNoise, ign, 0.86);
-                clip(coverage - threshold);
+                float u = AetherFadeU(vertColor.a, t);
+                float tail = smoothstep(1.0 - saturate(_FadeSoftness), 1.0, u);
+                // solid hair before the fade starts (u = 0); then eases to _FadeOpacity over the first part of the fade, then dithers out
+                float coverage = lerp(1.0, _FadeOpacity * (1.0 - 0.45 * u), smoothstep(0.0, 0.2, u)) * (1.0 - tail);
+                // ordered IGN broken up by a little white noise so the dither reads as fine stubble grain, not a regular grid
+                float wn = frac(sin(dot(floor(screenPosXY), float2(12.9898, 78.233))) * 43758.5453);
+                clip(coverage - lerp(AetherInterleavedGradientNoise(screenPosXY), wn, 0.45));
                 return;
             }
             // Mode 2: solid cohesive root->mid body; outer lock tips (vertColor.a > 0.5 && t > 0.70) fray into fine wisps
@@ -303,12 +333,27 @@ Shader "AetherStrand/SculptedHair_URP"
 
                 float fiberTone = (flowId.r - 0.5) * 0.92 + (seed - 0.5) * 0.32;
                 float3 albedo = clamp(gradColor * (1.0 + fiberTone * _StrandVariation), 0.0, 1.2);
+                // Fade caps: dark hair colour (between root and base), easing to a slightly lighter desaturated stubble tone. Never toward the tip colour or white.
+                bool isFadeCap = input.vertColor.a > 0.15 && input.vertColor.a < 0.45;
+                float fadeMask = isFadeCap ? smoothstep(0.0, 0.3, AetherFadeU(input.vertColor.a, t)) : 0.0; // 0 = normal hair, 1 = fully in the fade
+                if (fadeMask > 0.0)
+                {
+                    float3 fadeDark = lerp(_RootColor.rgb, _BaseColor.rgb, 0.5);
+                    float3 stubble = lerp(fadeDark, (dot(fadeDark, float3(0.3333, 0.3333, 0.3333)) * 1.15).xxx, 0.35);
+                    float3 fadeAlbedo = lerp(fadeDark, stubble, smoothstep(0.35, 1.0, t)) * (1.0 + fiberTone * _StrandVariation * 0.5);
+                    albedo = lerp(albedo, fadeAlbedo, fadeMask);
+                }
+                // Game-style look: per-clump brightness/warmth variation (one value per lock via the seed) so clumps separate, plus lighter tips.
+                float clumpTone = frac(seed * 41.7 + 0.31) * 2.0 - 1.0;
+                albedo *= 1.0 + clumpTone * _ClumpVariation * (1.0 - fadeMask);
+                albedo *= lerp(float3(1, 1, 1), float3(1.07, 1.0, 0.93), saturate(clumpTone * 0.5 + 0.5) * _ClumpVariation * (1.0 - fadeMask));
+                albedo *= 1.0 + _TipLighten * smoothstep(0.5, 1.0, t) * (1.0 - fadeMask);
 
                 float rootOcclusion = lerp(1.0 - _RootAO * 0.72 * scalpRoot, 1.0, smoothstep(0.0, 0.22, t));
                 float grooveCrevice = lerp(1.0, grooveAo, _GrooveDepth * 0.68);
                 float domeGrad = lerp(0.84, 1.08, smoothstep(-0.55, 0.68, headN.y));
                 float totalAO = rootOcclusion * grooveCrevice * lerp(0.72, 1.04, layerAOv) * domeGrad;
-                if (input.vertColor.a > 0.15 && input.vertColor.a < 0.45) totalAO = lerp(totalAO, 0.92, t * 0.70);
+                totalAO *= lerp(1.0, 0.9, t * fadeMask); // fade stays dark (no lift toward white)
 
                 // Light rig: web 3-light studio rig (_UseWebRig) or URP main light as key (game mode)
                 float3 LKey, LFill, LRim, keyCol, fillCol, rimCol, ambCol;
@@ -335,11 +380,13 @@ Shader "AetherStrand/SculptedHair_URP"
                 float ndlBack = saturate((dot(perturbedN, LRim) + 0.46) / 1.46);
                 float skyLift = saturate(baseN.y * 0.5 + 0.5);
 
+                // Shadow lift: crevice/root/layer AO only partly darkens, plus a little ambient fill, so shaded hair stays coloured instead of muddy.
+                float aoD = lerp(totalAO, 1.0, _ShadowLift * (1.0 - fadeMask));
                 float3 diffuse = albedo * (
-                    ambCol * (0.42 + 0.24 * skyLift) +
+                    ambCol * (0.42 + 0.24 * skyLift + 0.16 * _ShadowLift * (1.0 - fadeMask)) +
                     keyCol * ndlKey * 0.88 +
                     fillCol * ndlFill * 0.40 +
-                    rimCol * ndlBack * 0.56) * totalAO;
+                    rimCol * ndlBack * 0.56) * aoD;
 
                 float shiftTex = (flowId.b - 0.5) * 0.38 + (seed - 0.5) * 0.12;
                 float3 t1 = AS_ShiftTangent(T, perturbedN, _PrimaryShift + shiftTex);
@@ -347,7 +394,7 @@ Shader "AetherStrand/SculptedHair_URP"
 
                 float fiberCrest = smoothstep(0.42, 0.92, grooveAo);
                 float microGlint = 0.74 + 0.26 * smoothstep(0.28, 0.86, flowId.r);
-                float specMask = smoothstep(0.08, 0.24, t) * (0.24 + 0.76 * fiberCrest) * microGlint * lerp(0.62, 1.0, layerAOv);
+                float specMask = smoothstep(0.08, 0.24, t) * (0.24 + 0.76 * fiberCrest) * microGlint * lerp(0.62, 1.0, layerAOv) * lerp(1.0, 0.35, fadeMask);
                 float keyFacing  = smoothstep(-0.14, 0.48, dot(baseN, LKey));
                 float backFacing = smoothstep(-0.14, 0.48, dot(baseN, LRim));
 
@@ -361,11 +408,19 @@ Shader "AetherStrand/SculptedHair_URP"
                     (spec1Tint * spec1 * 0.56 + spec2Tint * spec2 * 0.44) * keyCol * keyFacing +
                     spec1Tint * backSpec * rimCol * backFacing) * specMask * rootOcclusion;
 
+                // Soft wide anisotropic sheen band (third Kajiya-Kay lobe, smooth mask: no per-fibre striping)
+                float3 tS = AS_ShiftTangent(T, perturbedN, 0.02 + shiftTex * 0.5);
+                float sheenMask = smoothstep(0.08, 0.30, t) * (0.7 + 0.3 * fiberCrest) * lerp(0.6, 1.0, layerAOv) * (1.0 - fadeMask);
+                float3 sheenTint = lerp(albedo * 2.4, _PrimarySpecColor.rgb, 0.40);
+                specular += sheenTint * sheenMask * _SheenBand *
+                    (AS_StrandSpecular(tS, V, LKey, _SheenPower) * keyCol * keyFacing +
+                     AS_StrandSpecular(tS, V, LRim, _SheenPower) * rimCol * backFacing * 0.6);
+
                 float fresnel = pow(1.0 - max(0.0, dot(baseN, V)), _RimPower);
                 float backGate = pow(max(0.0, dot(V, -LRim)), 1.4) * 0.45 + 0.55;
                 float tipWeight = lerp(0.22, 1.0, smoothstep(0.28, 0.94, t));
                 float3 rimTint = lerp(albedo * 1.65, rimCol, 0.30);
-                float3 rimScatter = rimTint * fresnel * backGate * tipWeight * _RimIntensity * 0.42 * lerp(0.72, 1.0, layerAOv);
+                float3 rimScatter = rimTint * fresnel * backGate * tipWeight * _RimIntensity * 0.42 * lerp(0.72, 1.0, layerAOv) * lerp(1.0, 0.3, fadeMask);
 
                 float3 finalColor = diffuse + specular + rimScatter;
 
@@ -620,6 +675,8 @@ Shader "AetherStrand/SculptedHair_URP"
             float  _UseAlphaClip;
             float  _AlphaClip;
             float  _DitherStrength;
+            float  _FadeOpacity;
+            float  _FadeSoftness;
             float  _HeadCenterBlend;
             float  _StrandVariation;
             float  _RootAO;
@@ -687,11 +744,11 @@ Shader "AetherStrand/SculptedHair_URP"
                 if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45)
                 {
                     float fadeStart0 = abs(i.vertColor.a - 0.25) < 0.002 ? 0.25 : clamp((i.vertColor.a - 0.16) / 0.28, 0.0, 1.0);
-                    float coverage = pow(1.0 - smoothstep(fadeStart0, 1.0, t), 0.75);
-                    float2 cell = floor(float2(i.uv.x * 42.0 + i.vertColor.b * 17.0, t * 28.0));
-                    float cellNoise = frac(sin(dot(cell, float2(127.1, 311.7))) * 43758.5453);
+                    float u = smoothstep(fadeStart0, 1.0, t);
+                    float tail = smoothstep(1.0 - saturate(_FadeSoftness), 1.0, u);
+                    float coverage = _FadeOpacity * (1.0 - 0.35 * u) * (1.0 - tail);
                     float ign = frac(52.9829189 * frac(dot(i.pos.xy, float2(0.06711056, 0.00583715))));
-                    clip(coverage - lerp(cellNoise, ign, 0.86));
+                    clip(coverage - ign);
                 }
                 else
                 #endif
@@ -734,7 +791,7 @@ Shader "AetherStrand/SculptedHair_URP"
                 float rootShade = lerp(1.0 - _RootAO, 1.0, smoothstep(0.0, 0.36, t));
                 float grooveShade = lerp(1.0, grooveAO, _GrooveDepth);
                 float ao = rootShade * grooveShade * lerp(0.55, 1.0, i.vertColor.g);
-                if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45) ao = lerp(ao, 0.92, t * 0.70);
+                if (i.vertColor.a > 0.15 && i.vertColor.a < 0.45) ao *= lerp(1.0, 0.9, t);
 
                 float wrapNdotL = saturate((dot(N, L) + 0.45) / 1.45);
                 float3 ambient = max(ShadeSH9(half4(N, 1.0)), float3(0.22, 0.22, 0.24));

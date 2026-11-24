@@ -61,6 +61,8 @@ namespace AetherStrand.Editor
             public bool isBaseShell;
             public bool isFadeCap;
             public float fadeStart = float.NaN; // NaN: default fade curve (alpha 0.25)
+            public int smooth = 1;        // shared fix 3: 1..4 Catmull-Rom subdivision of the node centreline (1 = legacy mesh)
+            public float roundness = 0f;  // 0..1: blends ribbon thickness toward width (tube-like section)
             public float scalpRoot = 0.65f;
             public bool lockNormal;
             public Vector3 rootNormal = Vector3.up;
@@ -360,6 +362,8 @@ namespace AetherStrand.Editor
                 int count = pts.Length;
                 if (count < 2) continue;
                 int ringsPerLock = count - 1;
+                int sm = Mathf.Clamp(lk.smooth, 1, 4);
+                int ringsOut = sm > 1 ? (ringsPerLock - 1) * sm + 1 : ringsPerLock; // rings actually emitted
                 int baseVert = verts.Count;
                 float maskVal = lk.isBaseShell ? 0.0f : lk.isFadeCap ? (float.IsNaN(lk.fadeStart) ? 0.25f : 0.16f + 0.28f * Mathf.Clamp01(lk.fadeStart)) : 1.0f;
                 int[] chainBones = null;
@@ -380,11 +384,31 @@ namespace AetherStrand.Editor
                 if (od.sqrMagnitude < 1e-6f) od = Vector3.up;
                 Vector3 o = Vector3.up;
 
-                for (int k = 0; k < ringsPerLock; k++)
+                Vector3[] ext = null;
+                if (sm > 1)
                 {
-                    float t = (float)k / (NodesPerLock - 1);
-                    Vector3 p = w[k];
-                    Vector3 tang = (k == 0 ? (w[1] - p) : (w[k + 1] - w[k - 1]));
+                    // Control polygon with reflected end points for the Catmull-Rom resample
+                    ext = new Vector3[count + 2];
+                    for (int i = 0; i < count; i++) ext[i + 1] = w[i];
+                    ext[0] = 2f * w[0] - w[1];
+                    ext[count + 1] = 2f * w[count - 1] - w[count - 2];
+                }
+                for (int m = 0; m < ringsOut; m++)
+                {
+                    int k = sm > 1 ? m / sm : m;
+                    float t = sm > 1 ? ((float)m / sm) / (NodesPerLock - 1) : (float)k / (NodesPerLock - 1);
+                    Vector3 p, tang;
+                    if (sm > 1)
+                    {
+                        float fu = (m - k * sm) / (float)sm;
+                        p = CatmullRom(ext[k], ext[k + 1], ext[k + 2], ext[k + 3], fu);
+                        tang = CatmullRomD(ext[k], ext[k + 1], ext[k + 2], ext[k + 3], fu);
+                    }
+                    else
+                    {
+                        p = w[k];
+                        tang = (k == 0 ? (w[1] - p) : (w[k + 1] - w[k - 1]));
+                    }
                     tang = tang.sqrMagnitude < 1e-12f ? Vector3.down : tang.normalized;
                     Vector3 hn = (p - hc); hn = hn.sqrMagnitude < 1e-12f ? Vector3.up : hn.normalized;
 
@@ -412,8 +436,9 @@ namespace AetherStrand.Editor
                         : Mathf.Max(0.06f, t < 0.44f ? 1f - t * 0.14f : Mathf.Pow((1f - t) / 0.56f, 0.94f) * 0.938f);
                     float halfW = baseHalfW * rootTuck * tipTaper;
                     float halfT = baseHalfT * rootThickTuck * (isFade ? 0.55f * (1f - t * 0.65f) : Mathf.Pow(Mathf.Max(0.04f, 1f - t), 0.86f));
+                    if (lk.roundness > 0f && !isFade && !isBase) halfT += (halfW * 0.9f * rootThickTuck - halfT) * Mathf.Clamp01(lk.roundness);
 
-                    BoneWeight bw = ComputeRingWeight(k, t, isDynamic, chainBones);
+                    BoneWeight bw = ComputeRingWeight(m, t, isDynamic, chainBones);
                     Vector3 tangU = new Vector3(-tang.x, tang.y, tang.z);
                     for (int r = 0; r < ringVerts; r++)
                     {
@@ -443,7 +468,7 @@ namespace AetherStrand.Editor
                 weights.Add(ComputeRingWeight(ringsPerLock, 1.0f, isDynamic, chainBones));
 
                 // Index order reversed vs web: the X mirror (RH -> LH) flips winding, and Unity treats clockwise as front
-                for (int k = 0; k < ringsPerLock - 1; k++)
+                for (int k = 0; k < ringsOut - 1; k++)
                 {
                     int r0 = baseVert + k * ringVerts;
                     int r1 = baseVert + (k + 1) * ringVerts;
@@ -454,7 +479,7 @@ namespace AetherStrand.Editor
                         tris.Add(b); tris.Add(c); tris.Add(d);
                     }
                 }
-                int lastRow = baseVert + (ringsPerLock - 1) * ringVerts;
+                int lastRow = baseVert + (ringsOut - 1) * ringVerts;
                 for (int r = 0; r < ringVerts - 1; r++)
                 {
                     tris.Add(lastRow + r); tris.Add(tipVertIdx); tris.Add(lastRow + r + 1);
@@ -472,6 +497,17 @@ namespace AetherStrand.Editor
             mesh.boneWeights = weights.ToArray();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float f)
+        {
+            float f2 = f * f;
+            return 0.5f * (2f * p1 + (p2 - p0) * f + (2f * p0 - 5f * p1 + 4f * p2 - p3) * f2 + (3f * p1 - p0 - 3f * p2 + p3) * f2 * f);
+        }
+
+        private static Vector3 CatmullRomD(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float f)
+        {
+            return 0.5f * ((p2 - p0) + 2f * (2f * p0 - 5f * p1 + 4f * p2 - p3) * f + 3f * (3f * p1 - p0 - 3f * p2 + p3) * f * f);
         }
 
         private static BoneWeight ComputeRingWeight(int ringIndex, float t, bool isDynamic, int[] chainBones)
@@ -533,9 +569,11 @@ namespace AetherStrand.Editor
             float maxZ = float.NegativeInfinity;
             float minZ = float.PositiveInfinity;
 
-            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN, bool fade, float fadeStart)>();
+            var parsedRaw = new List<(string zone, float w, float th, float seed, float ao, bool isBase, List<Vector3> pts, float scalp, bool lockN, Vector3 rootN, bool fade, float fadeStart, int smooth, float round)>();
             var fadeRx = new Regex("\"isFadeCap\"\\s*:\\s*(true|false)");
             var fadeStartRx = new Regex("\"fadeStart\"\\s*:\\s*([-0-9.eE+]+)");
+            var smoothRx = new Regex(@"""smooth"" *: *([-0-9.eE+]+)");
+            var roundRx = new Regex(@"""roundness"" *: *([-0-9.eE+]+)");
             foreach (Match m in matches)
             {
                 string blk = m.Value;
@@ -578,7 +616,9 @@ namespace AetherStrand.Editor
                     rootN = new Vector3(-rx, rz, -ry);
                 }
                 if (pts.Count >= 2)
-                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN, fadeRx.Match(blk) is Match fm && fm.Success && fm.Groups[1].Value == "true", fadeStartRx.Match(blk) is Match fsm && fsm.Success ? ParseF(fsm.Groups[1].Value, 0.25f) : float.NaN));
+                    parsedRaw.Add((zone, w, th, seed, ao, isBase, pts, scalp, lockN, rootN, fadeRx.Match(blk) is Match fm && fm.Success && fm.Groups[1].Value == "true", fadeStartRx.Match(blk) is Match fsm && fsm.Success ? ParseF(fsm.Groups[1].Value, 0.25f) : float.NaN,
+                        smoothRx.Match(blk) is Match smm && smm.Success ? Mathf.Clamp(Mathf.RoundToInt(ParseF(smm.Groups[1].Value, 1f)), 1, 4) : 1,
+                        roundRx.Match(blk) is Match rdm && rdm.Success ? Mathf.Clamp01(ParseF(rdm.Groups[1].Value, 0f)) : 0f));
             }
 
             // Auto-normalize if an unscaled 0.97m web-bust JSON is fed in
@@ -610,6 +650,8 @@ namespace AetherStrand.Editor
                     isBaseShell = item.isBase,
                     isFadeCap = item.fade,
                     fadeStart = item.fadeStart,
+                    smooth = item.smooth,
+                    roundness = item.round,
                     scalpRoot = item.scalp,
                     lockNormal = item.lockN,
                     rootNormal = item.rootN,

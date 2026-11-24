@@ -1,1 +1,52 @@
-{"schemaVersion": "2.0", "presetId": "leon", "customName": "Messy Mage", "builder": {"archetype": "messy-mage", "partPosition": 0.0, "bangsLength": 0.4, "bangsSweep": 0.45, "crownVolume": 0.65, "spikeLift": 0.25, "sideLength": 0.78, "backLength": 0.62, "layerShag": 0.85, "density": 1.1, "strandWidth": 0.95, "seed": 4417}, "shader": {"rootColor": "#120d0a", "baseColor": "#2b221d", "tipColor": "#463832", "primarySpecColor": "#8c867f", "secondarySpecColor": "#4a3a2e", "primaryShift": 0.08, "primaryPower": 84, "primaryIntensity": 0.22, "secondaryShift": -0.15, "secondaryPower": 28, "secondaryIntensity": 0.14, "rimIntensity": 0.18, "rimPower": 2.9, "rootAO": 0.54, "grooveDepth": 0.68, "strandVariation": 0.3}, "physics": {"stiffness": 0.6, "gravity": 4.6, "windStrength": 0.48, "windTurbulence": 0.16, "windAzimuth": 300, "damping": 0.12, "inertia": 0.85, "bendingSmoothness": 0.52, "collisionMarginMm": 9, "rootAnchor": 0.64, "solverSubsteps": 1, "strandWidthScale": 1, "collisionEnabled": true}}
+{
+  "schemaVersion": "2.0",
+  "presetId": "leon",
+  "customName": "Messy Mage",
+  "builder": {
+    "archetype": "messy-mage",
+    "partPosition": 0.0,
+    "bangsLength": 0.4,
+    "bangsSweep": 0.45,
+    "crownVolume": 0.65,
+    "spikeLift": 0.25,
+    "sideLength": 0.78,
+    "backLength": 0.62,
+    "layerShag": 0.85,
+    "density": 1.1,
+    "strandWidth": 0.95,
+    "seed": 4417
+  },
+  "shader": {
+    "rootColor": "#120d0a",
+    "baseColor": "#241c17",
+    "tipColor": "#463832",
+    "primarySpecColor": "#8c867f",
+    "secondarySpecColor": "#4a3a2e",
+    "primaryShift": 0.08,
+    "primaryPower": 76,
+    "primaryIntensity": 0.34,
+    "secondaryShift": -0.15,
+    "secondaryPower": 28,
+    "secondaryIntensity": 0.18,
+    "rimIntensity": 0.26,
+    "rimPower": 2.9,
+    "rootAO": 0.5,
+    "grooveDepth": 0.68,
+    "strandVariation": 0.34
+  },
+  "physics": {
+    "stiffness": 0.6,
+    "gravity": 4.6,
+    "windStrength": 0.48,
+    "windTurbulence": 0.16,
+    "windAzimuth": 300,
+    "damping": 0.12,
+    "inertia": 0.85,
+    "bendingSmoothness": 0.52,
+    "collisionMarginMm": 9,
+    "rootAnchor": 0.64,
+    "solverSubsteps": 1,
+    "strandWidthScale": 1,
+    "collisionEnabled": true
+  }
+}

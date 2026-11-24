@@ -1,6 +1,6 @@
   if (arch === 'noble-hime') {
     // NH-BEGIN noble-hime (long straight sleek, skull-hugging crown, blunt bangs, hime panels)
-    const backEnd = THREE.MathUtils.lerp(3.7, 4.6, config.backLength);
+    const backEnd = THREE.MathUtils.lerp(4.4, 5.4, config.backLength);
     const himeEnd = THREE.MathUtils.lerp(2.35, 2.55, config.sideLength);
     const bluntBrowPhi = THREE.MathUtils.lerp(1.62, 1.8, config.bangsLength);
     const nhRand = seededRand(config.seed * 7 + 11);
@@ -9,15 +9,18 @@
     for (let tier = 0; tier < 2; tier++) {
       const count = 24;
       for (let i = 0; i < count; i++) {
-        const theta = (i / count) * Math.PI * 2 + tier * 0.13;
-        if (tier >= 1 && Math.cos(theta) > 0.6) continue;
+        const theta = ((i + 0.5) / count) * Math.PI * 2 + tier * 0.13;
+        const aT = Math.abs(Math.atan2(Math.sin(theta), Math.cos(theta)));
+        const earGap = aT > 1.15 && aT < 1.5;
+        if (tier >= 1 && (Math.cos(theta) > 0.6 || earGap)) continue;
         const phiStart = tier === 0 ? 0.12 : 0.5;
         const pts = buildSculptedLock({
           thetaStart: theta, thetaEnd: theta, phiStart,
-          phiEnd: Math.min(backEnd - 0.10, phiStart + 1.6, Math.cos(theta) > 0.3 ? 1.25 : 9),
+          phiEnd: Math.min(backEnd - 0.10, phiStart + 1.6, Math.cos(theta) > 0.3 ? 1.25 : earGap ? 1.35 : 9),
           baseLift: 0.002, midArch: 0.002, tipFlickOut: 0.0, napeHug: 0.9,
         });
         specs.push({
+          smooth: 3,
           pointsLocal: pts, width: 0.09 * wMul, thickness: 0.01, stiffnessBias: 0.8, layerAO: 0.9,
           layerOrder: 0, isBaseShell: true, lockNormal: false, scalpRoot: tier === 0 ? 0.5 : 0.3,
         });
@@ -29,13 +32,15 @@
     for (let i = 0; i < backCount; i++) {
       const u = i / (backCount - 1);
       const theta = THREE.MathUtils.lerp(1.4, Math.PI * 2 - 1.4, u);
-      const hemEnd = backEnd - 0.06 * Math.pow(Math.abs(Math.cos(theta * 0.5 - Math.PI / 2)), 2) + (nhRand() - 0.5) * 0.02;
+      const dV = Math.abs(theta - Math.PI) / (Math.PI - 1.4);
+      const hemEnd = backEnd - 0.22 * Math.pow(dV, 1.5) + (nhRand() - 0.5) * 0.006;
       const pts = buildSculptedLock({
         thetaStart: theta, thetaEnd: theta,
         phiStart: 0.3 + (i % 2) * 0.08, phiEnd: hemEnd,
         baseLift: 0.003, midArch: 0.002, tipFlickOut: 0.0, napeHug: 0.88,
       });
       specs.push({
+        smooth: 3,
         pointsLocal: pts, width: 0.07 * wMul, thickness: 0.011, stiffnessBias: 0.8, layerAO: 0.9,
         layerOrder: 1, lockNormal: false, scalpRoot: 0.4, isFadeCap: true, fadeStart: 0.97,
       });
@@ -47,10 +52,11 @@
         const theta = side * (0.62 + k * 0.1);
         const pts = buildSculptedLock({
           thetaStart: theta, thetaEnd: theta,
-          phiStart: 0.3 + k * 0.03, phiEnd: himeEnd + (nhRand() - 0.5) * 0.01,
+          phiStart: 0.3 + k * 0.03, phiEnd: himeEnd,
           baseLift: 0.008, midArch: 0.003, tipFlickOut: 0.012, napeHug: 1.0,
         });
         specs.push({
+          smooth: 3,
           pointsLocal: pts, width: 0.075 * wMul, thickness: 0.011, stiffnessBias: 0.85, layerAO: 0.9,
           layerOrder: 2, lockNormal: false, scalpRoot: 0.34, isFadeCap: true, fadeStart: 0.97,
         });
@@ -62,14 +68,15 @@
     for (let i = 0; i < bangCount; i++) {
       const frac = (i / (bangCount - 1)) * 2 - 1;
       if (Math.abs(frac) < 0.03) continue;
-      const theta = frac * 0.52 + (frac >= 0 ? 0.03 : -0.03);
+      const theta = frac * 0.52 + (frac >= 0 ? 0.08 : -0.08);
       const pts = buildSculptedLock({
         thetaStart: theta * 0.55, thetaEnd: theta,
-        phiStart: 0.3 + Math.abs(frac) * 0.08, phiEnd: bluntBrowPhi + frac * frac * 0.05 + (nhRand() - 0.5) * 0.004,
-        baseLift: 0.005, midArch: 0.003, tipFlickOut: 0.008, napeHug: 1.05,
+        phiStart: 0.3 + Math.abs(frac) * 0.08, phiEnd: bluntBrowPhi + frac * frac * 0.04,
+        baseLift: 0.003, midArch: 0.001, tipFlickOut: 0.004, napeHug: 1.0,
       });
       specs.push({
-        pointsLocal: pts, width: 0.075 * wMul, thickness: 0.011, stiffnessBias: 0.9, layerAO: 0.9,
+        smooth: 3,
+        pointsLocal: pts, width: (Math.abs(frac) < 0.25 ? 0.05 : 0.075) * wMul, thickness: 0.011, stiffnessBias: 0.9, layerAO: 0.9,
         layerOrder: 3, lockNormal: false, scalpRoot: 0.36, isFadeCap: true, fadeStart: 0.97,
       });
     }

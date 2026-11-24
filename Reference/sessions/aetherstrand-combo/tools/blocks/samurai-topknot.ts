@@ -6,20 +6,18 @@
     const knotPhi = 0.3;
     const knotAnchor = skullSurfacePoint(knotTheta, knotPhi, 0.012);
     // hairline: high forehead, receding temples, short sideburn in front of the ear, tapered nape
-    const cutKnots: Array<[number, number]> = [
-      [0, 1.24], [0.22, 1.14], [0.55, 1.12], [0.9, 1.26], [1.15, 1.52], [1.3, 1.72],
-      [1.5, 1.72], [1.9, 1.72], [2.25, 1.84], [2.6, 1.96], [2.9, 2.22], [Math.PI, 2.52],
-    ];
-    const cutPhi = (th: number): number => {
-      const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
-      for (let k = 1; k < cutKnots.length; k++) {
-        if (a <= cutKnots[k][0]) {
-          const u = (a - cutKnots[k - 1][0]) / (cutKnots[k][0] - cutKnots[k - 1][0]);
-          return THREE.MathUtils.lerp(cutKnots[k - 1][1], cutKnots[k][1], u * u * (3 - 2 * u));
+    const frontKnots: Array<[number, number]> = [[0, 1.24], [0.22, 1.14], [0.55, 1.12], [0.9, 1.26], [1.15, 1.40], [1.3, 1.50]];
+    const frontHair = (a: number): number => {
+      for (let k = 1; k < frontKnots.length; k++) {
+        if (a <= frontKnots[k][0]) {
+          const u = (a - frontKnots[k - 1][0]) / (frontKnots[k][0] - frontKnots[k - 1][0]);
+          return THREE.MathUtils.lerp(frontKnots[k - 1][1], frontKnots[k][1], u * u * (3 - 2 * u));
         }
       }
-      return cutKnots[cutKnots.length - 1][1];
+      return frontKnots[frontKnots.length - 1][1];
     };
+    const cutPhi = (th: number): number =>
+      earAlignedCutPhi(th, { hairlinePhi: frontHair, templeRecede: 0, sideburnLength: 0.95, sideburnTaper: 0.32, earClearance: 0.12, napePhi: 2.52, napeCurve: 1.8 });
 
     // Zone 1: scalp cover under the pulled strands (snug, no scalp showing)
     for (let tier = 0; tier < 2; tier++) {

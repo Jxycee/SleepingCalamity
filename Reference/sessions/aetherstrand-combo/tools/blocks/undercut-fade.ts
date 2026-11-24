@@ -1,25 +1,13 @@
   if (arch === 'undercut-fade') {
     const sweepSign = config.bangsSweep >= 0 ? 1 : -1;
-    const fadeSideEnd = THREE.MathUtils.lerp(1.5, 1.66, config.sideLength); // fade ends at the ear top
     const fadeNapeEnd = THREE.MathUtils.lerp(1.9, 2.1, config.backLength);
     const frontHairline = 1.28;
     const smooth01 = (x: number) => { const c = THREE.MathUtils.clamp(x, 0, 1); return c * c * (3 - 2 * c); };
     const mkU = (sd: number) => { let st = (sd >>> 0) || 1; return () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }; };
     const seedU = (config.seed || 1337);
     const rS1 = mkU(seedU + 11), rS2 = mkU(seedU + 22), rS3 = mkU(seedU + 33), rS4 = mkU(seedU + 44), rS5 = mkU(seedU + 55);
-    // cut line phi(|theta|): forehead hairline, receding temple corner, pointed sideburn, ear arch, curved nape
-    const cutKnots: Array<[number, number]> = [[0.7, frontHairline], [1.1, frontHairline - 0.12], [1.38, fadeSideEnd + 0.10], [1.56, fadeSideEnd + 0.08], [1.78, fadeSideEnd - 0.06], [2.05, fadeSideEnd + 0.04], [2.5, THREE.MathUtils.lerp(fadeSideEnd + 0.04, fadeNapeEnd - 0.04, 0.6)], [3.1416, fadeNapeEnd - 0.02]];
-    const cutPhi = (th: number): number => {
-      const a = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
-      if (a <= cutKnots[0][0]) return cutKnots[0][1];
-      for (let k = 1; k < cutKnots.length; k++) {
-        if (a <= cutKnots[k][0]) {
-          const f = smooth01((a - cutKnots[k - 1][0]) / (cutKnots[k][0] - cutKnots[k - 1][0]));
-          return THREE.MathUtils.lerp(cutKnots[k - 1][1], cutKnots[k][1], f);
-        }
-      }
-      return cutKnots[cutKnots.length - 1][1];
-    };
+    // cut line phi(|theta|): shared ear-aligned helper (pointed sideburn in front of the ear, arch over the ear, curved nape)
+    const cutPhi = (th: number): number => earAlignedCutPhi(th, { hairlinePhi: frontHairline, templeRecede: 0.12, sideburnLength: THREE.MathUtils.lerp(1.1, 1.3, config.sideLength), sideburnTaper: 0.30, earClearance: 0.06, napePhi: fadeNapeEnd, napeCurve: 1.3 });
     const domePt = (x: number, z: number, lift: number): THREE.Vector3 => {
       const nx = x / SCALP_RX;
       const nz = z / SCALP_RZ;

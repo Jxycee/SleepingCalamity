@@ -11,12 +11,12 @@
       const last = pts.length - 1;
       for (let n = 2; n <= last; n++) {
         const t = n / last;
-        const w = (Math.sin(t * TAU * 1.8 + phase) * amp + Math.sin(t * TAU * 3.1 + phase * 1.9) * amp * 0.18) * Math.pow(t, 0.7);
+        const w = (Math.sin(t * TAU * 1.8 + phase) * amp + Math.sin(t * TAU * 1.0 + phase * 0.7 + 1.3) * amp * 0.5 * Math.pow(t, 2.5)) * Math.pow(t, 0.7);
         const dd = Math.max(0, eqY - pts[n].y - 0.24);
-        const c = n >= last - 3 ? Math.pow((n - (last - 3)) / 3, 2) : 0;
-        const out = layerOut * Math.min(1, t * 2.2) + clear * 0.3 * (1 - Math.exp(-dd * 4.2)) + c * 0.02;
-        pts[n].x += tx * (w + curl * c * 0.035) + ox * out;
-        pts[n].z += tz * (w + curl * c * 0.05) + oz * out;
+        const c = n >= last - 4 ? Math.pow((n - (last - 4)) / 4, 2) : 0;
+        const out = layerOut * Math.min(1, t * 2.2) + clear * 0.3 * (1 - Math.exp(-dd * 4.2)) + c * 0.03 * curl;
+        pts[n].x += tx * (w + curl * c * 0.06) + ox * out;
+        pts[n].z += tz * (w + curl * c * 0.06) + oz * out;
       }
     };
     const rShell = seededRand((config.seed || 1) + 11);
@@ -39,6 +39,7 @@
           baseLift: 0.008, midArch: 0.010, tipFlickOut: 0.006, napeHug: 0.8,
         });
         specs.push({
+          smooth: 3,
           pointsLocal: pts, width: 0.09 * wMul, thickness: 0.012,
           stiffnessBias: 0.8, layerAO: 0.7, layerOrder: 0, isBaseShell: true,
           lockNormal: false, scalpRoot: tier === 0 ? 0.45 : 0.22,
@@ -46,20 +47,27 @@
       }
     }
 
-    // Zone 1b: hairline fringe along the part (smooth lift, swept from the part)
-    for (let i = 0; i < 44; i++) {
-      const th = -0.95 + (i / 43) * 1.9 + (rFr() - 0.5) * 0.03;
-      const side = th - partTheta >= 0 ? 1 : -1;
-      const near = Math.abs(th - partTheta) < 0.25;
-      const pts = buildSculptedLock({
-        thetaStart: th, thetaEnd: th + side * (near ? 0.1 : 0.32 + rFr() * 0.2),
-        phiStart: 0.12 + rFr() * 0.1, phiEnd: 1.5 + rFr() * 0.12 + (near ? 0.12 : 0),
-        baseLift: 0.022, midArch: 0.016, tipFlickOut: 0.006, napeHug: 0.8,
-      });
-      specs.push({
-        pointsLocal: pts, width: 0.085 * wMul, thickness: 0.012,
-        stiffnessBias: 0.7, layerAO: 0.9, layerOrder: 2, lockNormal: false, scalpRoot: 0.4,
-      });
+    // Zone 1b: face-framing fringe, 3 rows of narrow overlapping locks swept from the part behind the ears
+    for (let row = 0; row < 3; row++) {
+      const nR = 30;
+      for (let i = 0; i < nR; i++) {
+        const th = -0.9 + ((i + row * 0.33) / nR) * 1.8 + (rFr() - 0.5) * 0.02;
+        const dPart = th - partTheta;
+        const side = dPart >= 0 ? 1 : -1;
+        const nearPart = Math.abs(dPart) < 0.07;
+        const pts = buildSculptedLock({
+          thetaStart: th, thetaEnd: side * (2.05 + row * 0.1 + rFr() * 0.25),
+          phiStart: nearPart ? 0.5 : 0.18 + row * 0.08 + rFr() * 0.08,
+          phiEnd: 2.45 + row * 0.25 + rFr() * 0.3,
+          baseLift: 0.018 + row * 0.004, midArch: 0.016, tipFlickOut: 0.012, napeHug: 0.7,
+        });
+        wavify(pts, side * 2.1, 0.05, TAU * th * 0.55 + row, 0.02 + row * 0.015, 1.0, side);
+        specs.push({
+          smooth: 3,
+          pointsLocal: pts, width: (0.06 + row * 0.005) * wMul, thickness: 0.012,
+          stiffnessBias: 0.7, layerAO: 0.86, layerOrder: 4 + row, lockNormal: false, scalpRoot: 0.4,
+        });
+      }
     }
 
     // Zone 2: three depth layers of wide overlapping wavy locks
@@ -74,21 +82,21 @@
         const isBack = cosT < -0.2;
         const side = th - partTheta >= 0 ? 1 : -1;
         const phiStart = isFront ? 0.30 + rMid() * 0.25 : 0.10 + layer * 0.10 + rMid() * 0.14;
-        const step = Math.floor(rMid() * 4) / 3; // 4 length steps: rounded flowing ends
+        const step = rMid(); // continuous length variation: ragged soft hem
         let thEnd = th;
         let phiEnd: number;
         if (isFront) {
           // face-framing waves: front locks fall in front of the ear; others swept behind it
-          const framing = Math.abs(th) > 0.6 && Math.abs(th) < 1.2 && layer >= 1 && i % 5 === 0;
+          const framing = false;
           thEnd = side * (framing ? 1.45 + rMid() * 0.1 : 2.05 + rMid() * 0.3);
-          phiEnd = (framing ? 3.4 : THREE.MathUtils.lerp(2.9, 3.5, config.bangsLength)) - step * 0.25;
+          phiEnd = (framing ? 3.4 : THREE.MathUtils.lerp(2.9, 3.5, config.bangsLength)) - step * 0.4;
         } else if (!isBack) {
           const s = th >= 0 ? 1 : -1;
           thEnd = Math.abs(th) < 2.05 ? s * (2.1 + rMid() * 0.3) : th;
-          phiEnd = sideEnd - step * 0.28;
+          phiEnd = sideEnd - step * 0.45;
         } else {
           thEnd = th + (rMid() - 0.5) * 0.1;
-          phiEnd = backEnd - step * 0.32;
+          phiEnd = backEnd - step * 0.55;
         }
         const phase = TAU * (th * 0.55 + layer * 0.12) + step * 0.6;
         const pts = buildSculptedLock({
@@ -97,13 +105,14 @@
           midArch: 0.016 + layer * 0.008, tipFlickOut: 0.012 + layer * 0.006,
           napeHug: 0.7,
         });
-        wavify(pts, thEnd, 0.105 + layer * 0.012, phase, layerOut[layer], 1.0, Math.sin(th * 5 + layer) >= 0 ? 1 : -1);
+        wavify(pts, thEnd, 0.13 + layer * 0.014, phase, layerOut[layer], 1.0, Math.sin(th * 5 + layer) >= 0 ? 1 : -1);
         specs.push({
+          smooth: 3,
           pointsLocal: pts,
           width: (0.11 + layer * 0.025 + rMid() * 0.03) * wMul,
           thickness: 0.014,
-          stiffnessBias: 0.7 - layer * 0.06, layerAO: 0.8 + layer * 0.07, layerOrder: 1 + layer,
-          lockNormal: layer >= 1, scalpRoot: 0.3 + 0.03 * (2 - layer),
+          stiffnessBias: 0.7 - layer * 0.06, layerAO: 0.78 + layer * 0.06, layerOrder: 1 + layer,
+          lockNormal: false, scalpRoot: 0.3 + 0.03 * (2 - layer),
         });
       }
     }

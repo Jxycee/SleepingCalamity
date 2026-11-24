@@ -1,0 +1,27 @@
+{
+  "name": "GameRealisticDefault",
+  "note": "shader property defaults (plugin AetherStrand_Hair.shader + web uniforms in hairShaders.ts); per-recipe primary/secondary spec values stay in the recipes",
+  "shaderDefaults": {
+    "_FadeOpacity": 0.85,
+    "_FadeSoftness": 0.85,
+    "_FadeReach": 0.45,
+    "_SheenBand": 0.3,
+    "_SheenPower": 14.0,
+    "_ShadowLift": 0.3,
+    "_ClumpVariation": 0.2,
+    "_TipLighten": 0.12
+  },
+  "recommendedRecipeShaderBlock": {
+    "primaryShift": 0.06,
+    "primaryPower": 76,
+    "primaryIntensity": 0.34,
+    "secondaryShift": -0.14,
+    "secondaryPower": 26,
+    "secondaryIntensity": 0.18,
+    "rimIntensity": 0.26,
+    "rimPower": 2.8,
+    "rootAO": 0.5,
+    "grooveDepth": 0.68,
+    "strandVariation": 0.32
+  }
+}

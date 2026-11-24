@@ -18,13 +18,14 @@
     for (let i = 0; i < shellCount; i++) {
       const u = i / (shellCount - 1);
       const theta = THREE.MathUtils.lerp(thLo, thHi, u);
-      const isRear = Math.cos(theta) < -0.30;
+      const isRear = Math.cos(theta) < -0.40;
+      const earCut = earAlignedCutPhi(theta, { hairlinePhi: 1.38, templeRecede: 0, sideburnLength: 0.8, sideburnTaper: 0.32, earClearance: 0.06, napePhi: 1.85 });
       const pb = phiB(theta);
       const pts = buildSculptedLock({
         thetaStart: theta,
         thetaEnd: theta > Math.PI ? Math.min(thHi, theta + 0.45) : Math.max(thLo, theta - 0.45),
         phiStart: pb + 0.05,
-        phiEnd: isRear ? 1.85 : 1.38,
+        phiEnd: isRear ? 1.85 : earCut,
         baseLift: 0.004,
         midArch: 0.003,
         tipFlickOut: 0.0,
@@ -32,10 +33,10 @@
       });
       specs.push({
         pointsLocal: pts,
-        width: 0.075 * wMul,
+        width: 0.075 * wMul * (0.4 + 0.6 * Math.min(1, Math.min(u, 1 - u) / 0.10)),
         thickness: 0.008,
         stiffnessBias: 0.96,
-        layerAO: 0.82,
+        layerAO: 0.74,
         layerOrder: 0,
         isBaseShell: true,
         lockNormal: false,
@@ -43,11 +44,14 @@
       });
     }
 
+    // Zone 1b: real sideburns in front of the ears (shared ear-aligned helper)
+    sideburnLocks(specs, { sideburnLength: 0.8, sideburnTaper: 0.32, count: 8, width: 0.024 * wMul, layerOrder: 2, rootPhi: 1.05 });
+
     // Zone 2: soft thinning fade at the bald edge
-    const rimCount = 48;
+    const rimCount = 64;
     for (let i = 0; i < rimCount; i++) {
       const u = i / (rimCount - 1);
-      const theta = THREE.MathUtils.lerp(thLo - 0.05, thHi + 0.05, u);
+      const theta = THREE.MathUtils.lerp(thLo - 0.28, thHi + 0.28, u);
       const pb = phiB(theta);
       const pts = buildSculptedLock({
         thetaStart: theta,
@@ -114,8 +118,8 @@
         thetaEnd: THREE.MathUtils.lerp(theta, Math.PI, 0.80),
         phiStart,
         phiEnd: tiePhi,
-        baseLift: 0.020 + config.crownVolume * 0.030,
-        midArch: 0.020 + 0.016 * clamp01((phiStart - 0.55) / 0.5),
+        baseLift: 0.016 + config.crownVolume * 0.026 * (0.4 + 0.6 * clamp01((phiStart - 0.45) / 0.5)),
+        midArch: 0.010 + 0.024 * clamp01((phiStart - 0.45) / 0.5),
         tipFlickOut: 0.0,
         napeHug: 1.25,
       });

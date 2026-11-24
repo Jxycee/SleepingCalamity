@@ -130,6 +130,8 @@ namespace AetherStrand
                 ld.lockNormal = AetherStrandJson.B(d, "lockNormal", false);
                 ld.isFadeCap = AetherStrandJson.B(d, "isFadeCap", false);
                 ld.fadeStart = AetherStrandJson.D(d, "fadeStart", double.NaN);
+                ld.smooth = System.Math.Max(1, System.Math.Min(4, (int)System.Math.Round(AetherStrandJson.D(d, "smooth", 1.0))));
+                ld.roundness = System.Math.Max(0.0, System.Math.Min(1.0, AetherStrandJson.D(d, "roundness", 0.0)));
                 if (AetherStrandJson.Has(d, "rootNormal"))
                 {
                     double[] rn = AetherStrandJson.Arr(d["rootNormal"]);

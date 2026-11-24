@@ -44,6 +44,8 @@ namespace AetherStrand
             public double rootRawY = double.NaN;      // NaN: rest[0].y
             public bool isBaseShell, lockNormal, isFadeCap;
             public double fadeStart = double.NaN;     // NaN: default fade curve (alpha 0.25)
+            public int smooth = 1;                    // mesh-only Catmull-Rom subdivision 1..4 (solver stays at N nodes)
+            public double roundness = 0;              // 0..1 tube-like cross-section blend
             public double[] rootNormal = { 0, 1, 0 }; // web head-local
         }
 
